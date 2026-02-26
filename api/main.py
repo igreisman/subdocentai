@@ -295,21 +295,16 @@ def synthesize_extractive(
             else:
                 answer_paragraphs = raw_paragraphs
             # Build body: sentences within each paragraph joined by space,
-            # paragraphs separated by \n\n, total sentence cap of 8
+            # paragraphs separated by \n\n
             result_paras: List[str] = []
-            sent_count = 0
             for para in answer_paragraphs:
                 sents = [s for s in split_sentences(para) if len(s.strip()) >= 15]
                 if not sents:
                     continue
-                remaining = 8 - sent_count
-                if remaining <= 0:
-                    break
-                result_paras.append(" ".join(sents[:remaining]))
-                sent_count += len(sents[:remaining])
+                result_paras.append(" ".join(sents))
             faq_body = "\n\n".join(result_paras).strip()
         sents = chunk_sentences(ch)
-        used_sentences = sents[:8]
+        used_sentences = sents
         if used_sentences:
             citations.append({
                 "source_id": source_id,
@@ -328,7 +323,7 @@ def synthesize_extractive(
                 and any(w in s.lower() for w in want_terms_l)
             ]
             if new:
-                used_sentences.extend(new[:2])
+                used_sentences.extend(new)
                 citations.append({
                     "source_id": src2,
                     "display_citation": ch2.get("display_citation"),
@@ -340,7 +335,7 @@ def synthesize_extractive(
         # fallback: first two sentences of the top chunk
         _, ch, source_id = hits[0]
         sents = split_sentences(ch.get("text", "") or "")
-        used_sentences = sents[:2] if sents else ["(No text available in retrieved chunk.)"]
+        used_sentences = sents if sents else ["(No text available in retrieved chunk.)"]
         citations = [{
             "source_id": source_id,
             "display_citation": ch.get("display_citation"),
@@ -348,13 +343,9 @@ def synthesize_extractive(
         }]
 
     if faq_question and faq_body is not None:
-        if len(faq_body) > 700:
-            faq_body = faq_body[:700].rstrip() + "\u2026"
         answer_short = faq_question + "\n\n" + faq_body
     else:
         answer_short = " ".join(used_sentences).strip()
-        if len(answer_short) > 700:
-            answer_short = answer_short[:700].rstrip() + "…"
 
     return {
         "answer_mode": "standard",
