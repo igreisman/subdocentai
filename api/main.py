@@ -190,10 +190,26 @@ def retrieve(
             if not intent_gate(text, intent):
                 continue
 
-            # For comparison queries, strongly boost chunks that discuss both sides
             effective_weight = weight
+
+            # FAQ question-title match bonus: if the leading '?' paragraph of a
+            # FAQ chunk contains ALL query tokens, it's the best possible match.
+            # Apply a strong multiplier so it always outranks longer docs that
+            # merely contain the same words scattered in their body.
+            raw_paras = [p.strip() for p in re.split(r"\n\n+", text) if p.strip()]
+            if raw_paras and raw_paras[0].rstrip().endswith("?"):
+                title_toks = set(tokenize(raw_paras[0]))
+                q_set = set(q_tokens)
+                if q_set and q_set.issubset(title_toks):
+                    # All query tokens found in the question title → exact match
+                    effective_weight = weight * 4.0
+                elif q_set and len(q_set & title_toks) >= max(1, len(q_set) - 1):
+                    # All but one query token in title → near-exact match
+                    effective_weight = weight * 2.0
+
+            # For comparison queries, strongly boost chunks that discuss both sides
             if intent.get("wants_mark_compare") and _has_both_marks(text):
-                effective_weight = weight * 2.5
+                effective_weight = max(effective_weight, weight * 2.5)
                 # Extra bonus for chunks that use comparison language (analysis vs enumeration)
                 comp_bonus = sum(1 for phrase in COMPARISON_LANGUAGE if phrase in text.lower())
                 hits.append((s * effective_weight + comp_bonus, ch, source_id))
