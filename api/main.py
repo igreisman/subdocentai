@@ -295,7 +295,7 @@ def synthesize_extractive(
         if paragraphs and paragraphs[0].rstrip().endswith("?"):
             text = "\n\n".join(paragraphs[1:])
         sents = split_sentences(text)
-        return [s for s in sents if len(s.strip()) >= 15]
+        return [s for s in sents if len(s.strip()) >= 3]
 
     used_sentences: List[str] = []
     citations: List[Dict[str, Any]] = []
@@ -318,7 +318,7 @@ def synthesize_extractive(
             # paragraphs separated by \n\n
             result_paras: List[str] = []
             for para in answer_paragraphs:
-                sents = [s for s in split_sentences(para) if len(s.strip()) >= 15]
+                sents = [s for s in split_sentences(para) if len(s.strip()) >= 3]
                 if not sents:
                     continue
                 result_paras.append(" ".join(sents))
