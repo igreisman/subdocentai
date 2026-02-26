@@ -316,8 +316,19 @@ def synthesize_extractive(
                 answer_paragraphs = raw_paragraphs
             # Build body: sentences within each paragraph joined by space,
             # paragraphs separated by \n\n
+            # List paragraphs (numbered/bulleted) are preserved verbatim.
+            def is_list_para(p: str) -> bool:
+                lines = [l for l in p.splitlines() if l.strip()]
+                if len(lines) < 2:
+                    return False
+                return (all(re.match(r"^\d+\.\s", l) for l in lines) or
+                        all(l.startswith("•") for l in lines))
+
             result_paras: List[str] = []
             for para in answer_paragraphs:
+                if is_list_para(para):
+                    result_paras.append(para.strip())
+                    continue
                 sents = [s for s in split_sentences(para) if len(s.strip()) >= 3]
                 if not sents:
                     continue
