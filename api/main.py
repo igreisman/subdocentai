@@ -295,21 +295,21 @@ def synthesize_extractive(
             else:
                 answer_paragraphs = raw_paragraphs
             # Build body: sentences within each paragraph joined by space,
-            # paragraphs separated by \n\n, total sentence cap of 5
+            # paragraphs separated by \n\n, total sentence cap of 8
             result_paras: List[str] = []
             sent_count = 0
             for para in answer_paragraphs:
                 sents = [s for s in split_sentences(para) if len(s.strip()) >= 15]
                 if not sents:
                     continue
-                remaining = 5 - sent_count
+                remaining = 8 - sent_count
                 if remaining <= 0:
                     break
                 result_paras.append(" ".join(sents[:remaining]))
                 sent_count += len(sents[:remaining])
             faq_body = "\n\n".join(result_paras).strip()
         sents = chunk_sentences(ch)
-        used_sentences = sents[:5]
+        used_sentences = sents[:8]
         if used_sentences:
             citations.append({
                 "source_id": source_id,
