@@ -67,6 +67,19 @@
     .err {
       color: #b00020;
     }
+
+    .faq-question {
+      font-weight: bold;
+      font-size: 15px;
+      margin-bottom: 10px;
+      color: #222;
+    }
+
+    .faq-body {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      color: #666;
+    }
   </style>
 </head>
 
@@ -150,7 +163,7 @@
 
   <div class="card">
     <h3 style="margin:0 0 10px 0;">Answer</h3>
-    <div id="answer" class="mono muted">No answer yet.</div>
+    <div id="answer" class="muted">No answer yet.</div>
     <div id="what" style="margin-top:10px;"></div>
 
     <h4 style="margin-top:14px;">Citations</h4>
@@ -247,7 +260,22 @@
         }
 
         statusEl.textContent = "Answered.";
-        answerEl.textContent = data.answer_short || "(no answer_short)";
+        const answerText = data.answer_short || "(no answer_short)";
+        const nlIdx = answerText.indexOf('\n\n');
+        if (nlIdx !== -1) {
+          const q = answerText.slice(0, nlIdx);
+          const body = answerText.slice(nlIdx + 2);
+          const escapedBody = body
+            .split('\n\n')
+            .map(p => p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+            .map(p => `<p style="margin:0 0 10px 0;">${p}</p>`)
+            .join('');
+          answerEl.innerHTML =
+            `<div class="faq-question">${q}</div><div class="faq-body">${escapedBody}</div>`;
+        } else {
+          answerEl.className = 'mono muted';
+          answerEl.textContent = answerText;
+        }
         whatEl.textContent = data.what_you_are_seeing ? `🧭 ${data.what_you_are_seeing}` : "";
 
         if (Array.isArray(data.citations) && data.citations.length) {
