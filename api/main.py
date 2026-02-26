@@ -192,20 +192,24 @@ def retrieve(
 
             effective_weight = weight
 
-            # FAQ question-title match bonus: if the leading '?' paragraph of a
-            # FAQ chunk contains ALL query tokens, it's the best possible match.
-            # Apply a strong multiplier so it always outranks longer docs that
-            # merely contain the same words scattered in their body.
+            # FAQ question-title match bonus: reward titles whose vocabulary
+            # closely matches the query. Scale by title coverage so a short,
+            # specific title like "What is a torpedo?" (coverage=1.0) beats
+            # "What is in the after torpedo room?" (coverage=0.33) even when
+            # both contain the only query token "torpedo".
             raw_paras = [p.strip() for p in re.split(r"\n\n+", text) if p.strip()]
             if raw_paras and raw_paras[0].rstrip().endswith("?"):
                 title_toks = set(tokenize(raw_paras[0]))
                 q_set = set(q_tokens)
-                if q_set and q_set.issubset(title_toks):
-                    # All query tokens found in the question title → exact match
-                    effective_weight = weight * 4.0
-                elif q_set and len(q_set & title_toks) >= max(1, len(q_set) - 1):
-                    # All but one query token in title → near-exact match
-                    effective_weight = weight * 2.0
+                if q_set and title_toks:
+                    matched = len(q_set & title_toks)
+                    coverage = matched / len(title_toks)  # fraction of title covered by query
+                    if q_set.issubset(title_toks):
+                        # All query tokens in title: scale 4x by coverage
+                        effective_weight = weight * 4.0 * coverage
+                    elif matched >= max(1, len(q_set) - 1):
+                        # Near-exact (all but one): scale 2x by coverage
+                        effective_weight = weight * 2.0 * coverage
 
             # For comparison queries, strongly boost chunks that discuss both sides
             if intent.get("wants_mark_compare") and _has_both_marks(text):
