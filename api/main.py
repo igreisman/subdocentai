@@ -1,11 +1,18 @@
 # api/main.py
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 import json
 import os
 import re
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from typing import Dict, List, Tuple, Any, Optional
 
 app = FastAPI(title="Pampanito Local RAG Demo")
@@ -18,11 +25,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ------------------------------------------------------------
-# Paths / corpora loading
-# ------------------------------------------------------------
-
+# Serve web/ as static files at /
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WEB_DIR = os.path.join(BASE_DIR, "web")
+if os.path.isdir(WEB_DIR):
+    # Serve tour.html with no-cache so Safari always loads the latest version
+    @app.get("/web/tour.html", include_in_schema=False)
+    def serve_tour_html():
+        return FileResponse(
+            os.path.join(WEB_DIR, "tour.html"),
+            media_type="text/html",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+    app.mount("/web", StaticFiles(directory=WEB_DIR, html=True), name="web")
 CORPORA_DIR = os.path.join(BASE_DIR, "corpora")
 
 TOUR_PATH = os.path.join(CORPORA_DIR, "pampanito_tour_corpus.jsonl")
@@ -31,6 +50,13 @@ SHORTS_PATH = os.path.join(CORPORA_DIR, "dieselsubs_shorts_corpus.jsonl")
 
 # Feature flag: keep demo fully local today; later, flip to true with funding.
 USE_LLM = os.getenv("USE_LLM", "false").lower() in ("1", "true", "yes")
+
+# ── Historian contact email ────────────────────────────────────────────────
+HISTORIAN_EMAIL = os.getenv("HISTORIAN_EMAIL", "irving.greisman@gmail.com")
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")   # set in start_https.sh
+SMTP_PASS = os.getenv("SMTP_PASS", "")   # Gmail App Password
 
 
 def load_jsonl(path: str) -> List[Dict[str, Any]]:
@@ -64,6 +90,64 @@ SHORTS = load_jsonl(SHORTS_PATH)
 print(f"Loaded: {len(TOUR)} tour, {len(FAQ)} faq, {len(SHORTS)} shorts chunks")
 
 
+
+@app.post("/contact")
+async def contact(
+    question_text: str = Form(""),
+    visitor_response: str = Form(""),
+    lang: str = Form("en"),
+    audio: Optional[UploadFile] = File(None),
+):
+    """Receive a visitor question + contact response and email the historian."""
+    question = question_text.strip()
+    visitor_response = visitor_response.strip()
+
+    lang_label = {
+        "en": "English", "fr": "French", "de": "German",
+        "es": "Spanish", "zh": "Chinese", "ja": "Japanese",
+    }.get(lang, lang)
+
+    body = (
+        f"Tour language: {lang_label}\n\n"
+        f"Visitor question (as heard in {lang_label}):\n{question}\n\n"
+        f"Visitor contact info:\n{visitor_response}"
+    )
+    print(f"[CONTACT] {body}")
+
+    if not SMTP_USER or not SMTP_PASS:
+        return {"status": "logged", "note": "Set SMTP_USER and SMTP_PASS env vars to enable email."}
+
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = SMTP_USER
+        msg["To"] = HISTORIAN_EMAIL
+        msg["Subject"] = "Pampanito Visitor Question"
+        msg.attach(MIMEText(body, "plain"))
+
+        # Attach audio recording if provided
+        if audio:
+            audio_bytes = await audio.read()
+            if audio_bytes:
+                ct = (audio.content_type or "audio/webm")
+                ext = "mp4" if "mp4" in ct else "webm"
+                part = MIMEBase("audio", ext)
+                part.set_payload(audio_bytes)
+                encoders.encode_base64(part)
+                part.add_header("Content-Disposition", "attachment", filename=f"question.{ext}")
+                msg.attach(part)
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.send_message(msg)
+
+        return {"status": "sent"}
+    except Exception as e:
+        print(f"[CONTACT] Email send failed: {e}")
+        return {"status": "error", "detail": str(e)}
+
+
 @app.get("/health")
 def health():
     return {
@@ -84,7 +168,17 @@ STOPWORDS = {
     "the", "a", "an", "what", "were", "was", "is", "are", "of", "on", "in",
     "to", "and", "for", "some", "between", "did", "do", "does", "you",
     "it", "that", "this", "with", "as", "at", "by", "from", "about",
-    "whats", "what’s", "difference", "please", "tell", "me"
+    "whats", "what's", "difference", "please", "tell", "me",
+    # question / wh- words that carry no domain meaning on their own
+    "where", "how", "why", "when", "who", "which", "whose", "whom",
+    # directional/location words too common on a submarine to be useful signals
+    "after", "forward",
+    # context-universal words: every chunk is about a submarine/boat
+    "submarine", "boat", "sub",
+    # ultra-generic verbs / pronouns with no domain signal
+    "got", "get", "gets", "gotten", "happened", "happen",
+    "someone", "something", "somebody", "anyone", "anything",
+    "people", "person", "things", "thing",
 }
 
 
@@ -97,13 +191,60 @@ def tokenize(text: str) -> List[str]:
     return toks
 
 
+# Synonym expansion applied to query tokens before scoring.
+# Maps a query word to extra tokens that count as a match in the corpus.
+QUERY_SYNONYMS: Dict[str, List[str]] = {
+    "eat":    ["ate", "eaten", "eating", "food", "meal", "meals", "galley", "mess", "chow", "cook", "cooks", "cooked", "dining", "breakfast", "lunch", "dinner"],
+    "ate":    ["eat", "eaten", "food", "meal", "meals", "galley", "mess", "chow"],
+    "food":   ["eat", "ate", "meal", "meals", "galley", "mess", "chow", "cook", "cooked"],
+    "sleep":  ["slept", "sleeping", "bunk", "bunks", "bed", "beds", "rack", "racks", "berthing"],
+    "slept":  ["sleep", "bunk", "bunks", "bed", "beds", "rack", "racks"],
+    "work":   ["worked", "working", "duty", "watch", "operate", "operated", "station"],
+    "live":   ["lived", "living", "berthing", "bunk", "quarters", "crew"],
+    "shower": ["showers", "bath", "wash", "washing", "hygiene", "head"],
+    "toilet": ["head", "restroom", "bathroom", "latrine"],
+    "gun":    ["guns", "deck gun", "cannon", "weapon", "weapons", "armament"],
+    "shoot":  ["fire", "fired", "firing", "launch", "launched", "torpedo", "attack"],
+    "dive":   ["dived", "diving", "submerge", "submerged", "submerging", "crash dive"],
+    "speed":  ["knots", "fast", "faster", "slow", "slower", "velocity"],
+    "engine": ["engines", "motor", "motors", "diesel", "electric", "power", "drive"],
+    # crew-size questions: "men" and "served" should find crew/complement content
+    "men":    ["crew", "sailors", "crewmen", "enlisted", "personnel", "complement"],
+    "served": ["crew", "crewmen", "complement", "enlisted", "assigned"],
+    "crew":   ["men", "sailors", "crewmen", "complement", "personnel", "enlisted"],
+    # illness / medical questions
+    "sick":    ["ill", "illness", "health", "doctor", "pharmacist", "medical", "medicine", "injury", "injured", "wound", "wounded", "hurt"],
+    "ill":     ["sick", "illness", "health", "doctor", "pharmacist", "medical"],
+    "doctor":  ["pharmacist", "medical", "health", "sick", "ill", "medicine"],
+    "medical": ["doctor", "pharmacist", "health", "sick", "ill", "medicine", "injury"],
+    "hurt":    ["injured", "injury", "wound", "wounded", "sick", "ill", "medical"],
+}
+
+
+def expand_query_tokens(tokens: List[str]) -> List[str]:
+    """Return query tokens plus corpus-side synonyms for better vocabulary coverage."""
+    expanded = list(tokens)
+    seen = set(tokens)
+    for t in tokens:
+        for syn in QUERY_SYNONYMS.get(t, []):
+            if syn not in seen:
+                expanded.append(syn)
+                seen.add(syn)
+    return expanded
+
+
 def overlap_score(query_tokens: List[str], text: str) -> int:
-    """Count unique token overlap to avoid stopword hijacking."""
+    """Count token overlap using synonym-expanded query against text.
+    Multiple matches from the same synonym group each count separately,
+    so a food-rich chunk (breakfast + meal + galley) outranks one with a
+    single synonym hit.  We avoid synonym inflation by not mapping generic
+    terms (like 'officers') into the synonym table."""
+    expanded = expand_query_tokens(query_tokens)
     text_tokens = set(tokenize(text))
-    return len(set(query_tokens) & text_tokens)
+    return len(set(expanded) & text_tokens)
 
 
-def detect_intent(query_tokens: List[str]) -> Dict[str, Any]:
+def detect_intent(query_tokens: List[str], raw_question: str = "") -> Dict[str, Any]:
     """
     Very lightweight intent detection used only to gate obviously-wrong hits.
     """
@@ -113,8 +254,23 @@ def detect_intent(query_tokens: List[str]) -> Dict[str, Any]:
         ("torpedo" in tset and "mark" in tset)
     )
 
+    # Quantity question: "how many", "how much", "what number", etc.
+    raw_lower = raw_question.lower()
+    wants_quantity = bool(
+        re.search(r"how many|how much|how\s+\w+\s+(are|were|is|was)\b", raw_lower) or
+        "many" in tset or "count" in tset or "number of" in raw_lower
+    )
+
+    # Location question: starts with "where" or contains key where-phrases
+    is_where_question = bool(
+        re.match(r"\s*where\b", raw_lower) or
+        re.search(r"\bwhere (did|do|does|is|are|was|were|can)\b", raw_lower)
+    )
+
     return {
-        "wants_mark_compare": wants_mark_compare
+        "wants_mark_compare": wants_mark_compare,
+        "wants_quantity": wants_quantity,
+        "is_where_question": is_where_question,
     }
 
 
@@ -164,7 +320,7 @@ def retrieve(
     - Intent gating to prevent obviously wrong matches.
     """
     q_tokens = tokenize(question_text)
-    intent = detect_intent(q_tokens)
+    intent = detect_intent(q_tokens, question_text)
 
     hits: List[Hit] = []
 
@@ -202,10 +358,20 @@ def retrieve(
                 title_toks = set(tokenize(raw_paras[0]))
                 q_set = set(q_tokens)
                 if q_set and title_toks:
-                    matched = len(q_set & title_toks)
+                    # Use synonym-expanded query tokens so e.g. "served"→"assigned"
+                    # still matches a FAQ title like "How many men were assigned?"
+                    q_expanded_set = set(expand_query_tokens(q_tokens))
+                    matched = len(q_expanded_set & title_toks)
                     coverage = matched / len(title_toks)  # fraction of title covered by query
-                    if q_set.issubset(title_toks):
-                        # All query tokens in title: scale 4x by coverage
+                    # "All covered" = every original query token appears directly
+                    # or via synonym expansion in the title
+                    all_q_covered = all(
+                        t in title_toks or
+                        any(syn in title_toks for syn in QUERY_SYNONYMS.get(t, []))
+                        for t in q_set
+                    )
+                    if all_q_covered:
+                        # All query intent represented in title: scale 4x by coverage
                         effective_weight = weight * 4.0 * coverage
                     elif matched >= max(1, len(q_set) - 1):
                         # Near-exact (all but one): scale 2x by coverage
@@ -219,10 +385,24 @@ def retrieve(
                 hits.append((s * effective_weight + comp_bonus, ch, source_id))
                 continue
 
+            # For quantity questions, boost chunks that actually contain a number —
+            # they are far more likely to directly answer "how many" questions.
+            if intent.get("wants_quantity") and re.search(
+                r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten"
+                r"|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen"
+                r"|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy"
+                r"|eighty|ninety|hundred|thousand|dozen)\b",
+                text, re.I
+            ):
+                effective_weight *= 1.5
+
             hits.append((s * effective_weight, ch, source_id))
 
-    # Tour (current compartment only)
-    add_hits(TOUR, "pampanito_tour", weight=3.0, compartment_filter=True)
+    # Tour – search all compartments; current compartment chunks naturally
+    # score highest because they share the most vocabulary with a question
+    # asked while standing there.  Restricting to the current compartment
+    # caused cross-compartment "where is X?" questions to miss the right chunk.
+    add_hits(TOUR, "pampanito_tour", weight=3.0, compartment_filter=False)
 
     # FAQ (global)
     add_hits(FAQ, "dieselsubs_faq", weight=1.2, compartment_filter=False)
@@ -274,12 +454,15 @@ def synthesize_extractive(
     - Supplements with 1-2 sentences from a second chunk if needed.
     """
     q_tokens = tokenize(question_text)
-    intent = detect_intent(q_tokens)
+    intent = detect_intent(q_tokens, question_text)
 
     if intent.get("wants_mark_compare"):
         want_terms = MARK_COMPARE_SIGNAL_TERMS
     else:
-        want_terms = [t for t in q_tokens if len(t) > 2]
+        # Expand query terms with synonyms so sentence filtering can match
+        # corpus vocabulary that differs from the user's phrasing
+        # (e.g. "eat" matches "ate", "galley", "food" etc.)
+        want_terms = expand_query_tokens([t for t in q_tokens if len(t) > 2])
     want_terms_l = [w.lower() for w in want_terms]
 
     def chunk_sentences(ch: Dict[str, Any]) -> List[str]:
@@ -302,7 +485,10 @@ def synthesize_extractive(
     faq_question: Optional[str] = None
     faq_body: Optional[str] = None  # paragraph-structured body, set for FAQ chunks
 
-    # Primary chunk: up to 5 sentences in original order
+    # Primary chunk: sentences in original order, but for tour chunks
+    # restrict to sentences containing at least one query term so a chunk
+    # that only mentions "periscopes" in passing doesn't flood the answer
+    # with unrelated content.  FAQ/shorts keep their full paragraph body.
     if hits:
         _, ch, source_id = hits[0]
         # For FAQ chunks: capture the question and build a paragraph-structured body
@@ -334,8 +520,18 @@ def synthesize_extractive(
                     continue
                 result_paras.append(" ".join(sents))
             faq_body = "\n\n".join(result_paras).strip()
-        sents = chunk_sentences(ch)
-        used_sentences = sents
+            sents = chunk_sentences(ch)
+            used_sentences = sents
+        else:
+            # Tour / shorts chunk: only keep sentences that contain a query term.
+            # This prevents a chunk that mentions a term in passing from flooding
+            # the answer with off-topic content.
+            sents = chunk_sentences(ch)
+            if want_terms_l:
+                filtered = [s for s in sents if any(w in s.lower() for w in want_terms_l)]
+            else:
+                filtered = sents
+            used_sentences = filtered  # may be empty; secondary loop will supplement
         if used_sentences:
             citations.append({
                 "source_id": source_id,
@@ -363,24 +559,122 @@ def synthesize_extractive(
                 break
 
     if not used_sentences:
-        # fallback: first two sentences of the top chunk
-        _, ch, source_id = hits[0]
-        sents = split_sentences(ch.get("text", "") or "")
-        used_sentences = sents if sents else ["(No text available in retrieved chunk.)"]
-        citations = [{
-            "source_id": source_id,
-            "display_citation": ch.get("display_citation"),
-            "chunk_id": ch.get("chunk_id"),
-        }]
+        # fallback: try any hit that has sentences containing query terms,
+        # preferring FAQ/shorts over tour for this last-resort path
+        for _, ch_fb, src_fb in sorted(hits, key=lambda h: 0 if h[2] != "pampanito_tour" else 1):
+            sents_fb = split_sentences(ch_fb.get("text", "") or "")
+            rel = [s for s in sents_fb if any(w in s.lower() for w in want_terms_l)] if want_terms_l else sents_fb[:2]
+            if rel:
+                used_sentences = rel[:3]
+                citations = [{
+                    "source_id": src_fb,
+                    "display_citation": ch_fb.get("display_citation"),
+                    "chunk_id": ch_fb.get("chunk_id"),
+                }]
+                break
+        # absolute last resort: first two sentences of the top chunk
+        if not used_sentences:
+            _, ch, source_id = hits[0]
+            sents = split_sentences(ch.get("text", "") or "")
+            used_sentences = sents[:2] if sents else ["(No text available in retrieved chunk.)"]
+            citations = [{
+                "source_id": source_id,
+                "display_citation": ch.get("display_citation"),
+                "chunk_id": ch.get("chunk_id"),
+            }]
 
     if faq_question and faq_body is not None:
         answer_short = faq_question + "\n\n" + faq_body
     else:
         answer_short = " ".join(used_sentences).strip()
 
+    # For WHERE questions answered from a tour chunk, prepend the location name
+    # so the visitor gets a direct answer before the elaborating content.
+    if intent.get("is_where_question") and hits and answer_short:
+        top_ch = hits[0][1]
+        loc = (top_ch.get("location_context") or "").strip()
+        # Only prepend if it's a tour chunk (not FAQ) and the answer doesn't
+        # already open with the location name.
+        if loc and hits[0][2] == "pampanito_tour" and not answer_short.lower().startswith(loc.lower()):
+            answer_short = f"In the {loc}. " + answer_short
+
+    # Remove spoken filler words that appear in oral-history transcripts.
+    # Patterns handled:
+    #   "uh,"  "uh."  "uh "      → dropped with surrounding punctuation/space
+    #   ", uh,"  ", uh "         → comma cleaned up
+    #   "I, uh, said"            → "I said"
+    def clean_speech_fillers(text: str) -> str:
+        # Fillers surrounded by commas:  ", uh,"  → ","
+        text = re.sub(r",\s*\b(uh|um|er|ah|uhh|umm)\b\s*,", ",", text, flags=re.I)
+        # Filler at start of sentence or after comma with trailing comma/space
+        text = re.sub(r"(?<![a-z])\b(uh|um|er|ah|uhh|umm)\b[,\s]+", " ", text, flags=re.I)
+        # Filler at end before punctuation
+        text = re.sub(r",?\s*\b(uh|um|er|ah|uhh|umm)\b\s*(?=[.!?])", "", text, flags=re.I)
+        # Dangling leading comma after removal:  ", said" → " said"
+        text = re.sub(r"\s*,\s*,", ",", text)
+        # Clean up extra spaces
+        text = re.sub(r"  +", " ", text)
+        return text.strip()
+
+    answer_short = clean_speech_fillers(answer_short)
+
+    # Detect partial match:
+    # 1. None of the subject query terms appear in the final answer, OR
+    # 2. It was a quantity question ("how many X") but no sentence that
+    #    contains the *counted noun* also contains a number/quantity word.
+    NUMBER_WORDS = re.compile(
+        r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten"
+        r"|eleven|twelve|dozen|several|numerous|multiple)\b", re.I
+    )
+
+    def answer_has_quantity_for_subject(text: str, count_subject: List[str]) -> bool:
+        """True if any sentence contains both a count-subject term and a number."""
+        if not count_subject:
+            return bool(NUMBER_WORDS.search(text))
+        for sent in split_sentences(text):
+            sl = sent.lower()
+            if any(w in sl for w in count_subject) and NUMBER_WORDS.search(sl):
+                return True
+        return False
+
+    # Extract the noun being counted from the raw question:
+    # e.g. "how many bunks are there" → ["bunks"]
+    # Only grab the first 1-2 words after "how many" to avoid absorbing
+    # location phrases like "in after torpedo room" as the subject.
+    count_subject: List[str] = []
+    qty_match = re.search(r"how\s+many\s+(\w+(?:\s+\w+)?)", question_text.lower())
+    if qty_match:
+        candidate_toks = [t for t in tokenize(qty_match.group(1)) if len(t) > 2]
+        # Drop location/directional words that would pollute quantity checking
+        LOCATION_WORDS = {"after", "forward", "room", "compartment", "area", "section"}
+        count_subject = [t for t in candidate_toks if t not in LOCATION_WORDS]
+
+    # Detect evaluative/superlative questions: "worst X", "best X", "hardest X", etc.
+    # If the question asks for a judgment but the answer doesn't address it, flag partial.
+    SUPERLATIVE_RE = re.compile(
+        r"\b(worst|best|hardest|easiest|longest|shortest|hottest|coldest"
+        r"|most\s+\w+|least\s+\w+|most|least|farthest|nearest|highest|lowest"
+        r"|biggest|smallest|largest|toughest|roughest|worst.case)\b",
+        re.I
+    )
+    superlatives_in_q = SUPERLATIVE_RE.findall(question_text.lower())
+    answer_missing_superlative = bool(superlatives_in_q) and not any(
+        s.strip() in answer_short.lower() for s in superlatives_in_q
+    )
+
+    partial_match = (
+        (bool(want_terms_l) and not any(w in answer_short.lower() for w in want_terms_l))
+        or (
+            intent.get("wants_quantity")
+            and not answer_has_quantity_for_subject(answer_short, count_subject or [w for w in want_terms_l if w not in {"many", "much", "count"}])
+        )
+        or answer_missing_superlative
+    )
+
     return {
         "answer_mode": "standard",
         "answer_short": answer_short,
+        "partial_match": partial_match,
         "answer_deep": None,
         "what_you_are_seeing": None,
         "citations": citations[:2],

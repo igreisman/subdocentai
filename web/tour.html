@@ -1,0 +1,1381 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>USS Pampanito — Audio Tour</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, system-ui, sans-serif;
+      background: #0a0f1a;
+      color: #e8e8e8;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: #0d1525;
+      border-bottom: 1px solid #1e2d4a;
+    }
+
+    header h1 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: .03em;
+      color: #c9d8f0;
+    }
+
+    header .sub {
+      font-size: 12px;
+      color: #607090;
+    }
+
+    #settingsBtn {
+      display: none;
+      background: none;
+      border: none;
+      border-radius: 6px;
+      color: #607090;
+      font-size: 13px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+
+    #settingsBtn:hover {
+      color: #c9d8f0;
+    }
+
+    #headerLang {
+      margin-top: 6px;
+      background: #0d1525;
+      border: 1px solid #2a3a5a;
+      border-radius: 4px;
+      color: #8aa0c0;
+      font-size: 12px;
+      padding: 3px 8px;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    /* ── Main layout ─────────────────────────────────── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 20px 16px;
+      gap: 20px;
+      max-width: 680px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ── Compartment badge ───────────────────────────── */
+    #compartmentBadge {
+      text-align: center;
+    }
+
+
+    #selectSizer {
+      position: fixed;
+      top: -9999px;
+      left: -9999px;
+      width: max-content;
+      visibility: hidden;
+      white-space: pre;
+      font-size: 26px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    #stopsWrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #stopsWrap::after {
+      content: '▾';
+      font-size: 28px;
+      color: #2d3f55;
+      pointer-events: none;
+      flex-shrink: 0;
+      position: relative;
+      top: -2px;
+    }
+
+    #stopsSelect {
+      font-size: 26px;
+      font-weight: 700;
+      color: #c9d8f0;
+      background: transparent;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      padding: 2px 4px 2px 0;
+    }
+
+    #stopsSelect option {
+      background: #0d1525;
+      color: #c9d8f0;
+      font-size: 15px;
+      font-weight: normal;
+    }
+
+    #progressMeta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    #trackCounter {
+      font-size: 12px;
+      color: #607090;
+    }
+
+    /* ── Waveform / progress ─────────────────────────── */
+    #progressWrap {
+      width: 100%;
+      background: #151e30;
+      border-radius: 4px;
+      height: 6px;
+      cursor: pointer;
+      position: relative;
+      overflow: visible;
+    }
+
+    #progressBar {
+      height: 100%;
+      background: #3a78cc;
+      border-radius: 4px;
+      width: 0%;
+      transition: width .25s linear;
+      pointer-events: none;
+    }
+
+    #timecode {
+      font-size: 12px;
+      color: #607090;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Transport controls ──────────────────────────── */
+    #transport {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .tBtn {
+      background: #151e30;
+      border: 1px solid #1e2d4a;
+      border-radius: 50%;
+      color: #c9d8f0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .15s, border-color .15s;
+    }
+
+    .tBtn:hover {
+      background: #1e2d4a;
+      border-color: #3a78cc;
+    }
+
+    #playPauseBtn {
+      width: 36px;
+      height: 36px;
+      font-size: 16px;
+      margin: 0 8px;
+    }
+
+    #micBtn {
+      width: 36px;
+      height: 36px;
+      font-size: 18px;
+      margin: 0 8px;
+    }
+
+    #micBtn.listening {
+      background: #7a1a1a;
+      border-color: #cc3a3a;
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    #micBtn.answering {
+      background: #3a1a1a;
+      border-color: #7a3a3a;
+    }
+
+    #askStatus {
+      margin-top: 6px;
+      min-height: 18px;
+    }
+
+    #askStatusMsg {
+      display: block;
+      font-size: 12px;
+      color: #607090;
+      text-align: center;
+      min-height: 18px;
+    }
+
+    /* ── Answer panel ────────────────────────────────── */
+    #answerPanel {
+      width: 100%;
+      background: #0d1525;
+      border: 1px solid #1e2d4a;
+      border-radius: 12px;
+      padding: 16px;
+      display: none;
+    }
+
+    #answerPanel.visible {
+      display: block;
+    }
+
+    #questionEcho {
+      font-size: 13px;
+      color: #4a7abf;
+      margin-bottom: 10px;
+      font-style: italic;
+    }
+
+    #answerText {
+      margin-top: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #c9d8f0;
+    }
+
+    .partial-match-note {
+      font-size: 12px;
+      font-style: italic;
+      color: #607090;
+      margin-bottom: 8px;
+    }
+
+    .faq-question {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: #c9d8f0;
+    }
+
+    .faq-body {
+      font-size: 14px;
+      line-height: 1.55;
+      color: #b0c0d8;
+    }
+
+    .faq-body p {
+      margin-bottom: 8px;
+    }
+
+    .faq-body ol,
+    .faq-body ul {
+      padding-left: 1.6em;
+      margin-bottom: 8px;
+    }
+
+    .faq-body li {
+      margin-bottom: 3px;
+    }
+
+    /* ── Suggestion chips ─────────────────────────────── */
+    #suggestionsRow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+      width: 100%;
+    }
+
+    .sugChip {
+      background: #0d1a30;
+      border: 1px solid #2a4a7a;
+      border-radius: 20px;
+      color: #7aaee8;
+      font-size: 12px;
+      line-height: 1.3;
+      padding: 6px 14px;
+      cursor: pointer;
+      text-align: left;
+      flex: 1 1 calc(33% - 8px);
+      min-width: 0;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .sugChip:active {
+      background: #162540;
+      border-color: #4a7abf;
+    }
+
+    /* ── Settings modal ──────────────────────────────── */
+    #settingsModal {
+      background: #0d1525;
+      border: 1px solid #2a3a5a;
+      border-radius: 12px;
+      padding: 22px 24px;
+      max-width: 420px;
+      width: 90%;
+      color: #c9d8f0;
+    }
+
+    #settingsModal::backdrop {
+      background: rgba(0, 0, 0, .6);
+    }
+
+    #settingsModal h2 {
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      font-size: 12px;
+      color: #607090;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      background: #151e30;
+      border: 1px solid #2a3a5a;
+      border-radius: 6px;
+      color: #c9d8f0;
+      font-size: 14px;
+      padding: 8px 10px;
+    }
+
+    .field .hint {
+      font-size: 11px;
+      color: #4a5a7a;
+      margin-top: 4px;
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .modal-btns button {
+      flex: 1;
+      padding: 10px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: 1px solid #2a3a5a;
+      cursor: pointer;
+      background: #151e30;
+      color: #c9d8f0;
+    }
+
+    .modal-btns button.primary {
+      background: #1a3d7a;
+      border-color: #3a78cc;
+    }
+
+    .modal-btns button:hover {
+      border-color: #4a88dc;
+    }
+
+    audio {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div style="flex:1"></div>
+    <div style="text-align:center">
+      <h1>USS Pampanito (SS-383)<br>AI Docent</h1>
+      <select id="headerLang">
+        <option value="en">English</option>
+        <option value="fr">Français</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="zh">中文</option>
+        <option value="ja">日本語</option>
+      </select>
+    </div>
+    <div style="flex:1;display:flex;justify-content:flex-end">
+      <button id="settingsBtn">⚙</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Compartment display -->
+    <div id="compartmentBadge">
+      <div id="stopsWrap"><select id="stopsSelect"></select><span id="selectSizer"></span></div>
+      <div id="progressMeta">
+        <div id="trackCounter">Track — of —</div>
+        <button class="tBtn" id="playPauseBtn" title="Play/Pause">▶</button>
+        <button class="tBtn" id="micBtn" title="Ask a Question">🎙</button>
+        <div id="timecode">0:00 / 0:00</div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div style="width:100%">
+      <div id="progressWrap">
+        <div id="progressBar"></div>
+      </div>
+    </div>
+
+    <div id="askStatus">
+      <span id="askStatusMsg"></span>
+      <div id="suggestionsRow"></div>
+    </div>
+
+    <!-- Answer panel -->
+    <div id="answerPanel">
+      <div id="questionEcho"></div>
+      <div id="answerText"></div>
+    </div>
+
+  </main>
+
+  <!-- Hidden audio element -->
+  <audio id="player" preload="metadata"></audio>
+
+  <!-- Settings dialog -->
+  <dialog id="settingsModal">
+    <h2>Settings</h2>
+    <div class="field">
+      <label>API Base URL</label>
+      <input id="settApiBase" value="" />
+      <div class="hint">e.g. https://192.168.0.108:8443</div>
+    </div>
+    <div class="field">
+      <label>ElevenLabs API Key <span style="color:#4a5a7a;">(optional — for AI voice)</span></label>
+      <input id="settElKey" type="password" placeholder="sk_..." />
+      <div class="hint">Leave blank to use browser speech synthesis</div>
+    </div>
+    <div class="field">
+      <label>ElevenLabs Voice ID</label>
+      <input id="settElVoice" value="EXAVITQu4vr4xnSDxMaL" />
+      <div class="hint">Default: Sarah (neutral US English)</div>
+    </div>
+    <div class="field">
+      <label>Audio Base URL</label>
+      <input id="settAudioBase" value="" />
+      <div class="hint">e.g. http://192.168.1.23:5500/audio — or leave blank to use relative /audio/</div>
+    </div>
+    <div class="field">
+      <label>FAQ Audio Language</label>
+      <select id="settLang">
+        <option value="en">English (en)</option>
+        <option value="fr">French (fr)</option>
+        <option value="de">German (de)</option>
+        <option value="es">Spanish (es)</option>
+        <option value="zh">Chinese (zh)</option>
+        <option value="ja">Japanese (ja)</option>
+      </select>
+      <div class="hint">Selects the language version of pre-recorded FAQ audio</div>
+    </div>
+    <div class="modal-btns">
+      <button id="settCancel">Cancel</button>
+      <button id="settSave" class="primary">Save</button>
+    </div>
+  </dialog>
+
+  <script>
+    // ── Debug mode ────────────────────────────────────────────────────────────
+    const DEBUG = false;
+
+    // ── Track manifest ─────────────────────────────────────────────────────────
+    const TRACKS = [
+      { file: "01_after_deck.mp3", compartment: "after_deck", label: "After Deck" },
+      { file: "02_after_torpedo_room.mp3", compartment: "after_torpedo_room", label: "After Torpedo" },
+      { file: "03_maneuvering_room.mp3", compartment: "maneuvering_room", label: "Maneuvering" },
+      { file: "04_after_engine_room.mp3", compartment: "after_engine_room", label: "After Engine" },
+      { file: "05_forward_engine_room.mp3", compartment: "forward_engine_room", label: "Forward Engine" },
+      { file: "06_after_battery.mp3", compartment: "after_battery", label: "After Battery" },
+      { file: "07_crews_mess.mp3", compartment: "crews_mess", label: "Crew's Mess" },
+      { file: "08_radio_room.mp3", compartment: "radio_room", label: "Radio Room" },
+      { file: "09_control_room.mp3", compartment: "control_room", label: "Control" },
+      { file: "10_conning_tower.mp3", compartment: "conning_tower", label: "Conning Tower" },
+      { file: "11_forward_batter_compartment.mp3", compartment: "forward_battery_compartment", label: "Forward Battery" },
+      { file: "12_forward_torpedo_room.mp3", compartment: "forward_torpedo_room", label: "Forward Torpedo" },
+      { file: "13_forward_deck.mp3", compartment: "forward_deck", label: "Forward Deck" },
+    ];
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    let currentIdx = 0;
+    let isPlaying = false;
+    let wasPlaying = false; // remember play state when interrupted
+    let playedTracks = new Set();
+
+    // ── Settings ───────────────────────────────────────────────────────────────
+    function loadSettings() {
+      return {
+        apiBase: localStorage.getItem('tour_apiBase') || `${location.protocol}//${location.hostname}:8443`,
+        elKey: localStorage.getItem('tour_elKey') || '',
+        elVoice: localStorage.getItem('tour_elVoice') || 'EXAVITQu4vr4xnSDxMaL',
+        audioBase: localStorage.getItem('tour_audioBase') || '',
+        lang: localStorage.getItem('tour_lang') || 'en',
+      };
+    }
+
+    function saveSettings(s) {
+      localStorage.setItem('tour_apiBase', s.apiBase);
+      localStorage.setItem('tour_elKey', s.elKey);
+      localStorage.setItem('tour_elVoice', s.elVoice);
+      localStorage.setItem('tour_audioBase', s.audioBase);
+      localStorage.setItem('tour_lang', s.lang);
+    }
+
+    function getAudioUrl(file) {
+      const base = (loadSettings().audioBase || 'audio').replace(/\/$/, '');
+      return `${base}/${file}`;
+    }
+
+    // ── DOM refs ───────────────────────────────────────────────────────────────
+    const player = document.getElementById('player');
+    const trackCounter = document.getElementById('trackCounter');
+    const progressBar = document.getElementById('progressBar');
+    const progressWrap = document.getElementById('progressWrap');
+    const timecodeEl = document.getElementById('timecode');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const micBtn = document.getElementById('micBtn');
+    const stopsSelect = document.getElementById('stopsSelect');
+    const selectSizer = document.getElementById('selectSizer');
+    const askStatus = document.getElementById('askStatusMsg');
+    const answerPanel = document.getElementById('answerPanel');
+    const questionEcho = document.getElementById('questionEcho');
+    const answerText = document.getElementById('answerText');
+    const settingsModal = document.getElementById('settingsModal');
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (DEBUG) settingsBtn.style.display = 'block';
+    const settApiBase = document.getElementById('settApiBase');
+    const settElKey = document.getElementById('settElKey');
+    const settElVoice = document.getElementById('settElVoice');
+    const settAudioBase = document.getElementById('settAudioBase');
+
+    // ── Stops select ──────────────────────────────────────────────────────────
+    function fitSelect() {
+      const label = TRACKS[currentIdx] ? TRACKS[currentIdx].label
+        : stopsSelect.options[stopsSelect.selectedIndex]?.text || '';
+      if (!fitSelect._canvas) fitSelect._canvas = document.createElement('canvas');
+      const ctx = fitSelect._canvas.getContext('2d');
+      const cs = getComputedStyle(stopsSelect);
+      ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+      stopsSelect.style.width = (Math.ceil(ctx.measureText(label).width) + 8) + 'px';
+    }
+
+    function buildPlaylist() {
+      stopsSelect.innerHTML = '';
+      TRACKS.forEach((t, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = t.label;
+        stopsSelect.appendChild(opt);
+      });
+      stopsSelect.value = currentIdx;
+      fitSelect();
+    }
+
+    function updatePlaylistHighlight() {
+      stopsSelect.value = currentIdx;
+      fitSelect();
+    }
+
+    stopsSelect.onchange = () => {
+      unlockAudio();
+      loadTrack(parseInt(stopsSelect.value));
+      play();
+    };
+
+    // Clicking the chevron (::after) or wrapper opens the select
+    document.getElementById('stopsWrap').addEventListener('click', (e) => {
+      if (e.target !== stopsSelect) {
+        try { stopsSelect.showPicker(); } catch (err) { stopsSelect.focus(); }
+      }
+    });
+
+    // ── Track loading ──────────────────────────────────────────────────────────
+    function loadTrack(idx) {
+      currentIdx = idx;
+      const t = TRACKS[idx];
+      player.src = getAudioUrl(t.file);
+      player.load();
+      trackCounter.textContent = `Stop ${idx + 1} of ${TRACKS.length}`;
+      progressBar.style.width = '0%';
+      timecodeEl.textContent = '0:00 / 0:00';
+      answerPanel.classList.remove('visible');
+      updatePlaylistHighlight();
+    }
+
+    function play() {
+      player.play().catch(() => { });
+      isPlaying = true;
+      playPauseBtn.textContent = '⏸';
+    }
+
+    function pause() {
+      player.pause();
+      isPlaying = false;
+      playPauseBtn.textContent = '▶';
+    }
+
+    // ── Transport ──────────────────────────────────────────────────────────────
+    playPauseBtn.onclick = () => { unlockAudio(); isPlaying ? pause() : play(); };
+
+    player.addEventListener('ended', () => {
+      playedTracks.add(currentIdx);
+      updatePlaylistHighlight();
+      if (currentIdx < TRACKS.length - 1) {
+        loadTrack(currentIdx + 1);
+        play();
+      } else {
+        isPlaying = false;
+        playPauseBtn.textContent = '▶';
+      }
+    });
+
+    player.addEventListener('loadedmetadata', () => {
+      timecodeEl.textContent = `0:00 / ${fmt(player.duration || 0)}`;
+    });
+
+    player.addEventListener('timeupdate', () => {
+      const cur = player.currentTime || 0;
+      const dur = player.duration || 0;
+      if (dur > 0) progressBar.style.width = `${(cur / dur) * 100}%`;
+      timecodeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
+    });
+
+    progressWrap.onclick = (e) => {
+      const rect = progressWrap.getBoundingClientRect();
+      const pct = (e.clientX - rect.left) / rect.width;
+      if (player.duration) player.currentTime = pct * player.duration;
+    };
+
+    function fmt(s) {
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return `${m}:${String(sec).padStart(2, '0')}`;
+    }
+
+    // ── Rendering helpers ──────────────────────────────────────────────────────
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const bold = s => s.replace(/\b(NOTE|WARNING|IMPORTANT|CAUTION):/g, '<strong>$1:</strong>');
+
+    function renderBlock(p) {
+      const lines = p.split('\n').map(l => l.trim()).filter(l => l);
+      if (lines.length > 1 && lines.every(l => /^\d+\.[\s\u00a0]/.test(l))) {
+        const items = lines.map(l => `<li>${bold(esc(l.replace(/^\d+\.[\s\u00a0]+/, '')))}</li>`).join('');
+        return `<ol>${items}</ol>`;
+      }
+      if (lines.length > 1 && lines.every(l => /^[•\-]\s/.test(l))) {
+        const items = lines.map(l => `<li>${bold(esc(l.replace(/^[•\-]\s+/, '')))}</li>`).join('');
+        return `<ul>${items}</ul>`;
+      }
+      return `<p>${bold(esc(p))}</p>`;
+    }
+
+    function renderAnswer(data) {
+      console.log('[renderAnswer] partial_match=', data.partial_match, 'answer_short length=', (data.answer_short || '').length);
+      const text = data.answer_short || '';
+      const disclaimer = data.partial_match
+        ? `<p class="partial-match-note">I don’t have a direct answer to that, but here’s something related:</p>`
+        : '';
+      const nlIdx = text.indexOf('\n\n');
+      if (nlIdx !== -1) {
+        const q = text.slice(0, nlIdx);
+        const body = text.slice(nlIdx + 2);
+        const rendered = body.split('\n\n').map(renderBlock).join('');
+        answerText.innerHTML = disclaimer + `<div class="faq-question">${esc(q)}</div><div class="faq-body">${rendered}</div>`;
+      } else {
+        answerText.innerHTML = disclaimer + `<span>${esc(text)}</span>`;
+      }
+    }
+
+    // ── Audio engine (AudioContext-based — survives iOS autoplay restrictions) ──
+    let audioCtx = null;
+    let currentSource = null; // currently-playing AudioBufferSourceNode
+
+    function unlockAudio() {
+      if (audioCtx) return;
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // Play a silent 1-sample buffer to fully unlock the context
+        const buf = audioCtx.createBuffer(1, 1, 22050);
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audioCtx.destination);
+        src.start(0);
+        audioCtx.resume();
+      } catch (e) { audioCtx = null; }
+      // Prime SpeechSynthesis as a last-resort fallback
+      if (window.speechSynthesis) {
+        const u = new SpeechSynthesisUtterance('');
+        window.speechSynthesis.speak(u);
+        window.speechSynthesis.cancel();
+      }
+    }
+
+    function showStopBtn() {
+      micBtn.classList.add('answering');
+      micBtn.textContent = '⏹';
+      micBtn.title = 'Stop';
+      micBtn.onclick = () => { stopAnswerAudio(); showAskBtn(); };
+    }
+
+    function showAskBtn() {
+      micBtn.classList.remove('answering');
+      micBtn.textContent = '🎙';
+      micBtn.title = 'Ask a Question';
+      micBtn.onclick = () => { unlockAudio(); if (isListening) stopListening(null); else startListening(); };
+    }
+
+    function stopAnswerAudio() {
+      if (currentSource) {
+        try { currentSource.stop(); } catch (e) { }
+        currentSource = null;
+      }
+      window.speechSynthesis && window.speechSynthesis.cancel();
+    }
+
+    // Play an ArrayBuffer through the unlocked AudioContext
+    function playArrayBuffer(arrayBuf, onended, gainValue) {
+      if (!audioCtx) { onended && onended(); return; }
+      stopAnswerAudio();
+      audioCtx.resume().then(() => {
+        audioCtx.decodeAudioData(arrayBuf, (decoded) => {
+          const src = audioCtx.createBufferSource();
+          src.buffer = decoded;
+          if (gainValue && gainValue !== 1.0) {
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.value = gainValue;
+            src.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+          } else {
+            src.connect(audioCtx.destination);
+          }
+          src.onended = () => { currentSource = null; onended && onended(); };
+          src.start(0);
+          currentSource = src;
+        }, () => { onended && onended(); }); // decode error
+      });
+    }
+
+    // Fetch a URL and play it via AudioContext; returns true if succeeded
+    async function fetchAndPlay(url, onended, gainValue) {
+      const resp = await fetch(url);
+      if (!resp.ok) return false;
+      const arrayBuf = await resp.arrayBuffer();
+      playArrayBuffer(arrayBuf, onended, gainValue);
+      return true;
+    }
+
+    // ── Try pre-recorded FAQ audio → ElevenLabs → browser TTS ─────────────────
+    async function playFaqAudioOrSpeak(data, answerPlain) {
+      stopAnswerAudio();
+
+      // If the answer is only a partial match, play the "no direct answer"
+      // audio clip first, then play the answer audio as usual.
+      if (data.partial_match) {
+        console.log('[playFaqAudioOrSpeak] partial_match=true, fetching nodirectanswer.mp3 from', getAudioUrl('nodirectanswer.mp3'));
+        try {
+          const abrtCtrl = new AbortController();
+          const abrtTimer = setTimeout(() => abrtCtrl.abort(), 3000);
+          const ndaResp = await fetch(getAudioUrl('nodirectanswer.mp3'), { signal: abrtCtrl.signal });
+          clearTimeout(abrtTimer);
+          console.log('[playFaqAudioOrSpeak] nodirectanswer.mp3 HTTP status=', ndaResp.status);
+          if (ndaResp.ok) {
+            const ndaBuf = await ndaResp.arrayBuffer();
+            await new Promise(resolve => playArrayBuffer(ndaBuf, resolve, 2.0));
+          }
+        } catch (e) { console.warn('[playFaqAudioOrSpeak] nodirectanswer fetch/play error:', e); }
+      } else {
+        console.log('[playFaqAudioOrSpeak] partial_match=false, skipping nodirectanswer.mp3');
+      }
+
+      const setSpeakStop = (onStop) => {
+        showStopBtn();
+      };
+      const resetSpeakBtn = () => {
+        showAskBtn();
+      };
+
+      // 1. Pre-recorded FAQ MP3 — fast timeout so a missing file doesn't block
+      const chunkId = data.citations && data.citations[0] && data.citations[0].chunk_id;
+      if (chunkId) {
+        askStatus.textContent = '🔊 Loading audio…';
+        try {
+          const abortCtrl = new AbortController();
+          const abortTimer = setTimeout(() => abortCtrl.abort(), 1500);
+          const resp = await fetch(getAudioUrl(`${chunkId}_${loadSettings().lang}.mp3`), { signal: abortCtrl.signal });
+          clearTimeout(abortTimer);
+          if (resp.ok) {
+            const arrayBuf = await resp.arrayBuffer();
+            playArrayBuffer(arrayBuf, resetSpeakBtn);
+            setSpeakStop(null);
+            askStatus.textContent = '';
+            return;
+          }
+        } catch (e) { /* not found or timed out — fall through */ }
+        askStatus.textContent = '';
+      }
+
+      // 2. ElevenLabs TTS — flash model, truncate to first 300 chars for speed
+      const s = loadSettings();
+      if (s.elKey) {
+        // Trim to ~300 chars at a sentence boundary for fast generation
+        let ttsText = answerPlain;
+        if (ttsText.length > 300) {
+          const cut = ttsText.lastIndexOf('. ', 300);
+          ttsText = ttsText.slice(0, cut > 50 ? cut + 1 : 300).trim();
+        }
+        try {
+          askStatus.textContent = '⏳ Generating audio…';
+          const res = await fetch(
+            `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(s.elVoice)}/stream?optimize_streaming_latency=3`,
+            {
+              method: 'POST',
+              headers: { 'xi-api-key': s.elKey, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                text: ttsText,
+                model_id: 'eleven_flash_v2_5',
+                voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+              }),
+            }
+          );
+          if (res.ok) {
+            const arrayBuf = await res.arrayBuffer();
+            playArrayBuffer(arrayBuf, resetSpeakBtn);
+            setSpeakStop(null);
+            return;
+          }
+        } catch (e) {
+          console.warn('ElevenLabs error, falling back to browser TTS:', e);
+          askStatus.textContent = '';
+        }
+      }
+
+      // 3. Browser SpeechSynthesis last resort
+      if (window.speechSynthesis) {
+        const utt = new SpeechSynthesisUtterance(answerPlain.replace(/\n+/g, ' '));
+        utt.rate = 0.95;
+        utt.onend = resetSpeakBtn;
+        window.speechSynthesis.speak(utt);
+        setSpeakStop(() => window.speechSynthesis.cancel());
+      }
+    }
+
+    // ── API call ───────────────────────────────────────────────────────────────
+    async function askQuestion(questionText) {
+      const s = loadSettings();
+      const t = TRACKS[currentIdx];
+      const payload = {
+        compartment_id: t.compartment,
+        audio_track_id: t.compartment,
+        playhead_time_ms: Math.floor((player.currentTime || 0) * 1000),
+        question_text: questionText,
+        answer_mode: 'standard',
+      };
+
+      const res = await fetch(`${s.apiBase}/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }
+
+    // ── Voice recognition (browser SpeechRecognition) ─────────────────────────
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let isListening = false;
+    let mediaRecorder = null;
+    let mediaChunks = [];
+    let lastQuestionAudio = null;  // Blob of the most recent question recording
+
+    const LANG_BCP47 = { en: 'en-US', fr: 'fr-FR', de: 'de-DE', es: 'es-ES', zh: 'zh-CN', ja: 'ja-JP' };
+
+    // Hide mic buttons if SpeechRecognition unavailable
+    if (!SpeechRec) {
+      micBtn.style.display = 'none';
+    }
+
+    micBtn.onclick = () => { unlockAudio(); if (isListening) stopListening(null); else startListening(); };
+
+    function startListening() {
+      if (!SpeechRec || !window.isSecureContext) return;
+
+      wasPlaying = isPlaying;
+      pause();
+
+      recognition = new SpeechRec();
+      recognition.lang = LANG_BCP47[loadSettings().lang] || 'en-US';
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      askStatus.style.display = '';
+      askStatus.textContent = 'Speak your question…';
+      isListening = true;
+      micBtn.classList.add('listening');
+      micBtn.textContent = '🔴';
+      micBtn.title = 'Tap to stop';
+      micBtn.onclick = () => { if (isListening) stopListening(null); };
+
+      let finalTranscript = '';
+
+      // Hard timeout — iOS onend is unreliable; stop after 12 s max
+      const hardTimeout = setTimeout(() => {
+        if (isListening) stopListening(finalTranscript);
+      }, 12000);
+
+      const finishUp = () => {
+        clearTimeout(hardTimeout);
+        if (isListening) stopListening(finalTranscript);
+      };
+
+      recognition.onresult = (e) => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) finalTranscript += t;
+          else interim += t;
+        }
+        askStatus.textContent = finalTranscript || interim || 'Speak your question…';
+      };
+
+      // onspeechend fires when the user stops talking — more reliable than onend on iOS
+      recognition.onspeechend = () => { recognition.stop(); };
+
+      recognition.onerror = (e) => {
+        if (e.error === 'no-speech') return;
+        askStatus.textContent = `Mic error: ${e.error}`;
+        clearTimeout(hardTimeout);
+        stopListening(null);
+      };
+
+      recognition.onend = finishUp;
+      recognition.start();
+
+      // Record audio in parallel so we can attach it to the contact email
+      lastQuestionAudio = null;
+      mediaChunks = [];
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+          const mimeType = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+            : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+              : '';
+          mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+          const capturedMimeType = mimeType || mediaRecorder.mimeType;
+          mediaRecorder.ondataavailable = e => { if (e.data.size > 0) mediaChunks.push(e.data); };
+          mediaRecorder.onstop = () => {
+            lastQuestionAudio = new Blob(mediaChunks, { type: capturedMimeType });
+            stream.getTracks().forEach(t => t.stop());
+          };
+          mediaRecorder.start(250);
+        }).catch(() => { /* mic permission denied — no audio attachment */ });
+      }
+    }
+
+    // ── Transcript correction (phonetic mishearing fixes) ─────────────────────
+    const CORRECTIONS = [
+      // Ship name
+      [/pam\s*pan+[ie]to/gi, 'Pampanito'],
+      [/pam\s*pen+[ie]to/gi, 'Pampanito'],
+      [/pam\s*pa\s*nee\s*to/gi, 'Pampanito'],
+      // Compartments
+      [/con+ing\s+tower/gi, 'conning tower'],
+      [/con+[eo]n+\s+tower/gi, 'conning tower'],
+      [/man[eo]+ver+ing/gi, 'maneuvering'],
+      [/tor+ped[oa]/gi, 'torpedo'],
+      [/torp\s+[ae]do/gi, 'torpedo'],
+      [/bal+[ae]st/gi, 'ballast'],
+      [/ball?\s+[ae]st/gi, 'ballast'],
+      [/p[ae]r+[ie]\s*scope/gi, 'periscope'],
+      [/per+[iy]\s*scope/gi, 'periscope'],
+      [/p[ae]r+[ae]scope/gi, 'periscope'],
+      [/snork[ae]l/gi, 'snorkel'],
+      [/hatch?way/gi, 'hatchway'],
+      [/bulk?head/gi, 'bulkhead'],
+      [/bulk?\s+head/gi, 'bulkhead'],
+      // Torpedo marks
+      [/mark\s+fourteen/gi, 'Mark 14'],
+      [/mark\s+eighteen/gi, 'Mark 18'],
+      [/mark\s+14/gi, 'Mark 14'],
+      [/mark\s+18/gi, 'Mark 18'],
+      [/mk\.?\s*14/gi, 'Mark 14'],
+      [/mk\.?\s*18/gi, 'Mark 18'],
+      // Sub systems
+      [/diesel?\s+sub(marine)?s?/gi, 'diesel submarines'],
+      [/bal+ao/gi, 'Balao'],
+      [/gato\s+class/gi, 'Gato class'],
+      [/fleet\s+sub/gi, 'fleet submarine'],
+    ];
+
+    function correctTranscript(text) {
+      let t = text;
+      for (const [pattern, replacement] of CORRECTIONS) {
+        t = t.replace(pattern, replacement);
+      }
+      return t;
+    }
+
+    function stopListening(transcript) {
+      isListening = false;
+      if (recognition) { try { recognition.stop(); } catch (e) { } recognition = null; }
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') { try { mediaRecorder.stop(); } catch (e) { } }
+      mediaRecorder = null;
+      micBtn.classList.remove('listening');
+      micBtn.textContent = '🎙';
+      micBtn.title = 'Ask a Question';
+      micBtn.onclick = () => { unlockAudio(); if (isListening) stopListening(null); else startListening(); };
+
+      if (!transcript || !transcript.trim()) {
+        askStatus.textContent = 'No speech detected. Try again.';
+        if (wasPlaying) play();
+        return;
+      }
+      handleQuestion(correctTranscript(transcript.trim()));
+    }
+
+    // ── Freeform listener — captures full spoken response ───────────────────
+    function listenFreeform(callback) {
+      if (!SpeechRec) { callback(''); return; }
+      const rec = new SpeechRec();
+      rec.lang = LANG_BCP47[loadSettings().lang] || 'en-US';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      let done = false;
+
+      const finish = (text) => {
+        if (done) return;
+        done = true;
+        try { rec.stop(); } catch (e) { }
+        callback(text);
+      };
+
+      const timer = setTimeout(() => finish(''), 12000);
+
+      rec.onresult = (e) => {
+        clearTimeout(timer);
+        finish((e.results[0][0].transcript || '').trim());
+      };
+      rec.onerror = () => { clearTimeout(timer); finish(''); };
+      rec.onend = () => { clearTimeout(timer); if (!done) finish(''); };
+
+      askStatus.textContent = 'Listening\u2026';
+      rec.start();
+    }
+
+    // ── Send visitor question + contact info to historian ───────────────────
+    async function sendContact(question, visitorResponse) {
+      const s = loadSettings();
+      try {
+        const form = new FormData();
+        form.append('question_text', question);
+        form.append('visitor_response', visitorResponse);
+        form.append('lang', s.lang);
+        if (lastQuestionAudio && lastQuestionAudio.size > 0) {
+          const ext = lastQuestionAudio.type.includes('mp4') ? 'mp4' : 'webm';
+          form.append('audio', lastQuestionAudio, `question.${ext}`);
+        }
+        const res = await fetch(`${s.apiBase}/contact`, { method: 'POST', body: form });
+        const data = await res.json();
+        console.log('[contact] result:', data);
+      } catch (e) {
+        console.warn('[contact] send failed:', e);
+      }
+    }
+
+    // ── Yes/no listener (used after nothits.mp3) ────────────────────────────
+    function listenYesNo(callback) {
+      if (!SpeechRec) { callback(false); return; }
+      const rec = new SpeechRec();
+      rec.lang = LANG_BCP47[loadSettings().lang] || 'en-US';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      let done = false;
+
+      const finish = (heard) => {
+        if (done) return;
+        done = true;
+        try { rec.stop(); } catch (e) { }
+        callback(heard);
+      };
+
+      const timer = setTimeout(() => finish(false), 6000);
+
+      rec.onresult = (e) => {
+        clearTimeout(timer);
+        const t = (e.results[0][0].transcript || '').trim().toLowerCase();
+        finish(/\byes\b|\byeah\b|\byep\b|\bsure\b|\bplease\b|\baffirmative\b/.test(t));
+      };
+      rec.onerror = () => { clearTimeout(timer); finish(false); };
+      rec.onend = () => { clearTimeout(timer); if (!done) finish(false); };
+
+      askStatus.textContent = 'Say "yes" or "no"\u2026';
+      rec.start();
+    }
+
+    const COMPARTMENT_SUGGESTIONS = {
+      forward_torpedo_room: [
+        'How did the torpedoes work?',
+        'Did sailors sleep next to the torpedoes?',
+        'How many torpedoes could Pampanito carry?',
+        'How long did it take to reload a torpedo?',
+        'What was the range of the torpedoes?',
+        'Were the torpedoes dangerous to the crew?',
+      ],
+      after_torpedo_room: [
+        'How many torpedoes were fired from the stern?',
+        'Could you fire from both ends at once?',
+        'How many bunks are in the after torpedo room?',
+        'What happened during a depth charge attack?',
+        'How thick is the pressure hull?',
+      ],
+      conning_tower: [
+        'Where are the periscopes?',
+        'How did the captain fire torpedoes?',
+        'What is a TDC?',
+        'How deep could Pampanito dive?',
+        'How did the radar work?',
+      ],
+      control_room: [
+        'How did the crew dive the submarine?',
+        'What are the ballast tanks?',
+        'How many men were in the control room?',
+        'How did they navigate underwater?',
+        'Could they communicate underwater?',
+      ],
+      crews_mess: [
+        'What did the crew eat?',
+        'How was food stored on board?',
+        'Did the crew have enough food?',
+        'Where did the officers eat?',
+        'How many meals a day did the crew get?',
+      ],
+      forward_battery_compartment: [
+        'How many batteries did Pampanito have?',
+        'How long could the submarine run on batteries?',
+        'How were the batteries recharged?',
+        'Were the batteries dangerous?',
+        'What happened if the batteries ran low?',
+      ],
+      after_battery: [
+        'Where did the crew sleep?',
+        'What was a hot bunk?',
+        'How many men slept in this area?',
+        'Did any sailors get sick on patrol?',
+        'What was the smell like inside the submarine?',
+      ],
+      forward_engine_room: [
+        'What kind of engines did Pampanito have?',
+        'How fast could Pampanito go on the surface?',
+        'How loud were the engines?',
+        'How much fuel did the submarine carry?',
+        'What did engine room crew do during battle?',
+      ],
+      after_engine_room: [
+        'How did the diesel engines work?',
+        'How many engines did Pampanito have?',
+        'How far could Pampanito travel on one tank of fuel?',
+        'What happened if an engine broke down at sea?',
+        'How hot did it get in the engine room?',
+      ],
+      maneuvering_room: [
+        'How did the crew control the electric motors?',
+        'What did the electricians do during a dive?',
+        'How did the submarine switch from diesel to electric?',
+        'How fast could Pampanito go underwater?',
+        'What was the crew size?',
+      ],
+      radio_room: [
+        'How did the crew communicate with headquarters?',
+        'Could enemy ships detect their radio signals?',
+        'What codes did they use?',
+        'How did they receive orders while submerged?',
+        'What was ULTRA intelligence?',
+      ],
+      forward_deck: [
+        'What gun is on the forward deck?',
+        'When did submarines use deck guns?',
+        'Did Pampanito ever sink a ship with its deck gun?',
+        'How dangerous was it on deck in combat?',
+        'How did the crew rescue survivors?',
+      ],
+      after_deck: [
+        'What gun is on the after deck?',
+        'What happened during a crash dive?',
+        'How did the crew get in and out of the submarine?',
+        'What patrols did Pampanito complete?',
+        'How did Pampanito rescue POWs?',
+      ],
+    };
+
+    const DEFAULT_SUGGESTIONS = [
+      'How deep could Pampanito dive?',
+      'How many men were in the crew?',
+      'How long were patrols?',
+      'What ships did Pampanito sink?',
+      'Did anyone on Pampanito get killed?',
+    ];
+
+    function showSuggestions(compartmentId) {
+      const row = document.getElementById('suggestionsRow');
+      const pool = COMPARTMENT_SUGGESTIONS[compartmentId] || DEFAULT_SUGGESTIONS;
+      const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+      const picks = shuffled.slice(0, 3);
+      row.innerHTML = picks.map(q =>
+        `<button class="sugChip" data-q="${q.replace(/"/g, '&quot;')}">${q}</button>`
+      ).join('');
+    }
+
+    document.getElementById('suggestionsRow').addEventListener('click', (e) => {
+      const chip = e.target.closest('.sugChip');
+      if (chip) { unlockAudio(); handleQuestion(chip.dataset.q); }
+    });
+
+    async function handleQuestion(question) {
+      document.getElementById('suggestionsRow').innerHTML = '';
+      askStatus.textContent = `Heard: "${question}"`;
+      questionEcho.textContent = `"${question}"`;
+      answerText.textContent = '';
+      answerPanel.classList.add('visible');
+
+      try {
+        const data = await askQuestion(question);
+
+        // ── No-source refusal: play nothits.mp3, then listen for yes/no ──────
+        if (data.refusal && data.refusal.is_refusal) {
+          renderAnswer(data);
+          askStatus.textContent = '';
+          showStopBtn();
+          const ok = await fetchAndPlay(getAudioUrl('nothits.mp3'), () => {
+            listenYesNo((heardYes) => {
+              console.log('[nohits] heardYes =', heardYes);
+              askStatus.textContent = heardYes ? 'Got it…' : '';
+              if (heardYes) {
+                showStopBtn();
+                const url2 = getAudioUrl('emailaddressorphonenumber.mp3');
+                console.log('[nohits] fetching', url2);
+                fetchAndPlay(url2, () => {
+                  // Audio finished — listen for their contact info
+                  listenFreeform((response) => {
+                    console.log('[contact] response:', response);
+                    if (response) {
+                      sendContact(question, response);
+                      showStopBtn();
+                      fetchAndPlay(getAudioUrl('wewillgetbacktoyou.mp3'), () => {
+                        askStatus.textContent = '';
+                        showAskBtn();
+                      }, 2.0).then(played => {
+                        if (!played) { askStatus.textContent = ''; showAskBtn(); }
+                      });
+                    } else {
+                      askStatus.textContent = '';
+                      showAskBtn();
+                    }
+                  });
+                }, 2.0).then(played => {
+                  console.log('[nohits] emailaddressorphonenumber played =', played);
+                  if (!played) {
+                    askStatus.textContent = 'Audio file not found.';
+                    showAskBtn();
+                  }
+                });
+              } else {
+                showAskBtn();
+              }
+            });
+          }, 2.0);
+          if (!ok) {
+            askStatus.textContent = 'nothits.mp3 not found.';
+            showAskBtn();
+          }
+          return;
+        }
+
+        renderAnswer(data);
+        const answerPlain = (data.answer_short || '').replace(/\n+/g, ' ');
+        answerPanel.classList.add('visible');
+        askStatus.textContent = '';
+        askStatus.style.display = 'none';
+        showSuggestions(TRACKS[currentIdx].compartment);
+
+        // Auto-play: pre-recorded FAQ audio if available, else TTS
+        playFaqAudioOrSpeak(data, answerPlain);
+      } catch (err) {
+        answerText.textContent = `Error: ${err.message}`;
+        askStatus.textContent = '';
+      }
+    }
+
+    // ── Settings modal ─────────────────────────────────────────────────────────
+    settingsBtn.onclick = () => {
+      const s = loadSettings();
+      settApiBase.value = s.apiBase;
+      settElKey.value = s.elKey;
+      settElVoice.value = s.elVoice;
+      settAudioBase.value = s.audioBase;
+      document.getElementById('settLang').value = s.lang;
+      settingsModal.showModal();
+    };
+    document.getElementById('settCancel').onclick = () => settingsModal.close();
+    document.getElementById('settSave').onclick = () => {
+      saveSettings({
+        apiBase: settApiBase.value.trim().replace(/\/+$/, ''),
+        elKey: settElKey.value.trim(),
+        elVoice: settElVoice.value.trim() || 'EXAVITQu4vr4xnSDxMaL',
+        audioBase: settAudioBase.value.trim().replace(/\/+$/, ''),
+        lang: document.getElementById('settLang').value,
+      });
+      document.getElementById('headerLang').value = document.getElementById('settLang').value;
+      const src = player.src;
+      if (!src) loadTrack(currentIdx);
+      settingsModal.close();
+    };
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    buildPlaylist();
+    loadTrack(0);
+
+    // ── Header language dropdown ──────────────────────────────────────────────
+    const headerLang = document.getElementById('headerLang');
+    headerLang.value = loadSettings().lang;
+    headerLang.addEventListener('change', () => {
+      const s = loadSettings();
+      s.lang = headerLang.value;
+      saveSettings(s);
+      document.getElementById('settLang').value = headerLang.value;
+    });
+  </script>
+</body>
+
+</html>

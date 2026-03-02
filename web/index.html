@@ -80,10 +80,13 @@
       font-size: 13px;
       color: #666;
     }
-    .faq-body ol, .faq-body ul {
+
+    .faq-body ol,
+    .faq-body ul {
       padding-left: 2em;
       margin: 0 0 10px 0;
     }
+
     .followup-btn {
       display: block;
       background: none;
@@ -94,7 +97,11 @@
       cursor: pointer;
       text-align: left;
     }
-    .followup-btn:hover { text-decoration: underline; }
+
+    .followup-btn:hover {
+      text-decoration: underline;
+    }
+
     dialog {
       border: 1px solid #ddd;
       border-radius: 10px;
@@ -102,11 +109,37 @@
       max-width: 360px;
       font-family: -apple-system, system-ui, sans-serif;
     }
-    dialog::backdrop { background: rgba(0,0,0,0.3); }
-    .dialog-title { font-size: 16px; font-weight: bold; margin: 0 0 14px 0; }
-    .dialog-btns { display: flex; gap: 10px; margin-top: 16px; }
-    .dialog-btns button { flex: 1; padding: 10px; font-size: 15px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; }
-    .dialog-btns button.primary { background: #0066cc; color: #fff; border-color: #0066cc; }
+
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .dialog-title {
+      font-size: 16px;
+      font-weight: bold;
+      margin: 0 0 14px 0;
+    }
+
+    .dialog-btns {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .dialog-btns button {
+      flex: 1;
+      padding: 10px;
+      font-size: 15px;
+      cursor: pointer;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    .dialog-btns button.primary {
+      background: #0066cc;
+      color: #fff;
+      border-color: #0066cc;
+    }
   </style>
 </head>
 
@@ -207,12 +240,14 @@
 
   <dialog id="versionModal">
     <p class="dialog-title">Which version would you like?</p>
-    <p style="font-size:13px;color:#444;margin:0;"><b>Quick</b> — a short, direct answer.<br><b>Deeper Docent</b> — full context and explanation.</p>
+    <p style="font-size:13px;color:#444;margin:0;"><b>Quick</b> — a short, direct answer.<br><b>Deeper Docent</b> — full
+      context and explanation.</p>
     <div class="dialog-btns">
       <button id="modalQuick">Quick</button>
       <button id="modalDeep" class="primary">Deeper Docent</button>
     </div>
-    <div style="text-align:right;margin-top:12px;"><button id="modalCancel" style="font-size:13px;background:none;border:none;color:#888;cursor:pointer;">Cancel</button></div>
+    <div style="text-align:right;margin-top:12px;"><button id="modalCancel"
+        style="font-size:13px;background:none;border:none;color:#888;cursor:pointer;">Cancel</button></div>
   </dialog>
 
   <script>
@@ -266,7 +301,7 @@
     };
 
     // ── Rendering helpers ────────────────────────────────────────────────
-    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const bold = s => s.replace(/\b(NOTE|WARNING|IMPORTANT|CAUTION):/g, '<strong>$1:</strong>');
     const renderBlock = p => {
       const lines = p.split('\n').map(l => l.trim()).filter(l => l);
@@ -359,7 +394,7 @@
     // ── Follow-up handlers ───────────────────────────────────────────────
     const versionModal = document.getElementById('versionModal');
     document.getElementById('modalQuick').onclick = () => { versionModal.close(); doAsk(lastQuestion, 'quick'); };
-    document.getElementById('modalDeep').onclick  = () => { versionModal.close(); doAsk(lastQuestion, 'deep'); };
+    document.getElementById('modalDeep').onclick = () => { versionModal.close(); doAsk(lastQuestion, 'deep'); };
     document.getElementById('modalCancel').onclick = () => versionModal.close();
 
     const compartmentLabels = {
