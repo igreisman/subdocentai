@@ -75,7 +75,7 @@ Every answer includes a citation identifying which source and chunk the informat
 
 The application is built on three layers: a browser-based frontend, an on-premises Python API server, and a local retrieval engine backed by curated JSONL corpora.
 
-### 6.1 Frontend (`web/tour.html`)
+### 6.1 Frontend (`web/pampanito.html`)
 
 A single-page application served directly by the backend. Designed for iOS Safari on iPhone — the primary visitor device.
 
@@ -165,6 +165,7 @@ This loop ensures the knowledge base grows over time, driven directly by actual 
 The application is a fully functional demonstration prototype. It covers all 11 interior compartments plus the fore and aft decks of the Pampanito, and the AI guide can answer hundreds of historical and technical questions about the ship and her crew.
 
 **Current capabilities:**
+
 - Voice Q&A in 6 languages across all compartments
 - Sub-2-second response time on local hardware
 - Intelligent fallback with honest partial-answer signalling
@@ -172,6 +173,7 @@ The application is a fully functional demonstration prototype. It covers all 11 
 - Zero internet dependency during visitor operation
 
 **Near-term roadmap:**
+
 - LLM-backed synthesis (GPT-4o) for richer, more conversational answers when funding is secured
 - Pre-cached TTS audio for the 50 most common questions — instant playback without any API latency
 - Expanded corpus coverage: crew oral histories, patrol logs, and post-war interviews

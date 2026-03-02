@@ -29,11 +29,11 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(BASE_DIR, "web")
 if os.path.isdir(WEB_DIR):
-    # Serve tour.html with no-cache so Safari always loads the latest version
-    @app.get("/web/tour.html", include_in_schema=False)
+    # Serve pampanito.html with no-cache so Safari always loads the latest version
+    @app.get("/web/pampanito.html", include_in_schema=False)
     def serve_tour_html():
         return FileResponse(
-            os.path.join(WEB_DIR, "tour.html"),
+            os.path.join(WEB_DIR, "pampanito.html"),
             media_type="text/html",
             headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
