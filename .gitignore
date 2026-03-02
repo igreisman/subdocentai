@@ -5,3 +5,4 @@ __pycache__/
 certs/
 serve_https.py
 .env.local
+feedback.jsonl
