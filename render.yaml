@@ -11,6 +11,3 @@ services:
         sync: false        # set manually in Render dashboard
       - key: SMTP_PASS
         sync: false        # set manually in Render dashboard
-    domains:
-      - subdocentai.com
-      - www.subdocentai.com
