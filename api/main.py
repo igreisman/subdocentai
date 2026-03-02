@@ -35,6 +35,12 @@ def root_redirect():
     return RedirectResponse(url="/web/index.html")
 
 if os.path.isdir(WEB_DIR):
+    # Convenience redirect: /pampanito.html → /web/pampanito.html
+    @app.get("/pampanito.html", include_in_schema=False)
+    def redirect_tour_html():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/web/pampanito.html")
+
     # Serve pampanito.html with no-cache so Safari always loads the latest version
     @app.get("/web/pampanito.html", include_in_schema=False)
     def serve_tour_html():
