@@ -28,6 +28,12 @@ app.add_middleware(
 # Serve web/ as static files at /
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(BASE_DIR, "web")
+
+@app.get("/", include_in_schema=False)
+def root_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/web/index.html")
+
 if os.path.isdir(WEB_DIR):
     # Serve pampanito.html with no-cache so Safari always loads the latest version
     @app.get("/web/pampanito.html", include_in_schema=False)
