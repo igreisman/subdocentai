@@ -538,7 +538,7 @@
     // ── Settings ───────────────────────────────────────────────────────────────
     function loadSettings() {
       return {
-        apiBase: localStorage.getItem('tour_apiBase') || `${location.protocol}//${location.hostname}:8443`,
+        apiBase: localStorage.getItem('tour_apiBase') || (location.hostname === 'localhost' || location.hostname === '192.168.0.108' ? `${location.protocol}//${location.hostname}:8443` : `${location.protocol}//${location.hostname}`),
         elKey: localStorage.getItem('tour_elKey') || '',
         elVoice: localStorage.getItem('tour_elVoice') || 'EXAVITQu4vr4xnSDxMaL',
         audioBase: localStorage.getItem('tour_audioBase') || '',
