@@ -409,10 +409,106 @@
     audio {
       display: none;
     }
+
+    /* ── Password gate ───────────────────────────────── */
+    #pwGate {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: #0a0f1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #pwBox {
+      background: #0d1525;
+      border: 1px solid #1e2d4a;
+      border-radius: 12px;
+      padding: 36px 32px;
+      text-align: center;
+      max-width: 320px;
+      width: 90%;
+    }
+    #pwBox h2 {
+      color: #c9d8f0;
+      font-size: 1.2rem;
+      margin-bottom: 18px;
+      letter-spacing: .03em;
+    }
+    #pwInput {
+      width: 100%;
+      padding: 10px 14px;
+      font-size: 1.1rem;
+      letter-spacing: .15em;
+      border-radius: 8px;
+      border: 1px solid #1e2d4a;
+      background: #131d30;
+      color: #e8e8e8;
+      text-align: center;
+      outline: none;
+    }
+    #pwInput:focus {
+      border-color: #3a6fd8;
+    }
+    #pwError {
+      color: #e05555;
+      font-size: .85rem;
+      margin-top: 10px;
+      min-height: 1.2em;
+    }
+    #pwSubmit {
+      margin-top: 16px;
+      width: 100%;
+      padding: 10px;
+      background: #1e3a6e;
+      color: #c9d8f0;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    #pwSubmit:hover { background: #2a4f8f; }
   </style>
 </head>
 
 <body>
+
+  <!-- Password gate -->
+  <div id="pwGate">
+    <div id="pwBox">
+      <h2>Password?</h2>
+      <input id="pwInput" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" />
+      <div id="pwError"></div>
+      <button id="pwSubmit">Enter</button>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const gate = document.getElementById('pwGate');
+      // Skip password gate on local machine
+      if (['localhost', '127.0.0.1', '::1', '192.168.0.108'].includes(location.hostname)) {
+        gate.style.display = 'none';
+        return;
+      }
+      const input = document.getElementById('pwInput');
+      const err = document.getElementById('pwError');
+      const btn = document.getElementById('pwSubmit');
+      function attempt() {
+        if (input.value.trim() === '1941') {
+          gate.style.display = 'none';
+        } else {
+          err.textContent = 'Incorrect password. Please try again.';
+          input.value = '';
+          input.focus();
+        }
+      }
+      btn.addEventListener('click', attempt);
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') attempt();
+      });
+      input.focus();
+    })();
+  </script>
 
   <header>
     <div style="flex:1"></div>
