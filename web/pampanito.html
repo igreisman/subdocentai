@@ -299,6 +299,78 @@
       margin-bottom: 8px;
     }
 
+    /* ── Feedback widget ─────────────────────────────── */
+    #feedbackRow {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #1e2d4a;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #feedbackRow.visible { display: flex; }
+    #feedbackButtons {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #feedbackPrompt {
+      font-size: 12px;
+      color: #607090;
+      flex: 1;
+    }
+    .fbBtn {
+      background: #131d30;
+      border: 1px solid #1e2d4a;
+      border-radius: 8px;
+      color: #c9d8f0;
+      font-size: 18px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .15s, border-color .15s;
+    }
+    .fbBtn:hover { background: #1e2d4a; border-color: #3a78cc; }
+    .fbBtn.selected { background: #1e3a6e; border-color: #3a78cc; }
+    #feedbackExtra {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+    #feedbackExtra.visible { display: flex; }
+    #feedbackComment {
+      width: 100%;
+      background: #131d30;
+      border: 1px solid #1e2d4a;
+      border-radius: 8px;
+      color: #c9d8f0;
+      font-size: 13px;
+      padding: 8px 10px;
+      resize: vertical;
+      min-height: 60px;
+      outline: none;
+    }
+    #feedbackComment:focus { border-color: #3a78cc; }
+    #feedbackSend {
+      align-self: flex-end;
+      background: #1e3a6e;
+      color: #c9d8f0;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 16px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #feedbackSend:hover { background: #2a4f8f; }
+    #feedbackThanks {
+      font-size: 12px;
+      color: #4a9a6a;
+      display: none;
+    }
+
     .faq-body li {
       margin-bottom: 3px;
     }
@@ -556,6 +628,19 @@
     <div id="answerPanel">
       <div id="questionEcho"></div>
       <div id="answerText"></div>
+      <!-- Feedback widget -->
+      <div id="feedbackRow">
+        <div id="feedbackButtons">
+          <span id="feedbackPrompt">Was this helpful?</span>
+          <button class="fbBtn" id="thumbsUp" title="Helpful">👍</button>
+          <button class="fbBtn" id="thumbsDown" title="Not helpful">👎</button>
+        </div>
+        <div id="feedbackExtra">
+          <textarea id="feedbackComment" placeholder="Anything to add? (optional)"></textarea>
+          <button id="feedbackSend">Send feedback</button>
+        </div>
+        <span id="feedbackThanks">Thanks for your feedback!</span>
+      </div>
     </div>
 
   </main>
@@ -797,6 +882,72 @@
       }
       return `<p>${bold(esc(p))}</p>`;
     }
+
+    // ── Feedback widget ──────────────────────────────────────────────────────
+    let _lastQuestion = '';
+    let _lastAnswer = '';
+    let _feedbackRating = null;
+
+    const feedbackRow    = document.getElementById('feedbackRow');
+    const feedbackExtra  = document.getElementById('feedbackExtra');
+    const feedbackThanks = document.getElementById('feedbackThanks');
+    const thumbsUpBtn    = document.getElementById('thumbsUp');
+    const thumbsDownBtn  = document.getElementById('thumbsDown');
+    const feedbackSend   = document.getElementById('feedbackSend');
+
+    function resetFeedback() {
+      _feedbackRating = null;
+      feedbackRow.classList.remove('visible');
+      feedbackExtra.classList.remove('visible');
+      feedbackThanks.style.display = 'none';
+      document.getElementById('feedbackComment').value = '';
+      thumbsUpBtn.classList.remove('selected');
+      thumbsDownBtn.classList.remove('selected');
+      thumbsUpBtn.style.pointerEvents = '';
+      thumbsDownBtn.style.pointerEvents = '';
+    }
+
+    function showFeedback(question, answer) {
+      _lastQuestion = question;
+      _lastAnswer = answer;
+      resetFeedback();
+      feedbackRow.classList.add('visible');
+    }
+
+    async function submitFeedback() {
+      const comment = document.getElementById('feedbackComment').value.trim();
+      try {
+        const s = loadSettings();
+        await fetch(`${s.apiBase}/feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: _lastQuestion,
+            answer: _lastAnswer,
+            rating: _feedbackRating,
+            comment,
+          }),
+        });
+      } catch (_) { /* best-effort */ }
+      feedbackExtra.classList.remove('visible');
+      feedbackThanks.style.display = 'block';
+      thumbsUpBtn.style.pointerEvents = 'none';
+      thumbsDownBtn.style.pointerEvents = 'none';
+    }
+
+    thumbsUpBtn.addEventListener('click', () => {
+      _feedbackRating = 'up';
+      thumbsUpBtn.classList.add('selected');
+      thumbsDownBtn.classList.remove('selected');
+      feedbackExtra.classList.add('visible');
+    });
+    thumbsDownBtn.addEventListener('click', () => {
+      _feedbackRating = 'down';
+      thumbsDownBtn.classList.add('selected');
+      thumbsUpBtn.classList.remove('selected');
+      feedbackExtra.classList.add('visible');
+    });
+    feedbackSend.addEventListener('click', submitFeedback);
 
     function renderAnswer(data) {
       console.log('[renderAnswer] partial_match=', data.partial_match, 'answer_short length=', (data.answer_short || '').length);
@@ -1379,6 +1530,7 @@
       askStatus.textContent = `Heard: "${question}"`;
       questionEcho.textContent = `"${question}"`;
       answerText.textContent = '';
+      resetFeedback();
       answerPanel.classList.add('visible');
 
       try {
@@ -1440,6 +1592,7 @@
         askStatus.textContent = '';
         askStatus.style.display = 'none';
         showSuggestions(TRACKS[currentIdx].compartment);
+        showFeedback(question, answerPlain);
 
         // Auto-play: pre-recorded FAQ audio if available, else TTS
         playFaqAudioOrSpeak(data, answerPlain);
