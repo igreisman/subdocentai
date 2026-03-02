@@ -308,17 +308,23 @@
       flex-direction: column;
       gap: 8px;
     }
-    #feedbackRow.visible { display: flex; }
+
+    #feedbackRow.visible {
+      display: flex;
+    }
+
     #feedbackButtons {
       display: flex;
       align-items: center;
       gap: 10px;
     }
+
     #feedbackPrompt {
       font-size: 12px;
       color: #607090;
       flex: 1;
     }
+
     .fbBtn {
       background: #131d30;
       border: 1px solid #1e2d4a;
@@ -333,14 +339,27 @@
       justify-content: center;
       transition: background .15s, border-color .15s;
     }
-    .fbBtn:hover { background: #1e2d4a; border-color: #3a78cc; }
-    .fbBtn.selected { background: #1e3a6e; border-color: #3a78cc; }
+
+    .fbBtn:hover {
+      background: #1e2d4a;
+      border-color: #3a78cc;
+    }
+
+    .fbBtn.selected {
+      background: #1e3a6e;
+      border-color: #3a78cc;
+    }
+
     #feedbackExtra {
       display: none;
       flex-direction: column;
       gap: 6px;
     }
-    #feedbackExtra.visible { display: flex; }
+
+    #feedbackExtra.visible {
+      display: flex;
+    }
+
     #feedbackComment {
       width: 100%;
       background: #131d30;
@@ -353,7 +372,11 @@
       min-height: 60px;
       outline: none;
     }
-    #feedbackComment:focus { border-color: #3a78cc; }
+
+    #feedbackComment:focus {
+      border-color: #3a78cc;
+    }
+
     #feedbackSend {
       align-self: flex-end;
       background: #1e3a6e;
@@ -364,7 +387,11 @@
       font-size: 13px;
       cursor: pointer;
     }
-    #feedbackSend:hover { background: #2a4f8f; }
+
+    #feedbackSend:hover {
+      background: #2a4f8f;
+    }
+
     #feedbackThanks {
       font-size: 12px;
       color: #4a9a6a;
@@ -492,6 +519,7 @@
       align-items: center;
       justify-content: center;
     }
+
     #pwBox {
       background: #0d1525;
       border: 1px solid #1e2d4a;
@@ -501,12 +529,14 @@
       max-width: 320px;
       width: 90%;
     }
+
     #pwBox h2 {
       color: #c9d8f0;
       font-size: 1.2rem;
       margin-bottom: 18px;
       letter-spacing: .03em;
     }
+
     #pwInput {
       width: 100%;
       padding: 10px 14px;
@@ -519,15 +549,18 @@
       text-align: center;
       outline: none;
     }
+
     #pwInput:focus {
       border-color: #3a6fd8;
     }
+
     #pwError {
       color: #e05555;
       font-size: .85rem;
       margin-top: 10px;
       min-height: 1.2em;
     }
+
     #pwSubmit {
       margin-top: 16px;
       width: 100%;
@@ -539,7 +572,10 @@
       font-size: 1rem;
       cursor: pointer;
     }
-    #pwSubmit:hover { background: #2a4f8f; }
+
+    #pwSubmit:hover {
+      background: #2a4f8f;
+    }
   </style>
 </head>
 
@@ -888,12 +924,12 @@
     let _lastAnswer = '';
     let _feedbackRating = null;
 
-    const feedbackRow    = document.getElementById('feedbackRow');
-    const feedbackExtra  = document.getElementById('feedbackExtra');
+    const feedbackRow = document.getElementById('feedbackRow');
+    const feedbackExtra = document.getElementById('feedbackExtra');
     const feedbackThanks = document.getElementById('feedbackThanks');
-    const thumbsUpBtn    = document.getElementById('thumbsUp');
-    const thumbsDownBtn  = document.getElementById('thumbsDown');
-    const feedbackSend   = document.getElementById('feedbackSend');
+    const thumbsUpBtn = document.getElementById('thumbsUp');
+    const thumbsDownBtn = document.getElementById('thumbsDown');
+    const feedbackSend = document.getElementById('feedbackSend');
 
     function resetFeedback() {
       _feedbackRating = null;

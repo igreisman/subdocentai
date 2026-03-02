@@ -41,6 +41,12 @@ if os.path.isdir(WEB_DIR):
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/web/pampanito.html")
 
+    # Convenience redirect: /feedback.html → /web/feedback.html
+    @app.get("/feedback.html", include_in_schema=False)
+    def redirect_feedback_html():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/web/feedback.html")
+
     # Serve pampanito.html with no-cache so Safari always loads the latest version
     @app.get("/web/pampanito.html", include_in_schema=False)
     def serve_tour_html():
@@ -820,6 +826,24 @@ def receive_feedback(payload: dict):
         print(f"[feedback] write error: {e}")
     print(f"[feedback] {entry['rating']} — {entry['question'][:80]}")
     return {"status": "ok"}
+
+
+@app.get("/feedback/list")
+def list_feedback():
+    """Return all feedback entries, newest first. Admin use only."""
+    if not os.path.exists(FEEDBACK_PATH):
+        return []
+    entries = []
+    with open(FEEDBACK_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    entries.append(json.loads(line))
+                except Exception:
+                    pass
+    entries.reverse()
+    return entries
 
 
 # ------------------------------------------------------------
