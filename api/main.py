@@ -197,6 +197,57 @@ def tokenize(text: str) -> List[str]:
     return toks
 
 
+# Compartment phrases where a word that is normally meaningful (e.g. "battery",
+# "room") is being used purely as a location name.  When the raw query contains
+# one of these phrases we drop the ambiguous word from the query tokens so it
+# doesn't match unrelated corpus content (e.g. "battery" → electrical cells).
+_COMPARTMENT_AMBIGUOUS_TOKENS: List[Tuple[re.Pattern, str]] = [
+    (re.compile(r"\bafter\s+battery\b", re.I), "battery"),
+    (re.compile(r"\bforward\s+battery\b", re.I), "battery"),
+]
+
+
+def remove_compartment_noise(tokens: List[str], raw_query: str) -> List[str]:
+    """Drop tokens that are ambiguous location words in this raw query context."""
+    drop: set = set()
+    for pattern, ambiguous_tok in _COMPARTMENT_AMBIGUOUS_TOKENS:
+        if pattern.search(raw_query):
+            drop.add(ambiguous_tok)
+    if not drop:
+        return tokens
+    return [t for t in tokens if t not in drop]
+
+
+# Maps query-phrase patterns to corpus compartment_id values.
+# When the visitor names a compartment in their question, tour chunks from
+# that compartment get a strong scoring boost so we don't accidentally
+# answer about the wrong location.
+_COMPARTMENT_QUERY_MAP: List[Tuple[re.Pattern, str]] = [
+    (re.compile(r"\bafter\s+battery\b", re.I),          "after_battery"),
+    (re.compile(r"\bforward\s+battery\b", re.I),         "forward_battery"),
+    (re.compile(r"\bafter\s+torpedo\b", re.I),           "after_torpedo_room"),
+    (re.compile(r"\bforward\s+torpedo\b", re.I),         "forward_torpedo_room"),
+    (re.compile(r"\bconning\s+tower\b", re.I),           "conning_tower"),
+    (re.compile(r"\bcontrol\s+room\b", re.I),            "control_room"),
+    (re.compile(r"\bengine\s+room\b", re.I),             "engine_room"),
+    (re.compile(r"\bafter\s+deck\b", re.I),              "after_deck"),
+    (re.compile(r"\bforward\s+deck\b|fore\s+deck\b", re.I), "forward_deck"),
+    (re.compile(r"\bforward\s+engine\b", re.I),          "forward_engine_room"),
+    (re.compile(r"\bafter\s+engine\b", re.I),            "after_engine_room"),
+    (re.compile(r"\bward\s*room\b", re.I),               "wardroom"),
+    (re.compile(r"\bgalley\b", re.I),                    "galley"),
+    (re.compile(r"\bknife\s+&\s+fork\b|\bdining\b", re.I), "wardroom"),
+]
+
+
+def detect_compartment_in_query(raw_query: str) -> Optional[str]:
+    """Return the corpus compartment_id named in the query, or None."""
+    for pattern, cid in _COMPARTMENT_QUERY_MAP:
+        if pattern.search(raw_query):
+            return cid
+    return None
+
+
 # Synonym expansion applied to query tokens before scoring.
 # Maps a query word to extra tokens that count as a match in the corpus.
 QUERY_SYNONYMS: Dict[str, List[str]] = {
@@ -330,7 +381,9 @@ def retrieve(
     - Intent gating to prevent obviously wrong matches.
     """
     q_tokens = tokenize(question_text)
+    q_tokens = remove_compartment_noise(q_tokens, question_text)
     intent = detect_intent(q_tokens, question_text)
+    named_compartment = detect_compartment_in_query(question_text)
 
     hits: List[Hit] = []
 
@@ -357,6 +410,14 @@ def retrieve(
                 continue
 
             effective_weight = weight
+
+            # If the query explicitly names a compartment, strongly boost tour
+            # chunks from that compartment so they outrank equally-relevant
+            # chunks from other locations (e.g. "bunks in after battery" should
+            # not be answered with After Torpedo Room bunk content).
+            if named_compartment and source_id == "pampanito_tour":
+                if ch.get("compartment_id") == named_compartment:
+                    effective_weight *= 3.0
 
             # FAQ question-title match bonus: reward titles whose vocabulary
             # closely matches the query. Scale by title coverage so a short,
@@ -464,6 +525,7 @@ def synthesize_extractive(
     - Supplements with 1-2 sentences from a second chunk if needed.
     """
     q_tokens = tokenize(question_text)
+    q_tokens = remove_compartment_noise(q_tokens, question_text)
     intent = detect_intent(q_tokens, question_text)
 
     if intent.get("wants_mark_compare"):
@@ -598,14 +660,25 @@ def synthesize_extractive(
     else:
         answer_short = " ".join(used_sentences).strip()
 
-    # For WHERE questions answered from a tour chunk, prepend the location name
-    # so the visitor gets a direct answer before the elaborating content.
+    # For answers sourced from the audio tour, prepend a human-readable source line.
+    # Deck stops (fore/aft): "From the audio in the After Deck"
+    # Interior compartments : "From the audio in the Conning Tower compartment"
+    # Use citations[0] (the chunk whose text was actually used), not hits[0].
+    if citations and answer_short and citations[0].get("source_id") == "pampanito_tour":
+        # Find the matching chunk to get location_context
+        used_chunk_id = citations[0].get("chunk_id")
+        tour_ch = next((c for c in TOUR if c.get("chunk_id") == used_chunk_id), None)
+        if tour_ch:
+            stop_loc = (tour_ch.get("location_context") or "").strip()
+            if stop_loc:
+
+                    answer_short = f"From the audio tour in {stop_loc}\n\n{answer_short}"
     if intent.get("is_where_question") and hits and answer_short:
         top_ch = hits[0][1]
         loc = (top_ch.get("location_context") or "").strip()
-        # Only prepend if it's a tour chunk (not FAQ) and the answer doesn't
-        # already open with the location name.
-        if loc and hits[0][2] == "pampanito_tour" and not answer_short.lower().startswith(loc.lower()):
+        # Only prepend if the answer actually came from a tour chunk and the location
+        # name isn't already present near the top of the answer (e.g. from the audio prefix).
+        if loc and citations and citations[0].get("source_id") == "pampanito_tour" and loc.lower() not in answer_short[:120].lower():
             answer_short = f"In the {loc}. " + answer_short
 
     # Remove spoken filler words that appear in oral-history transcripts.

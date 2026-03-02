@@ -820,6 +820,22 @@
         console.log('[playFaqAudioOrSpeak] partial_match=false, skipping nodirectanswer.mp3');
       }
 
+      // If the answer comes from an FAQ source, play the "FAQ that covers this
+      // topic" preamble clip before the answer audio.
+      const citationSourceId = data.citations && data.citations[0] && data.citations[0].source_id;
+      if (citationSourceId === 'dieselsubs_faq' || citationSourceId === 'dieselsubs_shorts') {
+        try {
+          const faqCtrl = new AbortController();
+          const faqTimer = setTimeout(() => faqCtrl.abort(), 3000);
+          const faqResp = await fetch(getAudioUrl('faqThatCoversThisTopic.mp3'), { signal: faqCtrl.signal });
+          clearTimeout(faqTimer);
+          if (faqResp.ok) {
+            const faqBuf = await faqResp.arrayBuffer();
+            await new Promise(resolve => playArrayBuffer(faqBuf, resolve, 2.0));
+          }
+        } catch (e) { console.warn('[playFaqAudioOrSpeak] faqThatCoversThisTopic fetch/play error:', e); }
+      }
+
       const setSpeakStop = (onStop) => {
         showStopBtn();
       };
