@@ -224,6 +224,10 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "doctor":  ["pharmacist", "medical", "health", "sick", "ill", "medicine"],
     "medical": ["doctor", "pharmacist", "health", "sick", "ill", "medicine", "injury"],
     "hurt":    ["injured", "injury", "wound", "wounded", "sick", "ill", "medical"],
+    # computer / fire control questions → TDC in conning tower
+    "computer":  ["torpedo data computer", "tdc", "fire control", "targeting", "conning tower", "periscope", "attack"],
+    "computers": ["torpedo data computer", "tdc", "fire control", "targeting", "conning tower"],
+    "tdc":       ["torpedo data computer", "computer", "fire control", "targeting", "attack"],
 }
 
 
