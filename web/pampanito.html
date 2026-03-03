@@ -241,6 +241,37 @@
       min-height: 18px;
     }
 
+    #textAskRow {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      align-items: center;
+    }
+
+    #textAskInput {
+      flex: 1;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #2a3a5a;
+      background: #0d1525;
+      color: #c8d8f0;
+      font-size: 14px;
+    }
+
+    #textAskInput::placeholder { color: #3a5070; }
+
+    #textAskSend {
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid #2a4a7a;
+      background: #1a2a4a;
+      color: #c8d8f0;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    #textAskSend:active { background: #2a3a6a; }
+
     /* ── Answer panel ────────────────────────────────── */
     #answerPanel {
       width: 100%;
@@ -658,6 +689,11 @@
     <div id="askStatus">
       <span id="askStatusMsg"></span>
       <div id="suggestionsRow"></div>
+      <!-- Text-input fallback for browsers without SpeechRecognition (Android Firefox, etc.) -->
+      <div id="textAskRow" style="display:none">
+        <input id="textAskInput" type="text" placeholder="Type your question…" autocomplete="off" />
+        <button id="textAskSend">Ask</button>
+      </div>
     </div>
 
     <!-- Answer panel -->
@@ -1222,9 +1258,37 @@
 
     const LANG_BCP47 = { en: 'en-US', fr: 'fr-FR', de: 'de-DE', es: 'es-ES', zh: 'zh-CN', ja: 'ja-JP' };
 
-    // Hide mic buttons if SpeechRecognition unavailable
+    const textAskRow   = document.getElementById('textAskRow');
+    const textAskInput = document.getElementById('textAskInput');
+    const textAskSend  = document.getElementById('textAskSend');
+
+    function showTextFallback(hint) {
+      // Switch the mic button to a keyboard icon and show the text row
+      micBtn.textContent = '⌨️';
+      micBtn.title = 'Type your question';
+      micBtn.onclick = () => {
+        textAskRow.style.display = textAskRow.style.display === 'none' ? 'flex' : 'none';
+        if (textAskRow.style.display !== 'none') textAskInput.focus();
+      };
+      textAskRow.style.display = 'flex';
+      textAskInput.focus();
+      if (hint) askStatus.textContent = hint;
+    }
+
+    // Wire up text-ask submit
+    function submitTextAsk() {
+      const q = textAskInput.value.trim();
+      if (!q) return;
+      textAskInput.value = '';
+      textAskRow.style.display = 'none';
+      handleQuestion(correctTranscript(q));
+    }
+    textAskSend.onclick = submitTextAsk;
+    textAskInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitTextAsk(); });
+
+    // No SpeechRecognition on this browser — show keyboard fallback instead of hiding the button
     if (!SpeechRec) {
-      micBtn.style.display = 'none';
+      showTextFallback('Speech recognition not available — type your question below.');
     }
 
     micBtn.onclick = () => { unlockAudio(); if (isListening) stopListening(null); else startListening(); };
@@ -1275,9 +1339,19 @@
 
       recognition.onerror = (e) => {
         if (e.error === 'no-speech') return;
-        askStatus.textContent = `Mic error: ${e.error}`;
         clearTimeout(hardTimeout);
         stopListening(null);
+        // 'network' = Google Speech API unreachable (common on Android/local server)
+        // 'not-allowed' = mic permission denied
+        if (e.error === 'network' || e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          showTextFallback(
+            e.error === 'not-allowed'
+              ? 'Microphone blocked \u2014 type your question below.'
+              : 'Speech recognition unavailable \u2014 type your question below.'
+          );
+        } else {
+          askStatus.textContent = `Mic error: ${e.error}`;
+        }
       };
 
       recognition.onend = finishUp;
