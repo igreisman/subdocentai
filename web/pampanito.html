@@ -1071,9 +1071,15 @@
 
     function showAskBtn() {
       micBtn.classList.remove('answering');
-      micBtn.textContent = '🎙';
-      micBtn.title = 'Ask a Question';
-      micBtn.onclick = () => { unlockAudio(); if (isListening) stopListening(null); else startListening(); };
+      if (useRecordMode) {
+        micBtn.textContent = '🎙';
+        micBtn.title = 'Tap to record your question';
+        micBtn.onclick = () => { unlockAudio(); startRecordTranscribe(); };
+      } else {
+        micBtn.textContent = '🎙';
+        micBtn.title = 'Ask a Question';
+        micBtn.onclick = () => { unlockAudio(); if (isListening) stopListening(null); else startListening(); };
+      }
     }
 
     function stopAnswerAudio() {
@@ -1255,6 +1261,8 @@
     let mediaRecorder = null;
     let mediaChunks = [];
     let lastQuestionAudio = null;  // Blob of the most recent question recording
+    let transcribeAvailable = false; // true when server has OPENAI_API_KEY for Whisper
+    let useRecordMode = false;       // use MediaRecorder→server instead of SpeechRecognition
 
     const LANG_BCP47 = { en: 'en-US', fr: 'fr-FR', de: 'de-DE', es: 'es-ES', zh: 'zh-CN', ja: 'ja-JP' };
 
@@ -1275,6 +1283,16 @@
       if (hint) askStatus.textContent = hint;
     }
 
+    function enableRecordMode(hint) {
+      // Switch to server-side Whisper transcription (works on all Android browsers)
+      useRecordMode = true;
+      micBtn.textContent = '🎤';
+      micBtn.title = 'Tap to record your question';
+      micBtn.onclick = () => { unlockAudio(); startRecordTranscribe(); };
+      textAskRow.style.display = 'none';
+      if (hint) { askStatus.style.display = ''; askStatus.textContent = hint; }
+    }
+
     // Wire up text-ask submit
     function submitTextAsk() {
       const q = textAskInput.value.trim();
@@ -1286,10 +1304,23 @@
     textAskSend.onclick = submitTextAsk;
     textAskInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitTextAsk(); });
 
-    // No SpeechRecognition on this browser — show keyboard fallback instead of hiding the button
-    if (!SpeechRec) {
-      showTextFallback('Speech recognition not available — type your question below.');
-    }
+    // No SpeechRecognition on this browser — determine fallback mode:
+    // server Whisper if OPENAI_API_KEY is configured, else text input.
+    // Also checks at startup so the UI is set correctly before first tap.
+    (async () => {
+      try {
+        const s = loadSettings();
+        const resp = await fetch(`${s.apiBase}/health`);
+        if (resp.ok) { const d = await resp.json(); transcribeAvailable = !!d.transcribe_available; }
+      } catch (e) { /* server not yet up or no network */ }
+      if (!SpeechRec) {
+        if (transcribeAvailable) {
+          enableRecordMode('Tap 🎤 to record your question');
+        } else {
+          showTextFallback('Speech recognition not available — type your question below.');
+        }
+      }
+    })();
 
     micBtn.onclick = () => { unlockAudio(); if (isListening) stopListening(null); else startListening(); };
 
@@ -1377,7 +1408,95 @@
       }
     }
 
-    // ── Transcript correction (phonetic mishearing fixes) ─────────────────────
+    // ── Server-side Whisper transcription (record→POST→transcript) ───────────
+    // Used on Android browsers that lack SpeechRecognition or whose
+    // SpeechRecognition requires Google's cloud (network error on local server).
+    function startRecordTranscribe() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showTextFallback('Microphone not available — type your question below.');
+        return;
+      }
+      wasPlaying = isPlaying;
+      pause();
+      isListening = true;
+      micBtn.classList.add('listening');
+      micBtn.textContent = '⏹';
+      micBtn.title = 'Tap to stop recording';
+      micBtn.onclick = () => stopRecordTranscribe();
+      askStatus.style.display = '';
+      askStatus.textContent = '🔴 Recording… tap mic to stop';
+
+      const hardTimeout = setTimeout(() => stopRecordTranscribe(), 30000);
+
+      mediaChunks = [];
+      lastQuestionAudio = null;
+
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+          : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+          : '';
+        mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+        const capturedMime = mimeType || mediaRecorder.mimeType || 'audio/webm';
+
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) mediaChunks.push(e.data); };
+        mediaRecorder.onstop = async () => {
+          clearTimeout(hardTimeout);
+          stream.getTracks().forEach(t => t.stop());
+          isListening = false;
+          micBtn.classList.remove('listening');
+          micBtn.textContent = '🎤';
+          micBtn.title = 'Tap to record your question';
+          micBtn.onclick = () => { unlockAudio(); startRecordTranscribe(); };
+
+          const blob = new Blob(mediaChunks, { type: capturedMime });
+          lastQuestionAudio = blob;
+
+          if (blob.size < 500) {
+            askStatus.textContent = 'No audio captured — try again.';
+            if (wasPlaying) play();
+            return;
+          }
+
+          askStatus.textContent = '⧖ Transcribing…';
+          const s = loadSettings();
+          const ext = capturedMime.includes('mp4') ? 'mp4' : 'webm';
+          const form = new FormData();
+          form.append('audio', blob, `question.${ext}`);
+          form.append('lang', s.lang || 'en');
+
+          try {
+            const resp = await fetch(`${s.apiBase}/transcribe`, { method: 'POST', body: form });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            const transcript = (data.transcript || '').trim();
+            if (!transcript) {
+              askStatus.textContent = 'Could not understand — try again.';
+              if (wasPlaying) play();
+              return;
+            }
+            handleQuestion(correctTranscript(transcript));
+          } catch (err) {
+            console.error('[transcribe]', err);
+            showTextFallback('Transcription failed — type your question below.');
+            if (wasPlaying) play();
+          }
+        };
+        mediaRecorder.start(250);
+      }).catch(() => {
+        clearTimeout(hardTimeout);
+        isListening = false;
+        micBtn.classList.remove('listening');
+        micBtn.textContent = '🎤';
+        micBtn.title = 'Tap to record your question';
+        micBtn.onclick = () => { unlockAudio(); startRecordTranscribe(); };
+        showTextFallback('Microphone access denied — type your question below.');
+      });
+    }
+
+    function stopRecordTranscribe() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    }
     const CORRECTIONS = [
       // Ship name
       [/pam\s*pan+[ie]to/gi, 'Pampanito'],

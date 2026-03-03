@@ -1,10 +1,11 @@
 # api/main.py
 from __future__ import annotations
 
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+import io
 import json
 import os
 import re
@@ -68,6 +69,9 @@ SHORTS_PATH = os.path.join(CORPORA_DIR, "dieselsubs_shorts_corpus.jsonl")
 
 # Feature flag: keep demo fully local today; later, flip to true with funding.
 USE_LLM = os.getenv("USE_LLM", "false").lower() in ("1", "true", "yes")
+
+# OpenAI key — used for Whisper transcription and (later) LLM synthesis
+_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # ── Historian contact email ────────────────────────────────────────────────
 HISTORIAN_EMAIL = os.getenv("HISTORIAN_EMAIL", "irving.greisman@gmail.com")
@@ -171,11 +175,60 @@ def health():
     return {
         "status": "ok",
         "use_llm": USE_LLM,
+        "transcribe_available": bool(_OPENAI_API_KEY),
         "tour_chunks": len(TOUR),
         "faq_chunks": len(FAQ),
         "shorts_chunks": len(SHORTS),
         "corpora_dir": CORPORA_DIR,
     }
+
+
+@app.post("/transcribe")
+async def transcribe_audio(
+    audio: UploadFile = File(...),
+    lang: str = Form("en"),
+):
+    """Transcribe visitor speech using OpenAI Whisper.
+    Accepts any audio format MediaRecorder can produce (webm, mp4, ogg).
+    Returns {transcript: str}.
+    """
+    if not _OPENAI_API_KEY:
+        raise HTTPException(status_code=503, detail="Transcription not available: OPENAI_API_KEY not set")
+
+    audio_bytes = await audio.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Empty audio")
+
+    ct = (audio.content_type or "").lower()
+    if "mp4" in ct or "mpeg" in ct:
+        ext = "mp4"
+    elif "ogg" in ct:
+        ext = "ogg"
+    elif "wav" in ct:
+        ext = "wav"
+    else:
+        ext = "webm"
+
+    buf = io.BytesIO(audio_bytes)
+    buf.name = f"audio.{ext}"  # openai client uses the name for format detection
+
+    lang_map = {"en": "en", "fr": "fr", "de": "de", "es": "es", "zh": "zh", "ja": "ja"}
+    whisper_lang = lang_map.get(lang, "en")
+
+    try:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=_OPENAI_API_KEY)
+        result = await client.audio.transcriptions.create(
+            model="whisper-1",
+            file=buf,
+            language=whisper_lang,
+        )
+        transcript = (result.text or "").strip()
+        print(f"[TRANSCRIBE] '{transcript[:80]}'")
+        return {"transcript": transcript}
+    except Exception as e:
+        print(f"[TRANSCRIBE] Whisper error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ------------------------------------------------------------
