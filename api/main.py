@@ -188,7 +188,8 @@ STOPWORDS = {
     "it", "that", "this", "with", "as", "at", "by", "from", "about",
     "whats", "what's", "difference", "please", "tell", "me",
     # question / wh- words that carry no domain meaning on their own
-    "where", "how", "why", "when", "who", "which", "whose", "whom",
+    # NOTE: "why" is intentionally NOT here — it drives is_why_question intent detection
+    "where", "how", "when", "who", "which", "whose", "whom",
     # directional/location words too common on a submarine to be useful signals
     "after", "forward",
     # context-universal words: every chunk is about a submarine/boat
@@ -242,8 +243,8 @@ _COMPARTMENT_QUERY_MAP: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"\bconning\s+tower\b", re.I),           "conning_tower"),
     (re.compile(r"\bcontrol\s+room\b", re.I),            "control_room"),
     (re.compile(r"\bengine\s+room\b", re.I),             "engine_room"),
-    (re.compile(r"\bafter\s+deck\b", re.I),              "after_deck"),
-    (re.compile(r"\bforward\s+deck\b|fore\s+deck\b", re.I), "forward_deck"),
+    (re.compile(r"\bafter\s+deck\b|\bafterdeck\b", re.I), "after_deck"),
+    (re.compile(r"\bforward\s+deck\b|fore\s+deck\b|\bforedeck\b", re.I), "forward_deck"),
     (re.compile(r"\bforward\s+engine\b", re.I),          "forward_engine_room"),
     (re.compile(r"\bafter\s+engine\b", re.I),            "after_engine_room"),
     (re.compile(r"\bward\s*room\b", re.I),               "wardroom"),
@@ -291,6 +292,14 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "computer":  ["torpedo data computer", "tdc", "fire control", "targeting", "conning tower", "periscope", "attack"],
     "computers": ["torpedo data computer", "tdc", "fire control", "targeting", "conning tower"],
     "tdc":       ["torpedo data computer", "computer", "fire control", "targeting", "attack"],
+    # Speech-to-text substitutions: common mis-transcriptions mapped to intended words
+    # "controls" → "patrols" is a very common STT error (same syllable pattern)
+    "controls":  ["patrols", "patrol", "war patrol", "missions", "mission", "voyages"],
+    # "complete" / "completed" used when asking about patrols Pampanito finished
+    "complete":  ["completed", "conducted", "finished", "ran", "made", "patrols"],
+    # "afterdeck" (one word) ↔ "after deck" (two words) — both forms used by visitors
+    "afterdeck": ["after deck", "deck", "gun", "deck gun", "aft", "after"],
+    "foredeck":  ["forward deck", "deck", "gun", "deck gun", "forward"],
 }
 
 
@@ -340,10 +349,17 @@ def detect_intent(query_tokens: List[str], raw_question: str = "") -> Dict[str, 
         re.search(r"\bwhere (did|do|does|is|are|was|were|can)\b", raw_lower)
     )
 
+    # Causal/reason question: starts with "why" or asks for a reason/cause
+    is_why_question = bool(
+        re.match(r"\s*why\b", raw_lower) or
+        re.search(r"\b(reason|reasons|cause|causes|caused|motive|motives|motivation)\b", raw_lower)
+    )
+
     return {
         "wants_mark_compare": wants_mark_compare,
         "wants_quantity": wants_quantity,
         "is_where_question": is_where_question,
+        "is_why_question": is_why_question,
     }
 
 
@@ -594,13 +610,35 @@ def synthesize_extractive(
                 return (all(re.match(r"^\d+\.\s", l) for l in lines) or
                         all(l.startswith("•") for l in lines))
 
+            # Detect ASCII-art / diagram paragraphs that are visual-only and
+            # unreadable as audio.  Examples:
+            #   [Engine] [Generator] ==> [Cubicle] ==> [Main Motors]
+            #   A --> B --> C
+            _DIAGRAM_RE = re.compile(
+                r"(\[\w[\w\s]*\].*==>)"   # [Foo] ==> style
+                r"|(==>|-->|\|\s*\||\+-+\+)"  # arrows / box-drawing
+                r"|(^\s*\[[\w\s]+\](\s*\[[\w\s]+\])+\s*$)",  # only [Brack] tokens
+                re.MULTILINE,
+            )
+
+            def is_diagram_para(p: str) -> bool:
+                """True if the paragraph is an ASCII diagram, not speakable prose."""
+                return bool(_DIAGRAM_RE.search(p))
+
             result_paras: List[str] = []
             for para in answer_paragraphs:
+                # Skip un-speakable ASCII diagrams entirely
+                if is_diagram_para(para):
+                    continue
                 if is_list_para(para):
                     result_paras.append(para.strip())
                     continue
                 sents = [s for s in split_sentences(para) if len(s.strip()) >= 3]
                 if not sents:
+                    continue
+                # Drop dangling header sentences (end with ':' and are the only
+                # sentence in the paragraph — the body they introduced was removed)
+                if len(sents) == 1 and sents[0].rstrip().endswith(":"):
                     continue
                 result_paras.append(" ".join(sents))
             faq_body = "\n\n".join(result_paras).strip()
@@ -693,6 +731,44 @@ def synthesize_extractive(
         if loc and citations and citations[0].get("source_id") == "pampanito_tour" and loc.lower() not in answer_short[:120].lower():
             answer_short = f"In the {loc}. " + answer_short
 
+    # ── Audio-safety pass ────────────────────────────────────────────────────
+    # Strip any diagram lines, ASCII-art, and orphaned colon-headers that
+    # may have leaked through from long FAQ chunks.  Applied per-line so we
+    # don't accidentally drop valid prose containing an arrow in a sentence.
+    _DIAGRAM_LINE_RE = re.compile(
+        r"==>|-->"                        # arrow diagrams
+        r"|\[[A-Z][\w\s]{0,20}\].*\["    # [Foo] ... [Bar] bracket chains
+        r"|^\s*[|+][-+|]+[|+]\s*$"       # box-drawing lines
+        r"|^Note\s*:",                    # "NOTE :" headers from FAQ
+        re.IGNORECASE,
+    )
+
+    def clean_for_audio(text: str) -> str:
+        """Remove lines that are diagrams, ASCII art, or dangling colon-headers."""
+        out_paras: List[str] = []
+        for para in re.split(r"\n\n+", text):
+            out_lines: List[str] = []
+            for line in para.splitlines():
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                # Drop diagram / ASCII-art lines
+                if _DIAGRAM_LINE_RE.search(stripped):
+                    continue
+                # Drop orphaned paragraph-header lines (end with ':',
+                # contain no full sentence, and are the only line)
+                out_lines.append(line)
+            # After filtering, drop the paragraph if its only remaining content
+            # is a dangling header (single short line ending with ':')
+            if len(out_lines) == 1 and out_lines[0].rstrip().endswith(":"):
+                continue
+            joined = "\n".join(out_lines).strip()
+            if joined:
+                out_paras.append(joined)
+        return "\n\n".join(out_paras)
+
+    answer_short = clean_for_audio(answer_short)
+
     # Remove spoken filler words that appear in oral-history transcripts.
     # Patterns handled:
     #   "uh,"  "uh."  "uh "      → dropped with surrounding punctuation/space
@@ -712,6 +788,62 @@ def synthesize_extractive(
         return text.strip()
 
     answer_short = clean_speech_fillers(answer_short)
+
+    # For "why" questions: if the answer contains none of the causal markers
+    # that would indicate an actual explanation, the retrieved content is off-topic.
+    # Return a refusal rather than a misleading answer.
+    CAUSAL_MARKERS = [
+        "because", "reason", "reasons", "in order to", "caused", "cause",
+        "due to", "led to", "motivated", "motive", "objective", "strategy",
+        "provoked", "prompted", "intent", "intended", "wanted to", "sought",
+        "goal", "aim", "embargo", "retaliation", "threat", "feared",
+    ]
+    if intent.get("is_why_question"):
+        answer_lower = answer_short.lower()
+        has_causal = any(m in answer_lower for m in CAUSAL_MARKERS)
+        if not has_causal:
+            # The top-ranked chunk doesn't answer the "why". Scan remaining
+            # hits for any chunk whose text contains causal language and
+            # rebuild the answer from that instead of returning a refusal.
+            rebuilt = False
+            for _, ch_why, src_why in hits:
+                text_why = (ch_why.get("text", "") or "").lower()
+                if any(m in text_why for m in CAUSAL_MARKERS):
+                    # Found a causal chunk — synthesise from it directly.
+                    raw_text = (ch_why.get("text", "") or "").replace("\xa0", " ")
+                    raw_paras = [p.strip() for p in re.split(r"\n\n+", raw_text) if p.strip()]
+                    if raw_paras and raw_paras[0].rstrip().endswith("?"):
+                        faq_question = raw_paras[0].strip()
+                        body_paras = raw_paras[1:]
+                    else:
+                        faq_question = None
+                        body_paras = raw_paras
+                    body = "\n\n".join(p.strip() for p in body_paras if p.strip())
+                    if faq_question:
+                        answer_short = faq_question + "\n\n" + body
+                    else:
+                        answer_short = body
+                    citations = [{
+                        "source_id": src_why,
+                        "display_citation": ch_why.get("display_citation"),
+                        "chunk_id": ch_why.get("chunk_id"),
+                    }]
+                    rebuilt = True
+                    break
+            if not rebuilt:
+                return {
+                    "answer_mode": "standard",
+                    "answer_short": "I don't have that detail in the Pampanito audio tour or the DieselSubs reference material I'm using.",
+                    "partial_match": False,
+                    "answer_deep": None,
+                    "what_you_are_seeing": None,
+                    "citations": [],
+                    "followups": [
+                        "Are you asking about something specific to Pampanito or the Pacific submarine war?",
+                        "Want to know what role Pampanito played after Pearl Harbor?",
+                    ],
+                    "refusal": {"is_refusal": True, "reason": "no_source"},
+                }
 
     # Detect partial match:
     # 1. None of the subject query terms appear in the final answer, OR
