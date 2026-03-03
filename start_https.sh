@@ -14,7 +14,7 @@ if [ -f .env.local ]; then
 fi
 
 # Fallback: set these here only for local dev if .env.local is absent
-# export OPENAI_API_KEY=""
+# export GROQ_API_KEY=""     # get a free key at console.groq.com
 # export SMTP_USER=""
 # export SMTP_PASS=""
 

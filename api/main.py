@@ -70,8 +70,8 @@ SHORTS_PATH = os.path.join(CORPORA_DIR, "dieselsubs_shorts_corpus.jsonl")
 # Feature flag: keep demo fully local today; later, flip to true with funding.
 USE_LLM = os.getenv("USE_LLM", "false").lower() in ("1", "true", "yes")
 
-# OpenAI key — used for Whisper transcription and (later) LLM synthesis
-_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+# Groq key — used for Whisper transcription (whisper-large-v3-turbo, ~0.3s latency)
+_GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # ── Historian contact email ────────────────────────────────────────────────
 HISTORIAN_EMAIL = os.getenv("HISTORIAN_EMAIL", "irving.greisman@gmail.com")
@@ -175,7 +175,7 @@ def health():
     return {
         "status": "ok",
         "use_llm": USE_LLM,
-        "transcribe_available": bool(_OPENAI_API_KEY),
+        "transcribe_available": bool(_GROQ_API_KEY),
         "tour_chunks": len(TOUR),
         "faq_chunks": len(FAQ),
         "shorts_chunks": len(SHORTS),
@@ -188,12 +188,12 @@ async def transcribe_audio(
     audio: UploadFile = File(...),
     lang: str = Form("en"),
 ):
-    """Transcribe visitor speech using OpenAI Whisper.
+    """Transcribe visitor speech using Groq Whisper (whisper-large-v3-turbo).
     Accepts any audio format MediaRecorder can produce (webm, mp4, ogg).
     Returns {transcript: str}.
     """
-    if not _OPENAI_API_KEY:
-        raise HTTPException(status_code=503, detail="Transcription not available: OPENAI_API_KEY not set")
+    if not _GROQ_API_KEY:
+        raise HTTPException(status_code=503, detail="Transcription not available: GROQ_API_KEY not set")
 
     audio_bytes = await audio.read()
     if not audio_bytes:
@@ -217,9 +217,12 @@ async def transcribe_audio(
 
     try:
         from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=_OPENAI_API_KEY)
+        client = AsyncOpenAI(
+            api_key=_GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1",
+        )
         result = await client.audio.transcriptions.create(
-            model="whisper-1",
+            model="whisper-large-v3-turbo",
             file=buf,
             language=whisper_lang,
         )
@@ -227,7 +230,7 @@ async def transcribe_audio(
         print(f"[TRANSCRIBE] '{transcript[:80]}'")
         return {"transcript": transcript}
     except Exception as e:
-        print(f"[TRANSCRIBE] Whisper error: {e}")
+        print(f"[TRANSCRIBE] Groq Whisper error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
