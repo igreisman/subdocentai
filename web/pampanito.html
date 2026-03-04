@@ -317,6 +317,13 @@
       margin-bottom: 8px;
       color: #c9d8f0;
     }
+    .faq-id {
+      font-weight: 400;
+      font-size: 11px;
+      color: #6a8ab0;
+      margin-left: 4px;
+      white-space: nowrap;
+    }
 
     .faq-body {
       font-size: 14px;
@@ -1014,7 +1021,8 @@
         const q = text.slice(0, nlIdx);
         const body = text.slice(nlIdx + 2);
         const rendered = body.split('\n\n').map(renderBlock).join('');
-        answerText.innerHTML = disclaimer + `<div class="faq-question">${esc(q)}</div><div class="faq-body">${rendered}</div>`;
+        const faqBadge = data.faq_id ? ` <span class="faq-id">(${esc(data.faq_id)})</span>` : '';
+        answerText.innerHTML = disclaimer + `<div class="faq-question">${esc(q)}${faqBadge}</div><div class="faq-body">${rendered}</div>`;
       } else {
         answerText.innerHTML = disclaimer + `<span>${esc(text)}</span>`;
       }

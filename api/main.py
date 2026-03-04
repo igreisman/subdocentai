@@ -640,6 +640,7 @@ def synthesize_extractive(
     citations: List[Dict[str, Any]] = []
     faq_question: Optional[str] = None
     faq_body: Optional[str] = None  # paragraph-structured body, set for FAQ chunks
+    faq_chunk_id: Optional[str] = None  # e.g. "faq_591", returned to client for display
 
     # Primary chunk: sentences in original order, but for tour chunks
     # restrict to sentences containing at least one query term so a chunk
@@ -649,6 +650,7 @@ def synthesize_extractive(
         _, ch, source_id = hits[0]
         # For FAQ chunks: capture the question and build a paragraph-structured body
         if ch.get("doc_type") in ("dieselsubs_faq", "dieselsubs_shorts"):
+            faq_chunk_id = ch.get("chunk_id") or None
             raw_text = (ch.get("text", "") or "").replace("\xa0", " ")
             raw_paragraphs = [p.strip() for p in re.split(r"\n\n+", raw_text) if p.strip()]
             if raw_paragraphs and raw_paragraphs[0].rstrip().endswith("?"):
@@ -958,6 +960,7 @@ def synthesize_extractive(
         "answer_mode": "standard",
         "answer_short": answer_short,
         "partial_match": partial_match,
+        "faq_id": faq_chunk_id,
         "answer_deep": None,
         "what_you_are_seeing": None,
         "citations": citations[:2],
