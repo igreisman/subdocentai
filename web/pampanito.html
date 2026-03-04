@@ -595,8 +595,6 @@
       margin-top: 10px;
       min-height: 1.2em;
     }
-
-
   </style>
 </head>
 
@@ -1245,7 +1243,7 @@
     let mediaRecorder = null;
     let mediaChunks = [];
     let lastQuestionAudio = null;  // Blob of the most recent question recording
-    let transcribeAvailable = false; // true when server has OPENAI_API_KEY for Whisper
+    let transcribeAvailable = true; // default true — downgraded only if /health says false
     let useRecordMode = false;       // use MediaRecorder→server instead of SpeechRecognition
 
     const LANG_BCP47 = { en: 'en-US', fr: 'fr-FR', de: 'de-DE', es: 'es-ES', zh: 'zh-CN', ja: 'ja-JP' };
@@ -1288,22 +1286,26 @@
     textAskSend.onclick = submitTextAsk;
     textAskInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitTextAsk(); });
 
-    // No SpeechRecognition on this browser — determine fallback mode:
-    // server Whisper if OPENAI_API_KEY is configured, else text input.
-    // Also checks at startup so the UI is set correctly before first tap.
+    // Determine speech mode on startup.
+    // We default transcribeAvailable=true so record mode is used even if the
+    // health check fails (e.g. visitor hasn't accepted the self-signed cert yet).
+    // We only downgrade if /health explicitly returns transcribe_available:false.
     (async () => {
       try {
         const s = loadSettings();
         const resp = await fetch(`${s.apiBase}/health`);
-        if (resp.ok) { const d = await resp.json(); transcribeAvailable = !!d.transcribe_available; }
-      } catch (e) { /* server not yet up or no network */ }
+        if (resp.ok) {
+          const d = await resp.json();
+          transcribeAvailable = !!d.transcribe_available;
+        }
+        // If fetch fails (cert not trusted, server down), transcribeAvailable stays true
+      } catch (e) { /* keep optimistic default */ }
       if (transcribeAvailable) {
-        // Prefer server-side Groq Whisper over native SpeechRecognition on all
-        // browsers — it's faster, more accurate, and works on Android Chrome.
         enableRecordMode('Tap 🎤 to record your question');
       } else if (!SpeechRec) {
         showTextFallback('Speech recognition not available — type your question below.');
       }
+      // else: SpeechRec exists and server has no Groq key → use native SpeechRecognition
     })();
 
     micBtn.onclick = () => { unlockAudio(); if (isListening) stopListening(null); else startListening(); };
