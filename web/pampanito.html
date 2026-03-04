@@ -258,7 +258,9 @@
       font-size: 14px;
     }
 
-    #textAskInput::placeholder { color: #3a5070; }
+    #textAskInput::placeholder {
+      color: #3a5070;
+    }
 
     #textAskSend {
       padding: 6px 14px;
@@ -270,7 +272,9 @@
       cursor: pointer;
     }
 
-    #textAskSend:active { background: #2a3a6a; }
+    #textAskSend:active {
+      background: #2a3a6a;
+    }
 
     /* ── Answer panel ────────────────────────────────── */
     #answerPanel {
@@ -1266,9 +1270,9 @@
 
     const LANG_BCP47 = { en: 'en-US', fr: 'fr-FR', de: 'de-DE', es: 'es-ES', zh: 'zh-CN', ja: 'ja-JP' };
 
-    const textAskRow   = document.getElementById('textAskRow');
+    const textAskRow = document.getElementById('textAskRow');
     const textAskInput = document.getElementById('textAskInput');
-    const textAskSend  = document.getElementById('textAskSend');
+    const textAskSend = document.getElementById('textAskSend');
 
     function showTextFallback(hint) {
       // Switch the mic button to a keyboard icon and show the text row
@@ -1313,12 +1317,12 @@
         const resp = await fetch(`${s.apiBase}/health`);
         if (resp.ok) { const d = await resp.json(); transcribeAvailable = !!d.transcribe_available; }
       } catch (e) { /* server not yet up or no network */ }
-      if (!SpeechRec) {
-        if (transcribeAvailable) {
-          enableRecordMode('Tap 🎤 to record your question');
-        } else {
-          showTextFallback('Speech recognition not available — type your question below.');
-        }
+      if (transcribeAvailable) {
+        // Prefer server-side Groq Whisper over native SpeechRecognition on all
+        // browsers — it's faster, more accurate, and works on Android Chrome.
+        enableRecordMode('Tap 🎤 to record your question');
+      } else if (!SpeechRec) {
+        showTextFallback('Speech recognition not available — type your question below.');
       }
     })();
 
@@ -1434,8 +1438,8 @@
       navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
         const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
           : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
-          : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
-          : '';
+            : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+              : '';
         mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
         const capturedMime = mimeType || mediaRecorder.mimeType || 'audio/webm';
 
