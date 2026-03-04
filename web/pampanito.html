@@ -1286,10 +1286,12 @@
     textAskSend.onclick = submitTextAsk;
     textAskInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitTextAsk(); });
 
-    // Determine speech mode on startup.
-    // We default transcribeAvailable=true so record mode is used even if the
-    // health check fails (e.g. visitor hasn't accepted the self-signed cert yet).
-    // We only downgrade if /health explicitly returns transcribe_available:false.
+    // Always start in record mode immediately (no race condition with async fetch).
+    // The health check below can only downgrade to native speech or text fallback
+    // if the server explicitly reports no Groq key — it can never prevent record mode.
+    enableRecordMode('Tap 🎤 to record your question');
+
+    // Background health check — downgrade only if server says no Groq key.
     (async () => {
       try {
         const s = loadSettings();
@@ -1297,18 +1299,22 @@
         if (resp.ok) {
           const d = await resp.json();
           transcribeAvailable = !!d.transcribe_available;
+          if (!transcribeAvailable) {
+            if (SpeechRec) {
+              // Server has no Groq key but browser has native speech — use it
+              useRecordMode = false;
+              showAskBtn();
+              askStatus.style.display = 'none';
+            } else {
+              showTextFallback('Speech recognition not available — type your question below.');
+            }
+          }
         }
-        // If fetch fails (cert not trusted, server down), transcribeAvailable stays true
-      } catch (e) { /* keep optimistic default */ }
-      if (transcribeAvailable) {
-        enableRecordMode('Tap 🎤 to record your question');
-      } else if (!SpeechRec) {
-        showTextFallback('Speech recognition not available — type your question below.');
-      }
-      // else: SpeechRec exists and server has no Groq key → use native SpeechRecognition
+        // fetch error or bad response → stay in record mode
+      } catch (e) { /* keep record mode */ }
     })();
 
-    micBtn.onclick = () => { unlockAudio(); if (isListening) stopListening(null); else startListening(); };
+    micBtn.onclick = () => { unlockAudio(); startRecordTranscribe(); };
 
     function startListening() {
       if (!SpeechRec || !window.isSecureContext) return;
