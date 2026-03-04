@@ -92,21 +92,7 @@
       min-height: 1.2em;
     }
 
-    #pwSubmit {
-      margin-top: 16px;
-      width: 100%;
-      padding: 10px;
-      background: #1e3a6e;
-      color: #c9d8f0;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      cursor: pointer;
-    }
 
-    #pwSubmit:hover {
-      background: #2a4f8f;
-    }
 
     /* ── Toolbar ── */
     #toolbar {
@@ -252,9 +238,8 @@
   <div id="pwGate">
     <div id="pwBox">
       <h2>Password?</h2>
-      <input id="pwInput" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" />
+      <input id="pwInput" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" maxlength="4" />
       <div id="pwError"></div>
-      <button id="pwSubmit">Enter</button>
     </div>
   </div>
 
@@ -284,19 +269,16 @@
       const gate = document.getElementById('pwGate');
       const input = document.getElementById('pwInput');
       const err = document.getElementById('pwError');
-      const btn = document.getElementById('pwSubmit');
-      function attempt() {
-        if (input.value.trim() === '1941') {
+      input.addEventListener('input', function () {
+        if (input.value.length < 4) return;
+        if (input.value === '1941') {
           gate.style.display = 'none';
           loadFeedback();
         } else {
-          err.textContent = 'Incorrect password.';
+          err.textContent = 'Incorrect — try again.';
           input.value = '';
-          input.focus();
         }
-      }
-      btn.addEventListener('click', attempt);
-      input.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(); });
+      });
       input.focus();
     })();
 
