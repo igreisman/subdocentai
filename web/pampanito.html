@@ -1286,12 +1286,19 @@
     textAskSend.onclick = submitTextAsk;
     textAskInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitTextAsk(); });
 
-    // Always start in record mode immediately (no race condition with async fetch).
-    // The health check below can only downgrade to native speech or text fallback
-    // if the server explicitly reports no Groq key — it can never prevent record mode.
-    enableRecordMode('Tap 🎤 to record your question');
+    // Android Chrome has webkitSpeechRecognition but it fails in practice (no Google
+    // Speech API, local HTTPS certs, etc).  Use Groq Whisper record mode on Android
+    // and on any browser without SpeechRecognition.  Desktop browsers get native
+    // SpeechRecognition which auto-detects silence — no tap-to-stop needed.
+    const isAndroid = /android/i.test(navigator.userAgent);
+    if (isAndroid || !SpeechRec) {
+      enableRecordMode('Tap 🎤 to record your question');
+    } else {
+      showAskBtn();
+    }
 
-    // Background health check — downgrade only if server says no Groq key.
+    // Background health check — if server has no Groq key, ensure Android falls
+    // back to text input and desktop stays in native-speech mode.
     (async () => {
       try {
         const s = loadSettings();
@@ -1300,21 +1307,14 @@
           const d = await resp.json();
           transcribeAvailable = !!d.transcribe_available;
           if (!transcribeAvailable) {
-            if (SpeechRec) {
-              // Server has no Groq key but browser has native speech — use it
-              useRecordMode = false;
-              showAskBtn();
-              askStatus.style.display = 'none';
-            } else {
+            if (isAndroid || !SpeechRec) {
               showTextFallback('Speech recognition not available — type your question below.');
             }
+            // Desktop with native SpeechRec: already in native mode, nothing to change
           }
         }
-        // fetch error or bad response → stay in record mode
-      } catch (e) { /* keep record mode */ }
+      } catch (e) { /* keep current mode */ }
     })();
-
-    micBtn.onclick = () => { unlockAudio(); startRecordTranscribe(); };
 
     function startListening() {
       if (!SpeechRec || !window.isSecureContext) return;
