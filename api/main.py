@@ -244,7 +244,7 @@ STOPWORDS = {
     "it", "that", "this", "with", "as", "at", "by", "from", "about",
     "whats", "what's", "difference", "please", "tell", "me",
     # common filler words that appear everywhere and create false score matches
-    "any", "there",
+    "any", "there", "than", "other",
     # question / wh- words that carry no domain meaning on their own
     # NOTE: "why" is intentionally NOT here — it drives is_why_question intent detection
     "where", "how", "when", "who", "which", "whose", "whom",
@@ -360,6 +360,10 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "bunk":   ["bunks", "bed", "beds", "rack", "racks", "berthing"],
     # "banks" is a common STT mishearing of "bunks" (also handled client-side)
     "banks":  ["bunks", "bunk", "bed", "beds", "rack", "racks", "berthing"],
+    # crew quality / selection questions
+    "smarter":  ["intelligent", "qualified", "trained", "selected", "better", "volunteers"],
+    "sailors":  ["submariners", "crewmen", "crew", "enlisted", "men", "personnel"],
+    "submariners": ["sailors", "crewmen", "crew", "enlisted", "men", "personnel"],
     # Speech-to-text substitutions: common mis-transcriptions mapped to intended words
     # "controls" → "patrols" is a very common STT error (same syllable pattern)
     "controls":  ["patrols", "patrol", "war patrol", "missions", "mission", "voyages"],

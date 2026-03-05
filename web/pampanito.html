@@ -317,6 +317,7 @@
       margin-bottom: 8px;
       color: #c9d8f0;
     }
+
     .faq-id {
       font-weight: 400;
       font-size: 11px;
@@ -1526,6 +1527,8 @@
       [/mk\.?\s*18/gi, 'Mark 18'],
       // Phonetic STT substitutions
       [/\bbanks\b/gi, 'bunks'],   // "banks" heard instead of "bunks"
+      // "where is" → "were" before crew/people nouns (common ASR error)
+      [/\bwhere\s+is\s+(submariners?|sailors?|officers?|crewmen?|crew\b|men\b)/gi, 'were $1'],
       // Sub systems
       [/diesel?\s+sub(marine)?s?/gi, 'diesel submarines'],
       [/bal+ao/gi, 'Balao'],
