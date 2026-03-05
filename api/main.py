@@ -243,6 +243,8 @@ STOPWORDS = {
     "to", "and", "for", "some", "between", "did", "do", "does", "you",
     "it", "that", "this", "with", "as", "at", "by", "from", "about",
     "whats", "what's", "difference", "please", "tell", "me",
+    # common filler words that appear everywhere and create false score matches
+    "any", "there",
     # question / wh- words that carry no domain meaning on their own
     # NOTE: "why" is intentionally NOT here — it drives is_why_question intent detection
     "where", "how", "when", "who", "which", "whose", "whom",
@@ -348,6 +350,12 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "computer":  ["torpedo data computer", "tdc", "fire control", "targeting", "conning tower", "periscope", "attack"],
     "computers": ["torpedo data computer", "tdc", "fire control", "targeting", "conning tower"],
     "tdc":       ["torpedo data computer", "computer", "fire control", "targeting", "attack"],
+    # plural/singular bridging
+    "rooms":  ["room"],
+    "room":   ["rooms"],
+    # sleeping / berthing
+    "bunks":  ["bunk", "sleep", "slept", "sleeping", "bed", "beds", "rack", "racks", "berthing"],
+    "bunk":   ["bunks", "sleep", "slept", "sleeping", "bed", "beds", "rack", "racks", "berthing"],
     # Speech-to-text substitutions: common mis-transcriptions mapped to intended words
     # "controls" → "patrols" is a very common STT error (same syllable pattern)
     "controls":  ["patrols", "patrol", "war patrol", "missions", "mission", "voyages"],
