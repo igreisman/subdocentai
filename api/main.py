@@ -353,9 +353,13 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     # plural/singular bridging
     "rooms":  ["room"],
     "room":   ["rooms"],
-    # sleeping / berthing
-    "bunks":  ["bunk", "sleep", "slept", "sleeping", "bed", "beds", "rack", "racks", "berthing"],
-    "bunk":   ["bunks", "sleep", "slept", "sleeping", "bed", "beds", "rack", "racks", "berthing"],
+    # sleeping / berthing — physical berthing terms only; do NOT include sleep/slept
+    # which over-matches tour chunks about the sleeping *experience* (e.g. "I slept
+    # in the aft torpedo room") when the visitor is asking about the physical bunks.
+    "bunks":  ["bunk", "bed", "beds", "rack", "racks", "berthing"],
+    "bunk":   ["bunks", "bed", "beds", "rack", "racks", "berthing"],
+    # "banks" is a common STT mishearing of "bunks" (also handled client-side)
+    "banks":  ["bunks", "bunk", "bed", "beds", "rack", "racks", "berthing"],
     # Speech-to-text substitutions: common mis-transcriptions mapped to intended words
     # "controls" → "patrols" is a very common STT error (same syllable pattern)
     "controls":  ["patrols", "patrol", "war patrol", "missions", "mission", "voyages"],
@@ -507,9 +511,19 @@ def retrieve(
             # chunks from that compartment so they outrank equally-relevant
             # chunks from other locations (e.g. "bunks in after battery" should
             # not be answered with After Torpedo Room bunk content).
+            # Guard: only apply the boost when the chunk also matches a query
+            # token *beyond* the compartment-name tokens themselves.  Without
+            # this, "were there bunks in the after torpedo room" inflates tour
+            # chunks that only share "torpedo"+"room" with the query and score
+            # 2×9=18, burying FAQ entries that explicitly list the bunks.
             if named_compartment and source_id == "pampanito_tour":
                 if ch.get("compartment_id") == named_compartment:
-                    effective_weight *= 3.0
+                    comp_toks = set(tokenize(named_compartment.replace("_", " ")))
+                    content_q_tokens = [t for t in q_tokens if t not in comp_toks]
+                    # Boost when: no content tokens (pure compartment query) OR
+                    # at least one content token matches something in the chunk
+                    if not content_q_tokens or overlap_score(content_q_tokens, text) > 0:
+                        effective_weight *= 3.0
 
             # FAQ question-title match bonus: reward titles whose vocabulary
             # closely matches the query. Scale by title coverage so a short,
