@@ -364,6 +364,11 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "smarter":  ["intelligent", "qualified", "trained", "selected", "better", "volunteers"],
     "sailors":  ["submariners", "crewmen", "crew", "enlisted", "men", "personnel"],
     "submariners": ["sailors", "crewmen", "crew", "enlisted", "men", "personnel"],
+    # food storage vocabulary
+    "stored":    ["stowed", "stow", "storage", "kept", "loaded", "provisions", "provisioned"],
+    "stowed":    ["stored", "storage", "stow", "kept", "provisions"],
+    "kept":      ["stored", "stowed", "storage", "stow", "provisions"],
+    "provisions":["food", "stores", "stored", "stowed", "supply", "supplies"],
     # Speech-to-text substitutions: common mis-transcriptions mapped to intended words
     # "controls" → "patrols" is a very common STT error (same syllable pattern)
     "controls":  ["patrols", "patrol", "war patrol", "missions", "mission", "voyages"],
