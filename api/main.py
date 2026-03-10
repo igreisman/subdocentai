@@ -348,6 +348,7 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "men":    ["crew", "sailors", "crewmen", "enlisted", "personnel", "complement"],
     "served": ["crew", "crewmen", "complement", "enlisted", "assigned"],
     "crew":   ["men", "sailors", "crewmen", "complement", "personnel", "enlisted"],
+    "crews":  ["crew", "men", "sailors", "crewmen", "complement", "personnel", "enlisted"],
     # illness / medical questions
     "sick":    ["ill", "illness", "health", "doctor", "pharmacist", "medical", "medicine", "injury", "injured", "wound", "wounded", "hurt"],
     "ill":     ["sick", "illness", "health", "doctor", "pharmacist", "medical"],
