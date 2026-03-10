@@ -349,6 +349,25 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "served": ["crew", "crewmen", "complement", "enlisted", "assigned"],
     "crew":   ["men", "sailors", "crewmen", "complement", "personnel", "enlisted"],
     "crews":  ["crew", "men", "sailors", "crewmen", "complement", "personnel", "enlisted"],
+    # medical
+    "doctors": ["doctor", "medical", "pharmacist", "corpsman", "medic", "physician"],
+    "doctor":  ["doctors", "medical", "pharmacist", "corpsman", "medic", "physician"],
+    "medical": ["doctor", "doctors", "pharmacist", "corpsman", "medic", "hospital"],
+    # supply / resupply
+    "resupplied": ["resupply", "supply", "supplies", "fuel", "reloaded", "restock"],
+    "resupply":   ["resupplied", "supply", "supplies", "fuel", "restock"],
+    # radar (distinct from sonar — different technology)
+    "radar":  ["detection", "sensors", "electronic", "radio", "sj"],
+    # decommission
+    "decommissioned":   ["decommissioning", "decommission", "retired", "mothballed", "inactive"],
+    "decommissioning":  ["decommissioned", "decommission", "retired", "mothballed"],
+    # museum / preservation
+    "preserved":  ["preservation", "restore", "restored", "maintain", "museum"],
+    "museum":     ["preserved", "preservation", "historic", "landmark", "exhibit"],
+    # war contribution / strategy
+    "strategy":   ["strategic", "campaign", "plan", "mission", "objective", "tactics"],
+    "contribute": ["contributed", "contribution", "role", "impact", "win", "winning"],
+    "won":    ["win", "winning", "victory", "defeat", "outcome"],
     # illness / medical questions
     "sick":    ["ill", "illness", "health", "doctor", "pharmacist", "medical", "medicine", "injury", "injured", "wound", "wounded", "hurt"],
     "ill":     ["sick", "illness", "health", "doctor", "pharmacist", "medical"],
