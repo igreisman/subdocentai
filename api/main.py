@@ -457,8 +457,79 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     # galley / kitchen
     "galley":  ["kitchen", "cook", "cooks", "cooking", "chow", "mess"],
     "kitchen": ["galley", "cook", "cooks", "cooking", "chow", "food"],
-    # snorkel
-    "snorkel":  ["breathe", "air", "diesel", "mast", "snorkeling"],
+    # snorkel (pam_175)
+    "snorkel":  ["breathe", "air", "diesel", "mast", "snorkeling", "snort"],
+    "snorkeling": ["snorkel", "snort", "diesel", "surface", "recharge"],
+    "snort":    ["snorkel", "snorkeling", "diesel", "recharge"],
+    # control room (pam_156)
+    "christmas":  ["tree", "green board", "board", "dials", "diving", "control"],
+    "green":      ["board", "christmas", "tree", "light", "dive", "safe"],
+    # garbage / trash disposal (pam_158)
+    "garbage":   ["trash", "waste", "disposal", "dispose", "gdu", "discard"],
+    "trash":     ["garbage", "waste", "disposal", "dispose", "gdu"],
+    "disposal":  ["garbage", "trash", "waste", "dispose", "gdu"],
+    "dispose":   ["garbage", "trash", "waste", "disposal", "gdu"],
+    # enemy survivors (pam_159)
+    "survivors": ["survivor", "rescued", "rescue", "enemy", "prisoner"],
+    "survivor":  ["survivors", "rescued", "rescue", "enemy", "prisoner"],
+    # fires / flooding (pam_160)
+    "fire":      ["fires", "flooding", "flood", "emergency", "emergency procedures", "danger"],
+    "fires":     ["fire", "flooding", "flood", "emergency"],
+    "flooding":  ["flood", "fire", "fires", "emergency", "leak", "leaking"],
+    "flood":     ["flooding", "fire", "fires", "emergency", "leak"],
+    "emergency": ["fire", "fires", "flooding", "flood", "aground", "danger", "crash"],
+    "leak":      ["flooding", "flood", "fire", "damage", "hull"],
+    # periscope feather (pam_161)
+    "feather":   ["periscope", "wake", "spray", "surface", "visible"],
+    "wake":      ["feather", "periscope", "surface", "visible", "wave"],
+    # boredom / morale (pam_162)
+    "boredom":   ["boring", "morale", "entertainment", "recreation", "pass time"],
+    "boring":    ["boredom", "morale", "entertainment", "recreation"],
+    "morale":    ["boredom", "boring", "entertainment", "recreation", "crew"],
+    "entertainment": ["boredom", "boring", "morale", "recreation", "games"],
+    "recreation":    ["boredom", "boring", "morale", "entertainment", "games"],
+    # grounded / aground (pam_164)
+    "aground":   ["grounded", "ground", "shoal", "shallow", "stuck"],
+    "grounded":  ["aground", "ground", "shoal", "shallow", "stuck"],
+    # battle stars (pam_166)
+    "stars":     ["battle", "star", "award", "awarded", "recognition", "credit"],
+    "star":      ["battle", "stars", "award", "awarded"],
+    # flying bridge (pam_167)
+    "bridge":    ["flying", "conn", "surface", "watch", "lookout", "top"],
+    "flying":    ["bridge", "conn", "top", "platform"],
+    # deep / dive depth (pam_168)
+    "deep":      ["depth", "feet", "test", "dive", "diving", "crush", "hull"],
+    "depth":     ["deep", "feet", "test", "dive", "underwater"],
+    "feet":      ["deep", "depth", "test", "400", "300"],
+    # magnetic exploder / dud torpedoes (pam_169)
+    "magnetic":  ["exploder", "exploders", "dud", "duds", "torpedo", "fail"],
+    "exploder":  ["magnetic", "exploders", "dud", "duds", "torpedo", "fail"],
+    "exploders": ["magnetic", "exploder", "dud", "duds", "torpedo"],
+    "dud":       ["duds", "magnetic", "exploder", "torpedo", "malfunction", "failed"],
+    "duds":      ["dud", "magnetic", "exploder", "torpedo", "malfunction"],
+    # celebrate / victory (pam_171)
+    "celebrate": ["celebration", "celebrating", "victory", "attack", "successful", "after"],
+    "celebration": ["celebrate", "celebrating", "victory", "attack"],
+    "victory":   ["celebrate", "celebration", "successful", "won", "win"],
+    # return to port / liberty (pam_172)
+    "liberty":   ["port", "leave", "rest", "r&r", "shore", "hawaii", "pearl"],
+    "leave":     ["liberty", "port", "rest", "r&r", "shore"],
+    "r&r":       ["liberty", "leave", "rest", "port"],
+    "returned":  ["return", "port", "liberty", "leave", "patrol"],
+    "return":    ["returned", "port", "liberty", "leave", "patrol"],
+    # Silent Service / nickname (pam_173)
+    "silent":    ["service", "nickname", "secretive", "secret", "quiet"],
+    "nickname":  ["silent", "service", "called", "known as", "name"],
+    # ace / best commander (pam_170)
+    "ace":       ["best", "top", "successful", "commander", "captain", "score"],
+    "best":      ["top", "ace", "successful", "most", "commander", "captain"],
+    "top":       ["best", "ace", "successful", "most", "commander"],
+    # periscope depth (pam_176)
+    "periscope": ["scope", "lens", "look", "observation", "conning", "tower"],
+    # construction / building (pam_174)
+    "construction": ["build", "built", "building", "shipyard", "keel", "launch"],
+    "shipyard":     ["build", "built", "construction", "built", "keel"],
+    "keel":         ["shipyard", "construction", "built", "build", "launch"],
     # qualification / dolphins / insignia (pam_136, pam_137)
     "qualified":   ["qualification", "qualify", "dolphins", "pin", "insignia", "certified", "certification"],
     "qualify":     ["qualified", "qualification", "dolphins", "pin", "insignia"],
