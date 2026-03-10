@@ -715,6 +715,78 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "targeting": ["aob", "angle", "bow", "fire control", "solution", "target"],
     "target":    ["targeting", "aob", "angle", "bow", "fire control", "solution"],
     "angle":     ["aob", "bow", "approach", "bearing", "target angle"],
+    # periscope attack procedure (pam_198)
+    "procedure": ["periscope", "attack", "approach", "step", "steps", "solution", "fire"],
+    "step":      ["procedure", "steps", "periscope", "attack", "approach"],
+    "steps":     ["procedure", "step", "periscope", "attack", "approach"],
+    "firing":    ["fire", "fire solution", "tdc", "shoot", "attack", "torpedo"],
+    "solution":  ["fire", "tdc", "firing", "bearing", "attack", "approach"],
+    # after engine room (pam_199) — extends existing "forward" / "fairbanks" entries
+    "aft":       ["after", "stern", "rear", "engine room", "maneuvering"],
+    "rear":      ["aft", "after", "stern", "engine room"],
+    # diving planes (pam_200)
+    "planesman": ["planes", "bow planes", "stern planes", "depth", "hydroplane", "control"],
+    "hydroplane":["planes", "bow planes", "planesman", "depth", "diving"],
+    "bow":       ["planes", "planesman", "hydroplane", "bow planes", "forward"],
+    "rudder":    ["planes", "planesman", "hydroplane", "stern planes", "yaw", "heading"],
+    # radar (pam_201) — extends existing "aircraft" entries
+    "radar":     ["sj", "sd", "surface search", "air search", "contact", "pip", "scan"],
+    "sj":        ["radar", "surface search", "contact", "range", "bearing"],
+    "sd":        ["radar", "air search", "aircraft", "plane", "warning"],
+    # tropical heat / temperature (pam_202)
+    "heat":      ["hot", "temperature", "tropical", "tropics", "sweat", "humid"],
+    "hot":       ["heat", "temperature", "tropical", "tropics", "sweat", "humid"],
+    "temperature":["heat", "hot", "tropical", "tropics", "celsius", "degrees"],
+    "tropical":  ["heat", "hot", "temperature", "tropics", "pacific", "equator"],
+    "tropics":   ["tropical", "heat", "hot", "temperature", "pacific", "equator"],
+    "humid":     ["heat", "hot", "tropical", "sweat", "temperature"],
+    # submarine captain qualities (pam_203) — extends existing "ace/best" entries
+    "captain":   ["commander", "co", "qualities", "leadership", "commanding", "officer"],
+    "commander": ["captain", "co", "qualities", "leadership", "commanding", "officer"],
+    "commanding":["captain", "commander", "co", "officer", "leadership"],
+    "qualities": ["captain", "commander", "co", "leadership", "good", "best", "ace"],
+    "leadership":["qualities", "captain", "commander", "co", "best", "ace"],
+    # depth charge attack experience (pam_204) — extends existing "sonar/sound" entries
+    "pinging":   ["sonar", "asdic", "hydrophone", "depth charge", "ping", "hunter"],
+    "ping":      ["pinging", "sonar", "asdic", "hydrophone", "depth charge"],
+    "asdic":     ["sonar", "pinging", "ping", "hydrophone", "depth charge", "jap"],
+    "concussion":["depth charge", "explosion", "bang", "blast", "charge", "attack"],
+    "scared":    ["depth charge", "fear", "terrifying", "terrified", "attack", "morale"],
+    "fear":      ["depth charge", "scared", "terrifying", "morale", "attack"],
+    "terrifying":["depth charge", "scared", "fear", "concussion", "attack"],
+    # evading destroyers (pam_205) — extends existing "destroyer/silent" entries
+    "evade":     ["evading", "evasion", "escape", "hide", "silent", "deep", "quiet"],
+    "evading":   ["evade", "evasion", "escape", "hide", "silent", "deep", "quiet"],
+    "evasion":   ["evade", "evading", "escape", "hide", "silent", "deep", "quiet"],
+    "quiet":     ["silent", "silent running", "evade", "evasion", "noise"],
+    "hide":      ["evade", "evading", "evasion", "silent", "deep", "quiet"],
+    # aircraft threat (pam_206) — strengthens existing "aircraft/planes" entries
+    "air":       ["aircraft", "airplane", "planes", "threat", "patrol", "bomb"],
+    "bomb":      ["aircraft", "airplane", "depth charge", "attack", "threat"],
+    "threat":    ["aircraft", "airplane", "destroyer", "destroyers", "danger"],
+    # US Navy wolfpack tactics (pam_207) — strengthens existing "wolfpack" entries
+    "coordinated":["wolfpack", "wolfpacks", "tactics", "pack", "group", "coordinate"],
+    "coordinate": ["wolfpack", "wolfpacks", "tactics", "pack", "group", "coordinated"],
+    "group":      ["wolfpack", "coordinated", "tactics", "pack", "coordinate"],
+    # US subs vs enemy submarines (pam_208)
+    "enemy":      ["japanese", "submarine", "enemy submarine", "batfish", "sank"],
+    "batfish":    ["enemy submarine", "japanese submarine", "sank", "killed", "sink"],
+    "engagements":["enemy submarine", "submarine", "batfish", "sank", "fight"],
+    "engagement": ["enemy submarine", "submarine", "batfish", "sank", "fight"],
+    "sank":       ["sunk", "sink", "sinking", "enemy", "batfish", "submarine"],
+    # magnetic vs contact exploder distinction (pam_209) — extends existing "magnetic/exploder" entries
+    "contact":    ["magnetic", "exploder", "mark 6", "fuze", "fuse", "dud", "detonate"],
+    "mark":       ["mark 6", "magnetic", "exploder", "torpedo", "mark 14", "mark 18"],
+    "detonate":   ["magnetic", "exploder", "contact", "dud", "fuze", "fuse", "fire"],
+    "fuse":       ["magnetic", "exploder", "contact", "detonate", "fuze", "mark 6"],
+    "fuze":       ["fuse", "magnetic", "exploder", "contact", "detonate", "mark 6"],
+    # Japanese anti-submarine warfare (pam_210)
+    "japanese":   ["asw", "anti-submarine", "japanese asw", "destroyer", "convoy", "depth charge"],
+    "asw":        ["japanese", "anti-submarine", "destroyer", "destroyers", "depth charge"],
+    "anti-submarine": ["asw", "japanese", "depth charge", "convoy", "destroyer"],
+    "effectiveness":  ["japanese", "asw", "anti-submarine", "losses", "successful", "effective"],
+    "effective":      ["effectiveness", "japanese", "asw", "anti-submarine", "losses"],
+    "hunter":     ["asw", "anti-submarine", "japanese", "destroyer", "depth charge"],
 }
 
 
