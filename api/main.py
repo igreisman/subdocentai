@@ -383,6 +383,9 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "stowed":    ["stored", "storage", "stow", "kept", "provisions"],
     "kept":      ["stored", "stowed", "storage", "stow", "provisions"],
     "provisions":["food", "stores", "stored", "stowed", "supply", "supplies"],
+    # torpedo singular/plural pairing
+    "torpedo":   ["torpedoes", "fired", "launched", "shot", "warhead"],
+    "torpedoes": ["torpedo", "fired", "launched", "shot", "warhead"],
     # underwater communication vocabulary
     "communicate": ["communication", "radio", "transmit", "transmission", "message", "messages", "signal", "contact", "talk"],
     "communication": ["communicate", "radio", "transmit", "message", "signal", "contact"],
