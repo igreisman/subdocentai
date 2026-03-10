@@ -410,8 +410,7 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     # torpedo singular/plural pairing
     "torpedo":   ["torpedoes", "fired", "launched", "shot", "warhead"],
     "torpedoes": ["torpedo", "fired", "launched", "shot", "warhead"],
-    # underwater communication vocabulary
-    "communicate": ["communication", "radio", "transmit", "transmission", "message", "messages", "signal", "contact", "talk"],
+    # underwater communication vocabulary — merged entry (see also batch-10 radio/telephone synonyms)
     "communication": ["communicate", "radio", "transmit", "message", "signal", "contact"],
     # Speech-to-text substitutions: common mis-transcriptions mapped to intended words
     # "controls" → "patrols" is a very common STT error (same syllable pattern)
@@ -616,6 +615,106 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "clothing":["clothes", "uniform", "uniforms", "wore", "wear", "wearing", "dress"],
     "uniform": ["uniforms", "clothes", "clothing", "wore", "wear", "dress"],
     "uniforms":["uniform", "clothes", "clothing", "wore", "wear", "dress"],
+    # OOD / officer of the deck (pam_177)
+    "ood":       ["deck", "deck watch", "officer", "watch", "conn", "conning", "underway"],
+    "conn":      ["ood", "deck", "officer", "watch", "conning", "bridge"],
+    # conning tower (pam_178)
+    "conning":   ["tower", "conn", "periscope", "helm", "tdc", "fairwater"],
+    "tower":     ["conning", "conn", "fairwater", "periscope"],
+    "fairwater": ["conning", "tower", "sail", "conn"],
+    # training / qualification (pam_179)
+    "training":  ["trained", "train", "school", "submarine school", "new london", "qualification", "qualify"],
+    "trained":   ["training", "train", "school", "submarine school", "new london"],
+    "school":    ["submarine school", "qualify", "qualification"],
+    # sound-powered telephone (pam_180)
+    "telephone": ["phone", "phones", "sound-powered", "spt", "circuit", "intercom"],
+    "phone":     ["telephone", "phones", "sound-powered", "spt", "circuit", "intercom"],
+    "intercom":  ["telephone", "phone", "sound-powered", "spt", "circuit"],
+    # communicate / recognize (pam_180, pam_181)
+    "recognize":  ["recognition", "silhouette", "night", "identification", "identify", "dark"],
+    # night identification / silhouette recognition (pam_181)
+    "identify":  ["recognition", "silhouette", "night", "identify", "identification", "oni", "dark"],
+    "silhouette":["identify", "recognition", "night", "identification", "oni", "dark"],
+    "recognition":["identify", "identification", "silhouette", "night", "dark"],
+    # after torpedo room / aft (pam_182)
+    "stern":     ["aft", "after", "rear", "torpedo room", "tubes"],
+    # volunteer / selection (pam_183)
+    "volunteer": ["volunteers", "volunteered", "selected", "selection", "screened", "choose"],
+    "volunteers":["volunteer", "volunteered", "selected", "selection", "screened"],
+    "screened":  ["volunteer", "selected", "selection", "screen", "testing", "physical"],
+    "selection": ["volunteer", "volunteers", "selected", "screened", "choose", "pick"],
+    # sunk / survive (pam_184)
+    "sunk":      ["sink", "sinking", "lost", "survival", "survive", "casualty", "casualties"],
+    "sink":      ["sunk", "sinking", "lost", "survival", "survive", "casualty"],
+    "sinking":   ["sunk", "sink", "lost", "survival", "survive", "casualty"],
+    "survival":  ["sunk", "sink", "survive", "casualty", "casualties", "escape"],
+    "survive":   ["sunk", "sink", "sinking", "survival", "casualty", "casualties"],
+    # night surface attack (pam_185)
+    "surface":   ["surfaced", "surfacing", "awash"],
+    "surfaced":  ["surface", "surfacing", "awash"],
+    "surfacing": ["surface", "surfaced", "blow", "awash"],
+    # lookout / binoculars / aircraft (pam_186)
+    "lookout":   ["lookouts", "watch", "binoculars", "bridge watch", "aircraft", "sector"],
+    "lookouts":  ["lookout", "watch", "binoculars", "bridge watch", "aircraft"],
+    "binoculars":["lookout", "lookouts", "watch", "glasses", "optics"],
+    # refueled / fuel (pam_187)
+    "refueled":  ["fuel", "fueled", "refuel", "refueling", "tender", "base", "guam", "midway"],
+    "refuel":    ["refueled", "fuel", "fueled", "refueling", "tender", "base"],
+    "refueling": ["refueled", "fuel", "fueled", "refuel", "tender", "base"],
+    # angle on the bow / AOB (pam_188)
+    "aob":       ["angle", "bow", "target angle", "approach angle", "track"],
+    "approach":  ["aob", "angle", "bow", "attack", "intercept", "course"],
+    # radio / Pearl Harbor (pam_189)
+    "radio":     ["communicate", "communication", "broadcast", "transmit", "ultra", "pearl harbor"],
+    "communicate":["telephone", "phone", "sound-powered", "radio", "broadcast", "transmit", "communication", "transmission", "message", "signal", "contact", "talk"],
+    "broadcast": ["radio", "communicate", "communication", "transmit", "pearl harbor"],
+    "transmit":  ["radio", "broadcast", "communicate", "transmission", "signal"],
+    "ultra":     ["radio", "intelligence", "decrypt", "signal", "code"],
+    "contact":   ["radio", "communicate", "broadcast", "transmit", "pearl harbor", "signal"],
+    # forward engine room (pam_190)
+    "forward":   ["engine room", "fairbanks", "diesel", "forward engine", "engines"],
+    "fairbanks": ["engine", "engines", "diesel", "forward engine room", "forward"],
+    # celestial navigation / dead reckoning (pam_191)
+    "celestial": ["sextant", "stars", "star sights", "navigation", "navigate", "dead reckoning"],
+    "sextant":   ["celestial", "stars", "star sights", "navigation", "navigate"],
+    "reckoning": ["dead reckoning", "celestial", "navigation", "navigate", "position"],
+    "position":  ["celestial", "sextant", "navigate", "navigation", "fix", "dead reckoning"],
+    # when to surface / surfacing timing (pam_192)
+    "dusk":      ["surface", "surfaced", "surfacing", "sunset", "dark", "timing"],
+    "timing":    ["surface", "surfaced", "when", "decision", "dusk", "sunset"],
+    # escape trunk / Momsen lung (pam_193)
+    "escape":    ["trunk", "hatch", "momsen", "lung", "abandon", "emergency"],
+    "trunk":     ["escape", "hatch", "momsen", "lung", "abandon", "emergency"],
+    "hatch":     ["escape", "trunk", "momsen", "lung", "abandon"],
+    "momsen":    ["escape", "trunk", "hatch", "lung", "rescue"],
+    # sonar / passive listening (pam_194)
+    "sonar":     ["hydrophone", "passive", "listening", "doppler", "sound", "propeller", "screw"],
+    "hydrophone":["sonar", "passive", "listening", "sound", "propeller"],
+    "passive":   ["sonar", "hydrophone", "listening", "doppler", "active"],
+    "doppler":   ["sonar", "hydrophone", "passive", "listening", "speed", "frequency"],
+    # chief of the boat / COB (pam_195)
+    "cob":       ["chief", "boat", "senior enlisted", "chief of the boat", "master chief"],
+    # torpedo spread / fan shot (pam_196)
+    "spread":    ["fan", "fan shot", "torpedo spread", "gyro", "salvo", "pattern", "spreads"],
+    "spreads":   ["fan", "fan shot", "torpedo spread", "gyro", "salvo", "spread"],
+    "fan":       ["spread", "spreads", "fan shot", "torpedo spread", "gyro", "salvo"],
+    "salvo":     ["spread", "spreads", "fan", "torpedo", "multiple", "volley"],
+    # collision / fratricide / deconflict (pam_197)
+    "collision": ["collide", "colliding", "friendly fire", "fratricide", "deconflict", "sector"],
+    "collide":   ["collision", "colliding", "friendly fire", "fratricide"],
+    "colliding": ["collision", "collide", "friendly fire", "fratricide"],
+    "fratricide":["collision", "collide", "friendly fire", "deconflict", "wolfpack"],
+    "deconflict":["collision", "collide", "fratricide", "sector", "zone"],
+    "friendly":  ["fratricide", "deconflict", "collision", "wolfpack", "zone", "sector"],
+    "attacking": ["collision", "fratricide", "friendly fire", "collide"],
+    # sonar / listen / operators (pam_194)
+    "listen":    ["sonar", "hydrophone", "passive", "listening", "sound operators", "operators"],
+    "listening": ["listen", "sonar", "hydrophone", "passive", "sound operators"],
+    "operators": ["sonar", "hydrophone", "listen", "listening", "passive", "sound operators"],
+    # targeting / fire control / AOB (pam_188)
+    "targeting": ["aob", "angle", "bow", "fire control", "solution", "target"],
+    "target":    ["targeting", "aob", "angle", "bow", "fire control", "solution"],
+    "angle":     ["aob", "bow", "approach", "bearing", "target angle"],
 }
 
 
