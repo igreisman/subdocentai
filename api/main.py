@@ -253,7 +253,9 @@ STOPWORDS = {
     # context-universal words: every chunk is about a submarine/boat
     "submarine", "boat", "sub",
     # ultra-generic verbs / pronouns with no domain signal
-    "got", "get", "gets", "gotten", "happened", "happen",
+    "got", "get", "gets", "gotten",
+    # NOTE: "happened" / "happen" intentionally NOT here — they disambiguate
+    # "what happened to X?" questions from generic "where is X?" questions.
     "someone", "something", "somebody", "anyone", "anything",
     "people", "person", "things", "thing",
     # generic auxiliary / modal verbs with no domain signal
@@ -339,6 +341,8 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "shoot":  ["fire", "fired", "firing", "launch", "launched", "torpedo", "attack"],
     "dive":   ["dived", "diving", "submerge", "submerged", "submerging", "crash dive"],
     "speed":  ["knots", "fast", "faster", "slow", "slower", "velocity"],
+    "fast":   ["speed", "knots", "faster", "velocity", "slow", "slower"],
+    "faster": ["fast", "speed", "knots", "velocity"],
     "engine": ["engines", "motor", "motors", "diesel", "electric", "power", "drive"],
     # crew-size questions: "men" and "served" should find crew/complement content
     "men":    ["crew", "sailors", "crewmen", "enlisted", "personnel", "complement"],
