@@ -459,6 +459,92 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "kitchen": ["galley", "cook", "cooks", "cooking", "chow", "food"],
     # snorkel
     "snorkel":  ["breathe", "air", "diesel", "mast", "snorkeling"],
+    # qualification / dolphins / insignia (pam_136, pam_137)
+    "qualified":   ["qualification", "qualify", "dolphins", "pin", "insignia", "certified", "certification"],
+    "qualify":     ["qualified", "qualification", "dolphins", "pin", "insignia"],
+    "dolphins":    ["qualified", "qualification", "insignia", "pin", "badge", "warfare"],
+    "insignia":    ["dolphins", "qualified", "pin", "badge", "warfare", "qualification"],
+    "badge":       ["insignia", "dolphins", "pin", "qualified"],
+    "certification": ["qualified", "qualify", "qualification", "insignia"],
+    # executive officer / XO (pam_139)
+    "executive":   ["xo", "exec", "officer", "second", "command"],
+    "xo":          ["executive", "exec", "officer", "second", "command"],
+    "exec":        ["executive", "xo", "officer", "second"],
+    # battle stations / general quarters (pam_140)
+    "battle":      ["stations", "general quarters", "gq", "combat", "quarters", "manned"],
+    "stations":    ["battle", "station", "general quarters", "gq", "quarters"],
+    "quarters":    ["battle stations", "general quarters", "station", "gq"],
+    # pharmacist / corpsman — extend existing entries
+    "pharmacist":  ["corpsman", "medic", "medical", "doctor", "mate", "surgeon"],
+    "corpsman":    ["pharmacist", "medic", "medical", "doctor", "mate"],
+    "mate":        ["pharmacist", "corpsman", "medic"],
+    # ballast / buoyancy / diving (pam_143)
+    "ballast":     ["tank", "tanks", "dive", "diving", "submerge", "flood", "blow", "buoyancy"],
+    "buoyancy":    ["ballast", "tank", "tanks", "float", "dive", "submerge"],
+    "flood":       ["ballast", "tank", "tanks", "dive", "submerge"],
+    "blow":        ["ballast", "tank", "tanks", "surface", "surfaced"],
+    # fleet boat / fleet submarine (pam_146)
+    "fleet":       ["boat", "submarine", "class", "type", "design"],
+    # patrol report / after-action (pam_144)
+    "report":      ["reports", "patrol report", "log", "logs", "record", "records", "documented"],
+    "reports":     ["report", "patrol report", "log", "logs", "record"],
+    # Gato / Balao / class differences (pam_148)
+    "gato":        ["balao", "class", "submarine", "design", "type"],
+    "balao":       ["gato", "class", "submarine", "design", "type", "depth"],
+    "class":       ["gato", "balao", "tench", "type", "design", "difference"],
+    "difference":  ["class", "compare", "compared", "versus", "vs", "unlike"],
+    "versus":      ["difference", "vs", "compare", "compared", "unlike"],
+    "vs":          ["versus", "difference", "compare", "compared"],
+    # died / killed (pam_154 / pam_056)
+    "died":        ["killed", "death", "dead", "die", "lost", "casualties"],
+    "die":         ["died", "killed", "death", "dead", "casualties"],
+    "killed":      ["died", "death", "dead", "die", "lost", "casualties"],
+    "death":       ["died", "killed", "dead", "die", "casualties"],
+    # orders / patrol assignments (pam_155 / pam_096)
+    # One-directional: "orders" finds pam_096 ("assignments"); but "assignments"
+    # already finds pam_096 directly — don't let it also expand to "orders" (pam_155)
+    "orders":      ["assignments", "assigned", "mission", "directed", "patrol"],
+    "assigned":    ["orders", "mission", "directed"],
+    # recharge / battery (pam_147)
+    "recharge":    ["recharging", "recharged", "charge", "charging", "battery", "batteries"],
+    "recharging":  ["recharge", "recharged", "charge", "charging", "battery", "batteries"],
+    "batteries":   ["battery", "recharge", "recharging", "charge", "power", "electric"],
+    "battery":     ["batteries", "recharge", "recharging", "charge", "power", "electric"],
+    # destroyer / tin can threat (pam_150)
+    "destroyers":  ["destroyer", "escort", "escorts", "tin", "threat", "anti-submarine", "asw"],
+    "tin":         ["destroyer", "destroyers", "can", "escort", "asw"],
+    "escort":      ["destroyer", "destroyers", "escorts", "anti-submarine", "asw"],
+    "escorts":     ["destroyer", "destroyers", "escort", "anti-submarine", "asw"],
+    # daily / duties (pam_149)
+    "daily":       ["duties", "day", "routine", "typical", "schedule", "work"],
+    "duties":      ["daily", "job", "tasks", "role", "responsibility", "routine"],
+    "routine":     ["daily", "duties", "day", "schedule", "typical"],
+    # commissioning (pam_152)
+    "commissioning": ["commissioned", "ceremony", "day", "placed", "service"],
+    "commissioned":  ["commissioning", "ceremony", "day", "placed", "service"],
+    # sound / noise (pam_151)
+    "sound":   ["sounds", "hear", "heard", "noise", "loud", "bang", "explosion"],
+    "sounds":  ["sound", "hear", "heard", "noise", "loud", "bang"],
+    "hear":    ["sound", "sounds", "heard", "noise", "loud"],
+    "heard":   ["sound", "sounds", "hear", "noise", "bang"],
+    "noise":   ["sound", "sounds", "hear", "heard", "loud", "bang", "explosion"],
+    "loud":    ["sound", "noise", "hear", "heard", "bang", "explosion"],
+    "bang":    ["sound", "noise", "explosion", "heard", "loud"],
+    # POW rescue vocabulary (pam_138)
+    "rescue":  ["rescued", "rescuing", "save", "saved", "survivor", "survivors", "pow", "prisoner"],
+    "rescued": ["rescue", "rescuing", "save", "saved", "survivor", "survivors", "pow"],
+    "prisoner":["prisoners", "pow", "pows", "captive", "captives", "rescued", "rescue"],
+    "prisoners":["prisoner", "pow", "pows", "captive", "captives", "rescued"],
+    "pow":     ["prisoner", "prisoners", "captive", "captives", "rescued", "rescue"],
+    "pows":    ["prisoner", "prisoners", "pow", "captive", "captives", "rescued"],
+    # wear / clothing (pam_135)
+    "wore":    ["wear", "wearing", "worn", "clothes", "clothing", "uniform", "uniforms"],
+    "wear":    ["wore", "wearing", "worn", "clothes", "clothing", "uniform", "uniforms"],
+    "wearing": ["wear", "wore", "worn", "clothes", "clothing", "uniform"],
+    "clothes": ["clothing", "uniform", "uniforms", "wore", "wear", "wearing"],
+    "clothing":["clothes", "uniform", "uniforms", "wore", "wear", "wearing", "dress"],
+    "uniform": ["uniforms", "clothes", "clothing", "wore", "wear", "dress"],
+    "uniforms":["uniform", "clothes", "clothing", "wore", "wear", "dress"],
 }
 
 
