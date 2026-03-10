@@ -421,6 +421,44 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     # "afterdeck" (one word) ↔ "after deck" (two words) — both forms used by visitors
     "afterdeck": ["after deck", "deck", "gun", "deck gun", "aft", "after"],
     "foredeck":  ["forward deck", "deck", "gun", "deck gun", "forward"],
+    # lifeguard mission / downed pilots rescue
+    "lifeguard": ["rescue", "downed", "pilots", "airmen", "aviators"],
+    "airmen":    ["lifeguard", "pilots", "aviators", "downed", "rescue"],
+    "pilots":    ["airmen", "lifeguard", "aviators", "downed", "rescue", "aircraft"],
+    "downed":    ["lifeguard", "airmen", "pilots", "aviators", "rescue"],
+    # mine-laying
+    "mines":       ["mine", "minelaying", "lay", "laying"],
+    "mine":        ["mines", "minelaying", "lay", "laying"],
+    "minelaying":  ["mines", "mine", "lay", "laying"],
+    # wolfpack / coordinated attack
+    "wolfpack":  ["wolf", "pack", "coordinated", "tactics", "packs"],
+    "wolfpacks": ["wolfpack", "wolf", "pack", "coordinated", "tactics"],
+    "wolf":      ["wolfpack", "wolfpacks", "pack", "coordinated"],
+    # convoy / merchant shipping
+    "convoy":   ["convoys", "merchant", "shipping", "transports", "fleet"],
+    "convoys":  ["convoy", "merchant", "shipping", "transports", "fleet"],
+    # aircraft threat
+    "aircraft":  ["plane", "planes", "airplane", "airplanes", "patrol"],
+    "airplane":  ["aircraft", "plane", "planes", "airplanes"],
+    "planes":    ["aircraft", "airplane", "airplanes", "plane"],
+    "plane":     ["aircraft", "airplane", "airplanes", "planes"],
+    # seasickness
+    "seasick":    ["seasickness", "sick", "nauseous", "motion", "vomit"],
+    "seasickness":["seasick", "sick", "nauseous", "motion"],
+    "nauseous":   ["seasick", "seasickness", "sick", "motion"],
+    # claustrophobia
+    "claustrophobia":  ["confined", "enclosed", "tight", "crowded", "phobia"],
+    "claustrophobic":  ["claustrophobia", "confined", "enclosed", "tight"],
+    "confined":        ["claustrophobia", "claustrophobic", "enclosed", "tight"],
+    # warship / naval vessel types
+    "warship":   ["warships", "destroyer", "cruiser", "naval", "vessel"],
+    "warships":  ["warship", "destroyer", "cruiser", "naval", "vessels"],
+    "destroyer": ["warship", "warships", "escort", "destroyer escort"],
+    # galley / kitchen
+    "galley":  ["kitchen", "cook", "cooks", "cooking", "chow", "mess"],
+    "kitchen": ["galley", "cook", "cooks", "cooking", "chow", "food"],
+    # snorkel
+    "snorkel":  ["breathe", "air", "diesel", "mast", "snorkeling"],
 }
 
 
