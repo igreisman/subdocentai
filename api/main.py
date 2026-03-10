@@ -256,6 +256,10 @@ STOPWORDS = {
     "got", "get", "gets", "gotten", "happened", "happen",
     "someone", "something", "somebody", "anyone", "anything",
     "people", "person", "things", "thing",
+    # generic auxiliary / modal verbs with no domain signal
+    "could", "would", "should", "had", "have", "has", "if", "its", "been",
+    # all content is WWII-era so these words match everything equally
+    "world", "war", "ii",
 }
 
 
@@ -364,11 +368,24 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "smarter":  ["intelligent", "qualified", "trained", "selected", "better", "volunteers"],
     "sailors":  ["submariners", "crewmen", "crew", "enlisted", "men", "personnel"],
     "submariners": ["sailors", "crewmen", "crew", "enlisted", "men", "personnel"],
+    # submerged / underwater propulsion vocabulary
+    "underwater": ["submerged", "submerge", "dived", "diving", "dive", "battery", "batteries"],
+    "submerged":  ["underwater", "dived", "diving", "dive", "battery", "batteries"],
+    "needed":     ["need", "needs", "require", "required", "requires", "uses", "use"],
+    "need":       ["needed", "needs", "require", "required", "requires"],
+    # torpedo reload vocabulary
+    "reloads":   ["reload", "reloading", "reloaded", "loading", "loaded", "skid", "skids"],
+    "reload":    ["reloads", "reloading", "reloaded", "loading", "loaded", "skid", "skids"],
+    "reloading": ["reload", "reloads", "reloaded", "loading", "loaded", "skid", "skids"],
+    "handled":   ["loaded", "done", "managed", "moved", "operated", "worked"],
     # food storage vocabulary
     "stored":    ["stowed", "stow", "storage", "kept", "loaded", "provisions", "provisioned"],
     "stowed":    ["stored", "storage", "stow", "kept", "provisions"],
     "kept":      ["stored", "stowed", "storage", "stow", "provisions"],
     "provisions":["food", "stores", "stored", "stowed", "supply", "supplies"],
+    # underwater communication vocabulary
+    "communicate": ["communication", "radio", "transmit", "transmission", "message", "messages", "signal", "contact", "talk"],
+    "communication": ["communicate", "radio", "transmit", "message", "signal", "contact"],
     # Speech-to-text substitutions: common mis-transcriptions mapped to intended words
     # "controls" → "patrols" is a very common STT error (same syllable pattern)
     "controls":  ["patrols", "patrol", "war patrol", "missions", "mission", "voyages"],
