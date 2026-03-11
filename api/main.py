@@ -254,6 +254,8 @@ STOPWORDS = {
     "submarine", "boat", "sub",
     # ultra-generic verbs / pronouns with no domain signal
     "got", "get", "gets", "gotten",
+    # prepositions with no domain meaning
+    "into", "onto", "upon", "within", "without", "through", "throughout",
     # NOTE: "happened" / "happen" intentionally NOT here — they disambiguate
     # "what happened to X?" questions from generic "where is X?" questions.
     "someone", "something", "somebody", "anyone", "anything",
@@ -267,6 +269,9 @@ STOPWORDS = {
 
 def tokenize(text: str) -> List[str]:
     text = (text or "").lower()
+    # Preserve known hyphenated terms before stripping punctuation
+    text = re.sub(r"\bv-mail\b", "vmail", text)
+    text = re.sub(r"\bjn-25\b", "jn25", text)
     # keep numbers (Mark 14 / Mark 18), strip punctuation
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     # keep tokens longer than 2 chars, OR 2-char pure numbers (e.g. "14", "18")
@@ -318,10 +323,12 @@ _COMPARTMENT_QUERY_MAP: List[Tuple[re.Pattern, str]] = [
 
 
 def detect_compartment_in_query(raw_query: str) -> Optional[str]:
-    """Return the corpus compartment_id named in the query, or None."""
-    for pattern, cid in _COMPARTMENT_QUERY_MAP:
-        if pattern.search(raw_query):
-            return cid
+    """Return the corpus compartment_id named in the query, or None.
+    If multiple compartments are mentioned (comparison query), return None
+    so the boost isn't applied unfairly to one side."""
+    matches = [cid for pattern, cid in _COMPARTMENT_QUERY_MAP if pattern.search(raw_query)]
+    if len(matches) == 1:
+        return matches[0]
     return None
 
 
@@ -337,7 +344,7 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "live":   ["lived", "living", "berthing", "bunk", "quarters", "crew"],
     "shower": ["showers", "bath", "wash", "washing", "hygiene", "head"],
     "toilet": ["head", "restroom", "bathroom", "latrine"],
-    "gun":    ["guns", "deck gun", "cannon", "weapon", "weapons", "armament"],
+    "gun":    ["guns", "deck gun", "cannon", "weapon", "weapons", "armament", "5 inch", "4 inch", "gun action"],
     "shoot":  ["fire", "fired", "firing", "launch", "launched", "torpedo", "attack"],
     "dive":   ["dived", "diving", "submerge", "submerged", "submerging", "crash dive"],
     "speed":  ["knots", "fast", "faster", "slow", "slower", "velocity"],
@@ -351,13 +358,15 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "crews":  ["crew", "men", "sailors", "crewmen", "complement", "personnel", "enlisted"],
     # medical
     "doctors": ["doctor", "medical", "pharmacist", "corpsman", "medic", "physician"],
-    "doctor":  ["doctors", "medical", "pharmacist", "corpsman", "medic", "physician"],
-    "medical": ["doctor", "doctors", "pharmacist", "corpsman", "medic", "hospital"],
+    "doctor":  ["doctors", "medical", "pharmacist", "corpsman", "medic", "physician", "health", "sick", "ill", "medicine"],
+    "medical": ["doctor", "doctors", "pharmacist", "corpsman", "medic", "hospital", "health", "sick", "ill", "medicine", "injury"],
     # supply / resupply
-    "resupplied": ["resupply", "supply", "supplies", "fuel", "reloaded", "restock"],
-    "resupply":   ["resupplied", "supply", "supplies", "fuel", "restock"],
+    "resupplied": ["resupply", "supply", "supplies", "fuel", "reloaded", "restock", "tender", "tenders"],
+    "resupply":   ["resupplied", "supply", "supplies", "fuel", "restock", "tender", "tenders"],
+    "tender":     ["tenders", "support ship", "resupply", "supply", "base", "flotilla", "fulton", "sperry", "depot"],
+    "tenders":    ["tender", "support ship", "resupply", "supply", "base", "fulton", "sperry"],
     # radar (distinct from sonar — different technology)
-    "radar":  ["detection", "sensors", "electronic", "radio", "sj"],
+    "radar":  ["sj", "sd", "surface search", "air search", "detection", "sensors", "electronic", "radio", "contact", "pip", "scan"],
     # decommission
     "decommissioned":   ["decommissioning", "decommission", "retired", "mothballed", "inactive"],
     "decommissioning":  ["decommissioned", "decommission", "retired", "mothballed"],
@@ -371,8 +380,6 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     # illness / medical questions
     "sick":    ["ill", "illness", "health", "doctor", "pharmacist", "medical", "medicine", "injury", "injured", "wound", "wounded", "hurt"],
     "ill":     ["sick", "illness", "health", "doctor", "pharmacist", "medical"],
-    "doctor":  ["pharmacist", "medical", "health", "sick", "ill", "medicine"],
-    "medical": ["doctor", "pharmacist", "health", "sick", "ill", "medicine", "injury"],
     "hurt":    ["injured", "injury", "wound", "wounded", "sick", "ill", "medical"],
     # computer / fire control questions → TDC in conning tower
     "computer":  ["torpedo data computer", "tdc", "fire control", "targeting", "conning tower", "periscope", "attack"],
@@ -399,7 +406,7 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "need":       ["needed", "needs", "require", "required", "requires"],
     # torpedo reload vocabulary
     "reloads":   ["reload", "reloading", "reloaded", "loading", "loaded", "skid", "skids"],
-    "reload":    ["reloads", "reloading", "reloaded", "loading", "loaded", "skid", "skids"],
+    "reload":    ["reloads", "reloading", "reloaded", "loading", "loaded", "skid", "skids", "tube", "tubes", "torpedo"],
     "reloading": ["reload", "reloads", "reloaded", "loading", "loaded", "skid", "skids"],
     "handled":   ["loaded", "done", "managed", "moved", "operated", "worked"],
     # food storage vocabulary
@@ -474,12 +481,12 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     # fires / flooding (pam_160)
     "fire":      ["fires", "flooding", "flood", "emergency", "emergency procedures", "danger"],
     "fires":     ["fire", "flooding", "flood", "emergency"],
-    "flooding":  ["flood", "fire", "fires", "emergency", "leak", "leaking"],
-    "flood":     ["flooding", "fire", "fires", "emergency", "leak"],
+    "flooding":  ["flood", "fire", "fires", "emergency", "leak", "leaking", "tube", "tubes", "outer", "door", "breech", "torpedo", "launch"],
+    "flood":     ["flooding", "fire", "fires", "emergency", "leak", "ballast", "tank", "tanks", "dive", "submerge"],
     "emergency": ["fire", "fires", "flooding", "flood", "aground", "danger", "crash"],
     "leak":      ["flooding", "flood", "fire", "damage", "hull"],
     # periscope feather (pam_161)
-    "feather":   ["periscope", "wake", "spray", "surface", "visible"],
+    "feather":   ["periscope", "wake", "spray", "surface", "visible", "scope"],
     "wake":      ["feather", "periscope", "surface", "visible", "wave"],
     # boredom / morale (pam_162)
     "boredom":   ["boring", "morale", "entertainment", "recreation", "pass time"],
@@ -498,7 +505,7 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "flying":    ["bridge", "conn", "top", "platform"],
     # deep / dive depth (pam_168)
     "deep":      ["depth", "feet", "test", "dive", "diving", "crush", "hull"],
-    "depth":     ["deep", "feet", "test", "dive", "underwater"],
+    "depth":     ["deep", "feet", "test", "dive", "underwater", "running", "problem", "failure"],
     "feet":      ["deep", "depth", "test", "400", "300"],
     # magnetic exploder / dud torpedoes (pam_169)
     "magnetic":  ["exploder", "exploders", "dud", "duds", "torpedo", "fail"],
@@ -509,7 +516,7 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     # celebrate / victory (pam_171)
     "celebrate": ["celebration", "celebrating", "victory", "attack", "successful", "after"],
     "celebration": ["celebrate", "celebrating", "victory", "attack"],
-    "victory":   ["celebrate", "celebration", "successful", "won", "win"],
+    "victory":   ["celebrate", "celebration", "successful", "won", "win", "vmail", "microfilm", "mail"],
     # return to port / liberty (pam_172)
     "liberty":   ["port", "leave", "rest", "r&r", "shore", "hawaii", "pearl"],
     "leave":     ["liberty", "port", "rest", "r&r", "shore"],
@@ -551,7 +558,6 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     # ballast / buoyancy / diving (pam_143)
     "ballast":     ["tank", "tanks", "dive", "diving", "submerge", "flood", "blow", "buoyancy"],
     "buoyancy":    ["ballast", "tank", "tanks", "float", "dive", "submerge"],
-    "flood":       ["ballast", "tank", "tanks", "dive", "submerge"],
     "blow":        ["ballast", "tank", "tanks", "surface", "surfaced"],
     # fleet boat / fleet submarine (pam_146)
     "fleet":       ["boat", "submarine", "class", "type", "design"],
@@ -562,8 +568,8 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "gato":        ["balao", "class", "submarine", "design", "type"],
     "balao":       ["gato", "class", "submarine", "design", "type", "depth"],
     "class":       ["gato", "balao", "tench", "type", "design", "difference"],
-    "difference":  ["class", "compare", "compared", "versus", "vs", "unlike"],
-    "versus":      ["difference", "vs", "compare", "compared", "unlike"],
+    "difference":  ["class", "compare", "compared", "versus", "vs", "unlike", "control room", "conning", "tower"],
+    "versus":      ["difference", "vs", "compare", "compared", "unlike", "control room", "conning", "tower"],
     "vs":          ["versus", "difference", "compare", "compared"],
     # died / killed (pam_154 / pam_056)
     "died":        ["killed", "death", "dead", "die", "lost", "casualties"],
@@ -579,7 +585,7 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "recharge":    ["recharging", "recharged", "charge", "charging", "battery", "batteries"],
     "recharging":  ["recharge", "recharged", "charge", "charging", "battery", "batteries"],
     "batteries":   ["battery", "recharge", "recharging", "charge", "power", "electric"],
-    "battery":     ["batteries", "recharge", "recharging", "charge", "power", "electric"],
+    "battery":     ["batteries", "recharge", "recharging", "charge", "power", "electric", "forward battery", "cells", "lead-acid"],
     # destroyer / tin can threat (pam_150)
     "destroyers":  ["destroyer", "escort", "escorts", "tin", "threat", "anti-submarine", "asw"],
     "tin":         ["destroyer", "destroyers", "can", "escort", "asw"],
@@ -619,8 +625,8 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "ood":       ["deck", "deck watch", "officer", "watch", "conn", "conning", "underway"],
     "conn":      ["ood", "deck", "officer", "watch", "conning", "bridge"],
     # conning tower (pam_178)
-    "conning":   ["tower", "conn", "periscope", "helm", "tdc", "fairwater"],
-    "tower":     ["conning", "conn", "fairwater", "periscope"],
+    "conning":   ["tower", "conn", "periscope", "helm", "tdc", "fairwater", "attack"],
+    "tower":     ["conning", "conn", "fairwater", "periscope", "tdc", "helm"],
     "fairwater": ["conning", "tower", "sail", "conn"],
     # training / qualification (pam_179)
     "training":  ["trained", "train", "school", "submarine school", "new london", "qualification", "qualify"],
@@ -649,8 +655,8 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "sinking":   ["sunk", "sink", "lost", "survival", "survive", "casualty"],
     "survival":  ["sunk", "sink", "survive", "casualty", "casualties", "escape"],
     "survive":   ["sunk", "sink", "sinking", "survival", "casualty", "casualties"],
-    # night surface attack (pam_185)
-    "surface":   ["surfaced", "surfacing", "awash"],
+    # night surface attack / deck gun (pam_185, pam_222)
+    "surface":   ["surfaced", "surfacing", "awash", "deck", "gun", "guns", "deck gun", "attack", "target"],
     "surfaced":  ["surface", "surfacing", "awash"],
     "surfacing": ["surface", "surfaced", "blow", "awash"],
     # lookout / binoculars / aircraft (pam_186)
@@ -669,8 +675,8 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "communicate":["telephone", "phone", "sound-powered", "radio", "broadcast", "transmit", "communication", "transmission", "message", "signal", "contact", "talk"],
     "broadcast": ["radio", "communicate", "communication", "transmit", "pearl harbor"],
     "transmit":  ["radio", "broadcast", "communicate", "transmission", "signal"],
-    "ultra":     ["radio", "intelligence", "decrypt", "signal", "code"],
-    "contact":   ["radio", "communicate", "broadcast", "transmit", "pearl harbor", "signal"],
+    "ultra":     ["radio", "intelligence", "decrypt", "signal", "code", "codebreaking", "jn25", "convoy", "route"],
+    "contact":   ["radio", "communicate", "broadcast", "transmit", "pearl harbor", "signal", "magnetic", "exploder", "mark 6", "fuze", "fuse", "dud", "detonate"],
     # forward engine room (pam_190)
     "forward":   ["engine room", "fairbanks", "diesel", "forward engine", "engines"],
     "fairbanks": ["engine", "engines", "diesel", "forward engine room", "forward"],
@@ -713,7 +719,7 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "operators": ["sonar", "hydrophone", "listen", "listening", "passive", "sound operators"],
     # targeting / fire control / AOB (pam_188)
     "targeting": ["aob", "angle", "bow", "fire control", "solution", "target"],
-    "target":    ["targeting", "aob", "angle", "bow", "fire control", "solution"],
+    "target":    ["targets", "targeting", "aob", "angle", "bow", "fire control", "solution"],
     "angle":     ["aob", "bow", "approach", "bearing", "target angle"],
     # periscope attack procedure (pam_198)
     "procedure": ["periscope", "attack", "approach", "step", "steps", "solution", "fire"],
@@ -730,7 +736,6 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "bow":       ["planes", "planesman", "hydroplane", "bow planes", "forward"],
     "rudder":    ["planes", "planesman", "hydroplane", "stern planes", "yaw", "heading"],
     # radar (pam_201) — extends existing "aircraft" entries
-    "radar":     ["sj", "sd", "surface search", "air search", "contact", "pip", "scan"],
     "sj":        ["radar", "surface search", "contact", "range", "bearing"],
     "sd":        ["radar", "air search", "aircraft", "plane", "warning"],
     # tropical heat / temperature (pam_202)
@@ -773,9 +778,8 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "batfish":    ["enemy submarine", "japanese submarine", "sank", "killed", "sink"],
     "engagements":["enemy submarine", "submarine", "batfish", "sank", "fight"],
     "engagement": ["enemy submarine", "submarine", "batfish", "sank", "fight"],
-    "sank":       ["sunk", "sink", "sinking", "enemy", "batfish", "submarine"],
+    "sank":       ["sunk", "sink", "sinking", "enemy", "batfish", "submarine", "pampanito", "ships", "merchant"],
     # magnetic vs contact exploder distinction (pam_209) — extends existing "magnetic/exploder" entries
-    "contact":    ["magnetic", "exploder", "mark 6", "fuze", "fuse", "dud", "detonate"],
     "mark":       ["mark 6", "magnetic", "exploder", "torpedo", "mark 14", "mark 18"],
     "detonate":   ["magnetic", "exploder", "contact", "dud", "fuze", "fuse", "fire"],
     "fuse":       ["magnetic", "exploder", "contact", "detonate", "fuze", "mark 6"],
@@ -787,6 +791,135 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "effectiveness":  ["japanese", "asw", "anti-submarine", "losses", "successful", "effective"],
     "effective":      ["effectiveness", "japanese", "asw", "anti-submarine", "losses"],
     "hunter":     ["asw", "anti-submarine", "japanese", "destroyer", "depth charge"],
+    # submarine tender (pam_211)
+    "fulton":     ["tender", "tenders", "support ship", "depot"],
+    "depot":      ["tender", "tenders", "base", "support", "supply"],
+    # Mark 14 depth-running problem (pam_212) — extends existing "torpedo/mark" entries
+    "deeper":     ["depth", "running depth", "running", "mark 14", "dud", "exploder", "set", "failure", "torpedo"],
+    "running":    ["run", "depth", "deeper", "failure", "torpedo", "problem", "running depth", "mark 14", "dud", "running deeper"],
+    "buford":     ["mark 14", "torpedo", "depth", "running"],  # Lockwood slang
+    "lockwood":   ["mark 14", "depth", "torpedo", "admiral"],
+    # ULTRA intelligence (pam_213)
+    "codebreaking":["ultra", "intelligence", "decrypt", "jn25", "convoy"],
+    "decrypt":    ["ultra", "codebreaking", "intelligence", "code", "cipher"],
+    "cipher":     ["ultra", "codebreaking", "decrypt", "code", "intelligence", "jn25"],
+    "intelligence":["ultra", "codebreaking", "decrypt", "convoy", "route", "intercept"],
+    "intercept":  ["ultra", "intelligence", "route", "convoy", "decrypt"],
+    "frupac":     ["ultra", "intelligence", "codebreaking", "pearl harbor"],
+    # down-the-throat shots (pam_214)
+    "throat":     ["down-the-throat", "shot", "destroyer", "attack", "dealey", "bow-on"],
+    "bow-on":     ["throat", "down-the-throat", "destroyer", "attack"],
+    "desperate":  ["throat", "last resort", "attack", "destroyer", "counterattack"],
+    "dealey":     ["harder", "destroyer", "throat", "medal", "honor", "attack"],
+    "harder":     ["dealey", "destroyer", "throat", "medal", "honor"],
+    # mine threat / avoidance (pam_215) — extends existing "mines" entries
+    "minefields": ["mines", "mine", "threat", "avoid", "sweep", "shallow"],
+    "minefield":  ["mines", "mine", "threat", "avoid", "sweep", "shallow"],
+    "avoid":      ["mine", "mines", "minefields", "minefield", "evade", "evasion", "sweep", "threat", "cope"],
+    "swept":      ["mines", "minefields", "minefield", "channel", "safe"],
+    "shallow":    ["mines", "minefields", "minefield", "water", "reef"],
+    # JANAC / tonnage accuracy (pam_216)
+    "janac":      ["tonnage", "sinking", "claims", "accuracy", "accurate", "overclaim"],
+    "tonnage":    ["janac", "sinking", "claims", "tons", "shipped", "merchant"],
+    "overclaim":  ["janac", "tonnage", "claims", "accuracy", "overstated"],
+    "overstated": ["janac", "tonnage", "claims", "accuracy", "overclaim"],
+    "accurate":   ["janac", "tonnage", "claims", "accuracy", "overclaim", "confirmed"],
+    "claims":     ["janac", "tonnage", "accurate", "accuracy", "sinking"],
+    # strategic results / campaign impact (pam_217)
+    "strategic":  ["campaign", "results", "impact", "oil", "shipping", "japan", "merchant"],
+    "campaign":   ["strategic", "results", "impact", "war", "shipping", "pacific", "submarine", "tender", "supply", "base"],
+    "impact":     ["strategic", "campaign", "results", "war", "shipping", "japan"],
+    "decisive":   ["strategic", "campaign", "impact", "results", "merchant", "oil"],
+    "merchant":   ["convoy", "convoys", "shipping", "tonnage", "tanker", "freighter"],
+    "maritime":   ["merchant", "shipping", "tonnage", "convoy", "tanker"],
+    "oil":        ["tanker", "fuel", "petroleum", "strategic", "crude", "dutch"],
+    "tanker":     ["oil", "fuel", "petroleum", "merchant", "convoy", "tonnage"],
+    # torpedo tube mechanics (pam_218)
+    "tube":       ["torpedo tube", "breech", "outer door", "impulse", "flood", "fire"],
+    "tubes":      ["torpedo tubes", "breech", "outer door", "impulse", "flood", "fire"],
+    "breech":     ["tube", "tubes", "door", "torpedo", "loading", "seal"],
+    "impulse":    ["tube", "tubes", "air", "launch", "fire", "torpedo"],
+    "launch":     ["fire", "launch", "torpedo", "tube", "impulse", "eject"],
+    "eject":      ["launch", "fire", "impulse", "torpedo", "tube"],
+    "fired":      ["launch", "launched", "fire", "shoot", "shot", "torpedo", "tube"],
+    # forward battery compartment / officers country (pam_219)
+    "wardroom":   ["officers", "forward battery", "compartment", "meals", "captain", "xo"],
+    "country":    ["officers", "wardroom", "forward battery", "quarters", "cabin"],
+    "cabin":      ["wardroom", "officers", "captain", "co", "forward battery"],
+    "stateroom":  ["cabin", "wardroom", "officers", "quarters", "forward battery"],
+    "cells":      ["battery", "forward battery", "lead-acid", "power", "electric"],
+    # Medal of Honor (pam_220)
+    "medal":      ["honor", "moh", "gilmore", "cromwell", "fluckey", "o'kane", "award"],
+    "honor":      ["medal", "moh", "award", "gilmore", "cromwell", "fluckey"],
+    "moh":        ["medal", "honor", "award", "gilmore", "cromwell", "o'kane"],
+    "gilmore":    ["medal", "honor", "growler", "take her down", "bridge"],
+    "cromwell":   ["medal", "honor", "sculpin", "ultra", "sacrifice", "down"],
+    "fluckey":    ["medal", "honor", "barb", "captain", "ace"],
+    "gilmour":    ["gilmore", "medal", "honor"],  # STT misspelling
+    # submarine mail (pam_221)
+    "mail":       ["letters", "post", "postal", "vmail", "home", "family"],
+    "letters":    ["mail", "post", "postal", "vmail", "home", "family", "write"],
+    "vmail":      ["mail", "letters", "postal", "microfilm", "victory", "censored", "microfilmed", "fpo", "censor", "blacked", "fremantle"],
+    "postal":     ["mail", "letters", "vmail", "fpo", "post office"],
+    "censor":     ["mail", "letters", "censored", "post", "patrol"],
+    "microfilm":  ["vmail", "victory", "mail", "letters", "censored"],
+    # deck guns vs torpedoes (pam_222) — extends existing "gun" entries
+    "guns":       ["gun", "deck gun", "5 inch", "4 inch", "surface", "gun action"],
+    "gun action": ["guns", "gun", "deck gun", "surface attack", "5 inch", "gun fight"],
+    "conserve":   ["torpedoes", "torpedo", "guns", "gun", "save", "deck gun", "instead", "rather"],
+    "sampan":     ["guns", "gun", "deck gun", "small", "vessel", "target"],
+    # conning tower vs control room (pam_223)
+    "compared":   ["versus", "difference", "control room", "conning", "tower"],
+    # Presidential Unit Citation (pam_224)
+    "presidential":["citation", "puc", "unit", "award", "honor", "pampanito"],
+    "citation":    ["presidential", "puc", "unit", "award", "honor"],
+    "puc":         ["presidential", "citation", "unit", "award", "honor"],
+    "unit":        ["presidential", "citation", "puc", "award"],
+    # two periscopes (pam_225)
+    "periscopes":  ["periscope", "attack scope", "search scope", "two", "scopes"],
+    "scopes":      ["periscope", "periscopes", "attack scope", "search scope", "two"],
+    "scope":       ["periscope", "periscopes", "attack scope", "search scope"],
+    "attack scope":["periscope", "periscopes", "search scope", "thin", "feather"],
+    "search scope":["periscope", "periscopes", "attack scope", "large", "magnification"],
+    # Pampanito's war record / ships sunk (pam_226)
+    "pampanito":   ["sank", "sunk", "ships", "patrols", "war record", "citation", "pow"],
+    "record":      ["pampanito", "sank", "sunk", "ships", "patrols", "war record"],
+    "patrols":     ["war patrol", "patrol", "pampanito", "record", "six", "missions"],
+    # ----------  batch 12 follow-up synonym fixes  ----------
+    # depth-running problem (pam_212)
+    "problem":    ["failure", "torpedo", "malfunction", "dud", "depth", "running"],
+    # mine threat / avoidance (pam_215)
+    "avoiding":   ["mine", "mines", "minefield", "evasion", "evade", "avoid"],
+    "avoidance":  ["mine", "mines", "minefield", "evasion", "evade", "avoid"],
+    # Medal of Honor (pam_220)
+    "decorated":  ["medal", "honor", "moh", "award", "gilmore", "fluckey", "citation"],
+    # submarine mail (pam_221)
+    "families":   ["family", "mail", "letters", "home", "loved"],
+    "family":     ["families", "mail", "letters", "home", "loved"],
+    "delivered":  ["mail", "letters", "post", "postal", "deliver"],
+    "deliver":    ["mail", "letters", "post", "postal", "delivered"],
+    # deck guns vs torpedoes (pam_222)
+    "rather":     ["instead", "versus", "gun", "guns", "deck gun", "conserve"],
+    "instead":    ["rather", "versus", "gun", "guns", "deck gun", "conserve"],
+    # attack/search periscope (pam_225)
+    "two":        ["periscopes", "attack scope", "search scope", "scopes"],
+    # Mark 14 depth running failure (pam_212)
+    "failure":    ["failed", "depth", "running", "problem", "mark 14", "dud", "torpedo"],
+    "failed":     ["failure", "depth", "running", "problem", "dud", "torpedo"],
+    # ULTRA / convoy routes (pam_213)
+    "decoded":    ["ultra", "codebreaking", "cipher", "jn25", "decrypt"],
+    "jn25":       ["ultra", "cipher", "codebreaking", "decrypt", "code", "intelligence"],
+    # loading into tube (pam_218)
+    "loaded":     ["load", "torpedo", "tube", "tubes", "breech", "skid", "reload"],
+    "loading":    ["load", "torpedo", "tube", "tubes", "breech", "skid", "reload"],
+    "sequence":   ["tube", "tubes", "torpedo", "firing", "flood", "breech", "outer", "launch", "steps"],
+    # V-mail (pam_221) — note: "v-mail" tokenizes to "vmail"; key handles both
+    "write":      ["mail", "letters", "vmail", "family", "home"],
+    "wrote":      ["mail", "letters", "vmail", "family", "home"],
+    # submarine tender services (pam_211)
+    "services":   ["tender", "tenders", "support", "supply", "repair", "resupply"],
+    "provided":   ["tender", "tenders", "supply", "support", "repair", "resupply"],
+    "provides":   ["tender", "tenders", "supply", "support", "repair", "resupply"],
 }
 
 
@@ -818,13 +951,22 @@ def detect_intent(query_tokens: List[str], raw_question: str = "") -> Dict[str, 
     Very lightweight intent detection used only to gate obviously-wrong hits.
     """
     tset = set(query_tokens)
-    wants_mark_compare = (
-        ("mark" in tset and ("14" in tset or "18" in tset)) or
-        ("torpedo" in tset and "mark" in tset)
+    raw_lower = raw_question.lower()
+    # True only when the query explicitly asks about BOTH Mark 14 and Mark 18,
+    # or uses comparison language alongside a specific Mark reference.
+    # Earlier broad condition ("torpedo" + "mark") triggered for any single-Mark
+    # torpedo question (e.g. "why did the Mark 14 fail?") which boosted the
+    # encyclopedia faq_982 entry far above the specific repair/failure FAQs.
+    _compare_words = {"vs", "versus", "difference", "differences", "compare",
+                      "comparison", "better", "worse", "prefer", "preferred",
+                      "advantage", "advantages", "disadvantage", "disadvantages"}
+    wants_mark_compare = bool(
+        ("14" in tset and "18" in tset) or
+        (("14" in tset or "18" in tset) and ("mark" in tset) and (tset & _compare_words)) or
+        re.search(r"mark\s*14.{0,20}mark\s*18|mark\s*18.{0,20}mark\s*14", raw_lower)
     )
 
     # Quantity question: "how many", "how much", "what number", etc.
-    raw_lower = raw_question.lower()
     wants_quantity = bool(
         re.search(r"how many|how much|how\s+\w+\s+(are|were|is|was)\b", raw_lower) or
         "many" in tset or "count" in tset or "number of" in raw_lower
@@ -968,7 +1110,8 @@ def retrieve(
                     )
                     if all_q_covered:
                         # All query intent represented in title: scale 4x by coverage
-                        effective_weight = weight * 4.0 * coverage
+                        # Clamp to at least weight so long titles are not penalized
+                        effective_weight = max(weight, weight * 4.0 * coverage)
                     elif matched >= max(1, len(q_set) - 1):
                         # Near-exact (all but one): scale 2x by coverage
                         effective_weight = weight * 2.0 * coverage
