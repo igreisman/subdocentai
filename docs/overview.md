@@ -6,7 +6,7 @@
 
 ## 1. What Is This?
 
-SubDocentAI is a voice- and text-enabled Q&A assistant that answers visitor questions about the USS Pampanito (SS-383) and WWII submarine history. It runs as a local HTTPS server on a Mac or small Linux machine, serving a mobile web app to any visitor's phone or a shared kiosk tablet over the local network.
+SubmarineDocent is a voice- and text-enabled Q&A assistant that answers visitor questions about the USS Pampanito (SS-383) and WWII submarine history. It runs as a local HTTPS server on a Mac or small Linux machine, serving a mobile web app to any visitor's phone or a shared kiosk tablet over the local network.
 
 Visitors speak or type a question and receive a spoken, historically accurate answer in seconds, drawn exclusively from verified museum-grade sources. No app download is required. No internet connection is needed during operation.
 
@@ -20,7 +20,7 @@ Museum visitors are curious. They stand inside a torpedo room and want to know w
 - Non-English-speaking visitors receive no additional context.
 - Staff cannot scale to provide personalised responses to hundreds of visitors daily.
 
-SubDocentAI provides an always-available, on-premises AI guide that responds to natural spoken questions in real time.
+SubmarineDocent provides an always-available, on-premises AI guide that responds to natural spoken questions in real time.
 
 ---
 

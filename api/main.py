@@ -1,7 +1,7 @@
 # api/main.py
 from __future__ import annotations
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,8 +31,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(BASE_DIR, "web")
 
 @app.get("/", include_in_schema=False)
-def root_redirect():
+def root_redirect(request: Request):
     from fastapi.responses import RedirectResponse
+    host = request.headers.get("host", "")
+    if host.startswith("pampanito."):
+        return RedirectResponse(url="/web/pampanito.html")
     return RedirectResponse(url="/web/index.html")
 
 if os.path.isdir(WEB_DIR):

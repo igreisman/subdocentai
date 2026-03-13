@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: subdocentai-demo
+    name: submarinedocent-demo
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT

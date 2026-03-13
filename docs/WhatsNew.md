@@ -1,4 +1,4 @@
-# What's New — SubDocentAI
+# What's New — SubmarineDocent
 
 Changes are listed newest-first. Dates are commit dates.
 
@@ -81,7 +81,7 @@ Full voice input support added for Android browsers, which cannot use the browse
 
 ## 2026-03-01–02 — Infrastructure & Launch
 
-- Deployed to Render.com (`subdocentai.com`) with `render.yaml`.
+- Deployed to Render.com (`submarinedocent.org`) with `render.yaml`.
 - Added `GROQ_API_KEY` to Render environment for production Whisper transcription.
 - Renamed `tour.html` → `pampanito.html`; added `/pampanito.html` redirect and root redirect to index.
 - Password gate added to protect pre-launch preview.
