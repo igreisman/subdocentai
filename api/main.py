@@ -33,7 +33,7 @@ WEB_DIR = os.path.join(BASE_DIR, "web")
 @app.get("/", include_in_schema=False)
 def root_redirect(request: Request):
     from fastapi.responses import RedirectResponse
-    host = request.headers.get("host", "")
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
     if host.startswith("pampanito."):
         return RedirectResponse(url="/web/pampanito.html")
     return RedirectResponse(url="/web/index.html")
