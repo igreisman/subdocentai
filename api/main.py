@@ -74,8 +74,19 @@ if os.path.isdir(WEB_DIR):
 CORPORA_DIR = os.path.join(BASE_DIR, "corpora")
 
 TOUR_PATH = os.path.join(CORPORA_DIR, "pampanito_tour_corpus.jsonl")
-FAQ_PATH = os.path.join(CORPORA_DIR, "dieselsubs_faq_corpus.jsonl")
 SHORTS_PATH = os.path.join(CORPORA_DIR, "dieselsubs_shorts_corpus.jsonl")
+
+# FAQ corpus — use Render persistent disk (/data) if mounted, else local corpora/
+_BUNDLED_FAQ_PATH = os.path.join(CORPORA_DIR, "dieselsubs_faq_corpus.jsonl")
+_RENDER_DATA_DIR = "/data"
+if os.path.isdir(_RENDER_DATA_DIR):
+    FAQ_PATH = os.path.join(_RENDER_DATA_DIR, "dieselsubs_faq_corpus.jsonl")
+    if not os.path.exists(FAQ_PATH) and os.path.exists(_BUNDLED_FAQ_PATH):
+        import shutil
+        shutil.copy2(_BUNDLED_FAQ_PATH, FAQ_PATH)
+        print(f"✅ Seeded persistent disk FAQ corpus from bundled copy")
+else:
+    FAQ_PATH = _BUNDLED_FAQ_PATH
 
 # Feature flag: keep demo fully local today; later, flip to true with funding.
 USE_LLM = os.getenv("USE_LLM", "false").lower() in ("1", "true", "yes")
