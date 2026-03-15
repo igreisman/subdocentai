@@ -10,13 +10,14 @@ import json
 import os
 import re
 import smtplib
+import threading
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from typing import Dict, List, Tuple, Any, Optional
 
-app = FastAPI(title="Pampanito Local RAG Demo")
+app = FastAPI(title="SubmarineDocent")
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,6 +51,12 @@ if os.path.isdir(WEB_DIR):
     def redirect_feedback_html():
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/web/feedback.html")
+
+    # Convenience redirect: /review.html → /web/review.html
+    @app.get("/review.html", include_in_schema=False)
+    def redirect_review_html():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/web/review.html")
 
     # Serve pampanito.html with no-cache so Safari always loads the latest version
     @app.get("/web/pampanito.html", include_in_schema=False)
@@ -1579,6 +1586,102 @@ def synthesize_openai_stub(
         "Want the extractive answer (from sources) or a deeper docent version later?"
     ]
     return base
+
+
+# ------------------------------------------------------------
+# Admin: generated FAQ review / edit / accept
+# ------------------------------------------------------------
+
+_GENERATED_PREFIXES = {"der", "pam", "fix"}
+_faq_write_lock = threading.Lock()
+
+
+def _save_faq_corpus() -> None:
+    """Atomically rewrite the FAQ JSONL file from the in-memory FAQ list."""
+    tmp = FAQ_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        for entry in FAQ:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    os.replace(tmp, FAQ_PATH)
+
+
+def _make_slug(title: str) -> str:
+    s = title.lower()
+    s = re.sub(r"[^a-z0-9\s-]", "", s)
+    s = re.sub(r"\s+", "-", s.strip())
+    return s[:120]
+
+
+@app.get("/admin/generated-faqs")
+def get_generated_faqs():
+    """Return all der_, pam_, fix_ entries for the review tool."""
+    return [e for e in FAQ if e.get("chunk_id", "").split("_")[0] in _GENERATED_PREFIXES]
+
+
+@app.put("/admin/faq/{chunk_id}")
+async def update_faq(chunk_id: str, request: Request):
+    """Update title and/or text of a generated FAQ entry."""
+    if chunk_id.split("_")[0] not in _GENERATED_PREFIXES:
+        raise HTTPException(status_code=400, detail="Only der_, pam_, fix_ entries can be edited here")
+    body = await request.json()
+    title = (body.get("title") or "").strip()
+    text = (body.get("text") or "").strip()
+    entry = next((e for e in FAQ if e.get("chunk_id") == chunk_id), None)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"{chunk_id} not found")
+    with _faq_write_lock:
+        if title:
+            entry["title"] = title
+        if text:
+            entry["text"] = text
+        _save_faq_corpus()
+    return {"status": "saved", "chunk_id": chunk_id}
+
+
+@app.post("/admin/faq/{chunk_id}/accept")
+def accept_faq(chunk_id: str):
+    """Promote a generated FAQ entry to an accepted faq_NNN entry."""
+    if chunk_id.split("_")[0] not in _GENERATED_PREFIXES:
+        raise HTTPException(status_code=400, detail="Only der_, pam_, fix_ entries can be accepted")
+    entry = next((e for e in FAQ if e.get("chunk_id") == chunk_id), None)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"{chunk_id} not found")
+    with _faq_write_lock:
+        faq_nums = [
+            int(e["chunk_id"].split("_")[1])
+            for e in FAQ
+            if e.get("chunk_id", "").startswith("faq_") and e["chunk_id"].split("_")[1].isdigit()
+        ]
+        new_num = max(faq_nums) + 1 if faq_nums else 1
+        new_id = f"faq_{new_num}"
+        old_id = entry["chunk_id"]
+        entry["chunk_id"] = new_id
+        # Normalise fields so the accepted entry matches the standard faq_ schema
+        entry.setdefault("slug", _make_slug(entry.get("title", "")))
+        entry.setdefault("topic_tags", [])
+        entry.setdefault("authority_level", "reference_faq")
+        entry.setdefault("era", "ww2")
+        entry.setdefault("platform", ["us_diesel_electric_submarines"])
+        entry.setdefault("pampanito_specific", True)
+        entry["source"] = f"accepted_from_{old_id}"
+        entry["display_citation"] = f"SubmarineDocent FAQ — {entry.get('title', new_id)}"
+        entry.pop("type", None)  # pam_ entries carry a spurious "type" key
+        _save_faq_corpus()
+    return {"status": "accepted", "old_id": old_id, "new_id": new_id}
+
+
+@app.delete("/admin/faq/{chunk_id}")
+def delete_faq(chunk_id: str):
+    """Permanently remove a generated FAQ entry from the corpus."""
+    if chunk_id.split("_")[0] not in _GENERATED_PREFIXES:
+        raise HTTPException(status_code=400, detail="Only der_, pam_, fix_ entries can be deleted")
+    with _faq_write_lock:
+        idx = next((i for i, e in enumerate(FAQ) if e.get("chunk_id") == chunk_id), None)
+        if idx is None:
+            raise HTTPException(status_code=404, detail=f"{chunk_id} not found")
+        FAQ.pop(idx)
+        _save_faq_corpus()
+    return {"status": "deleted", "chunk_id": chunk_id}
 
 
 # ------------------------------------------------------------

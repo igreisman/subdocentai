@@ -1,4 +1,4 @@
-Project: USS Pampanito Interactive AI Docent (Local RAG Demo)
+Project: SubmarineDocent
 
 Stack:
 
