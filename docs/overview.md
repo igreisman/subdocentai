@@ -31,10 +31,10 @@ Primary historical reference hub: [web/faqs.html](/Users/irving/Documents/submar
 - Dashboard of WWII diesel-electric submarine FAQ categories.
 - Public FAQ browser backed by `/api/faqs`.
 - Includes four special cards and dedicated in-page views for:
- 	- U.S. Submarine Medal of Honor recipients.
- 	- Lost submarines / Eternal Patrol.
- 	- Submarine incidents database.
- 	- Operations guide.
+  - U.S. Submarine Medal of Honor recipients.
+  - Lost submarines / Eternal Patrol.
+  - Submarine incidents database.
+  - Operations guide.
 
 This page is currently the most developed general-purpose historical interface in the site.
 
@@ -52,12 +52,11 @@ Standalone lost-submarines page: [web/eternal-patrol.html](/Users/irving/Documen
 - FAQ review tool: [web/review.html](/Users/irving/Documents/submarinedocent/web/review.html)
 - FAQ editor and SQL import tool: [web/faq_editor.html](/Users/irving/Documents/submarinedocent/web/faq_editor.html)
 
-### 5. Landing page
+### 5. Site entry behavior
 
-Current root landing page: [web/index.html](/Users/irving/Documents/submarinedocent/web/index.html)
-
-- Still a placeholder “Coming Soon” page.
-- The backend redirects `/` to `/web/index.html` by default, except for `pampanito.*` hostnames which redirect to the Pampanito tour.
+- The backend now redirects `/` to [web/faqs.html](/Users/irving/Documents/submarinedocent/web/faqs.html) by default.
+- `pampanito.*` hostnames still redirect to the Pampanito tour.
+- Legacy `/index.html` requests are redirected to the FAQ dashboard.
 
 ## Current Backend Surface
 
@@ -65,7 +64,8 @@ Main application file: [api/main.py](/Users/irving/Documents/submarinedocent/api
 
 ### Public routes
 
-- `/` -> redirects to `/web/index.html` or `/web/pampanito.html` depending on host.
+- `/` -> redirects to `/web/faqs.html` or `/web/pampanito.html` depending on host.
+- `/index.html`, `/web/index.html` -> redirect to the FAQ dashboard.
 - `/pampanito.html` -> redirects to the Pampanito app.
 - `/faqs`, `/faqs.html`, `/faq` -> redirect to the FAQ dashboard.
 - `/feedback.html`, `/review.html`, `/faq_editor.html` -> redirect to their matching web pages.
@@ -74,42 +74,42 @@ Main application file: [api/main.py](/Users/irving/Documents/submarinedocent/api
 ### Public API routes
 
 - `GET /health`
- 	- Returns service status, transcription availability, and corpus counts for tour, FAQ, and shorts corpora.
+  - Returns service status, transcription availability, and corpus counts for tour, FAQ, and shorts corpora.
 - `POST /ask`
- 	- Main question-answering endpoint used by the Pampanito app.
+  - Main question-answering endpoint used by the Pampanito app.
 - `POST /tts`
- 	- Text-to-speech endpoint.
+  - Text-to-speech endpoint.
 - `POST /transcribe`
- 	- Audio transcription endpoint.
+  - Audio transcription endpoint.
 - `POST /contact`
- 	- Visitor contact / unanswered-question handoff.
+  - Visitor contact / unanswered-question handoff.
 - `GET /api/faqs`
- 	- Returns published `faq_` entries grouped by category for the public FAQ page.
+  - Returns published `faq_` entries grouped by category for the public FAQ page.
 - `GET /api/eternal-patrol`
- 	- Returns the Eternal Patrol / lost submarines dataset.
+  - Returns the Eternal Patrol / lost submarines dataset.
 - `GET /api/incidents`
- 	- Returns the submarine incidents dataset.
+  - Returns the submarine incidents dataset.
 - `POST /feedback`
- 	- Accepts simple user feedback submissions.
+  - Accepts simple user feedback submissions.
 - `GET /feedback/list`
- 	- Returns stored feedback entries, intended for admin use.
+  - Returns stored feedback entries, intended for admin use.
 
 ### Admin / curator API routes
 
 - `GET /admin/generated-faqs`
- 	- Returns generated FAQ candidates (`der_`, `pam_`, `fix_`).
+  - Returns generated FAQ candidates (`der_`, `pam_`, `fix_`).
 - `GET /admin/faqs`
- 	- Returns full editable FAQ records.
+  - Returns full editable FAQ records.
 - `POST /admin/faq`
- 	- Creates a new published FAQ.
+  - Creates a new published FAQ.
 - `PUT /admin/faq/{chunk_id}`
- 	- Updates an FAQ.
+  - Updates an FAQ.
 - `POST /admin/faq/{chunk_id}/accept`
- 	- Promotes a generated FAQ entry into a published `faq_` entry.
+  - Promotes a generated FAQ entry into a published `faq_` entry.
 - `DELETE /admin/faq/{chunk_id}`
- 	- Removes generated FAQ entries.
+  - Removes generated FAQ entries.
 - `POST /admin/import-sql`
- 	- Imports FAQ content from a phpMyAdmin SQL export.
+  - Imports FAQ content from a phpMyAdmin SQL export.
 
 ## Data Sources in the Repo
 
@@ -118,7 +118,7 @@ Primary corpora live in [corpora](/Users/irving/Documents/submarinedocent/corpor
 Current line counts:
 
 | Corpus | File | Count | Purpose |
-|---|---|---:|---|
+| --- | --- | ---: | --- |
 | Pampanito tour corpus | [corpora/pampanito_tour_corpus.jsonl](/Users/irving/Documents/submarinedocent/corpora/pampanito_tour_corpus.jsonl) | 213 | Tour narration / compartment knowledge |
 | Diesel submarine FAQ corpus | [corpora/dieselsubs_faq_corpus.jsonl](/Users/irving/Documents/submarinedocent/corpora/dieselsubs_faq_corpus.jsonl) | 455 | Master FAQ corpus including published and generated entries |
 | Published FAQ entries | [corpora/dieselsubs_faq_corpus.jsonl](/Users/irving/Documents/submarinedocent/corpora/dieselsubs_faq_corpus.jsonl) | 229 | Public `faq_` entries exposed through `/api/faqs` |
@@ -182,11 +182,10 @@ As of March 2026, the site is best understood as a multi-surface historical web 
 - The FAQ site is the main public historical dashboard.
 - Eternal Patrol and Incidents are now real data-backed features, not placeholders.
 - Admin tooling for FAQ curation is present and working.
-- The top-level landing page is still a placeholder and does not yet present the full site clearly.
+- The FAQ dashboard is now the default entry point for the general site.
 
 ## Recommended Next Documentation Updates
 
-- Replace the placeholder root landing page with a true home page that matches the actual site structure.
 - Add a dedicated architecture doc for the FAQ dashboard and history datasets.
 - Add a curator workflow doc covering review, edit, import, and feedback moderation.
 - Add a route map doc separating public, admin, and data endpoints.

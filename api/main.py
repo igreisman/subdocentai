@@ -35,7 +35,7 @@ def root_redirect(request: Request):
     host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
     if host.startswith("pampanito."):
         return RedirectResponse(url="/web/pampanito.html")
-    return RedirectResponse(url="/web/index.html")
+    return RedirectResponse(url="/web/faqs.html")
 
 if os.path.isdir(WEB_DIR):
     # Convenience redirect: /pampanito.html → /web/pampanito.html
@@ -67,6 +67,12 @@ if os.path.isdir(WEB_DIR):
     @app.get("/faqs.html", include_in_schema=False)
     @app.get("/faq", include_in_schema=False)
     def redirect_faqs_html():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/web/faqs.html")
+
+    @app.get("/index.html", include_in_schema=False)
+    @app.get("/web/index.html", include_in_schema=False)
+    def redirect_index_html():
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/web/faqs.html")
 
