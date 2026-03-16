@@ -1669,11 +1669,54 @@ _GENERATED_PREFIXES = {"der", "pam", "fix"}
 _faq_write_lock = threading.Lock()
 
 
+def _normalize_faq_html(text: str) -> str:
+    value = (text or "").replace("\r\n", "\n").strip()
+    if not value:
+        return ""
+    if not re.search(r"</?[a-z][\s\S]*>|&(?:nbsp|amp|lt|gt|quot|#39);", value, re.I):
+        return value
+
+    value = re.sub(r'<span class="ql-ui"[^>]*></span>', "", value, flags=re.I)
+    value = re.sub(r'\sdata-row="\d+"', "", value, flags=re.I)
+    value = re.sub(r'\sstyle="color:\s*black;?"', "", value, flags=re.I)
+    value = re.sub(r'\sclass="ql-align-right"', ' style="text-align: right;"', value, flags=re.I)
+    value = re.sub(r'\sclass="ql-align-center"', ' style="text-align: center;"', value, flags=re.I)
+    value = re.sub(r'\sclass="ql-align-justify"', ' style="text-align: justify;"', value, flags=re.I)
+    value = re.sub(
+        r'\sclass="ql-indent-(\d+)"',
+        lambda m: f' style="margin-left: {int(m.group(1)) * 3}em;"',
+        value,
+        flags=re.I,
+    )
+
+    def _normalize_list(match: re.Match[str]) -> str:
+        body = match.group(1)
+        list_tag = "ol"
+        if re.search(r'<li\b[^>]*data-list="bullet"', body, re.I) and not re.search(r'<li\b[^>]*data-list="ordered"', body, re.I):
+            list_tag = "ul"
+        normalized_body = re.sub(r'\sdata-list="(?:bullet|ordered)"', "", body, flags=re.I)
+        return f"<{list_tag}>{normalized_body}</{list_tag}>"
+
+    def _normalize_unordered_list(match: re.Match[str]) -> str:
+        normalized_body = re.sub(r'\sdata-list="(?:bullet|ordered)"', "", match.group(1), flags=re.I)
+        return f"<ul>{normalized_body}</ul>"
+
+    value = re.sub(r'<ol\b[^>]*>(.*?)</ol>', _normalize_list, value, flags=re.I | re.S)
+    value = re.sub(r'<ul\b[^>]*>(.*?)</ul>', _normalize_unordered_list, value, flags=re.I | re.S)
+
+    while re.match(r'^\s*<p><br></p>', value, flags=re.I):
+        value = re.sub(r'^\s*<p><br></p>', "", value, count=1, flags=re.I)
+    while re.search(r'<p><br></p>\s*$', value, flags=re.I):
+        value = re.sub(r'<p><br></p>\s*$', "", value, count=1, flags=re.I)
+    return value.strip()
+
+
 def _save_faq_corpus() -> None:
     """Atomically rewrite the FAQ JSONL file from the in-memory FAQ list."""
     tmp = FAQ_PATH + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         for entry in FAQ:
+            entry["text"] = _normalize_faq_html(entry.get("text", ""))
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     os.replace(tmp, FAQ_PATH)
 
@@ -1736,7 +1779,7 @@ def public_faqs():
         if not e.get("chunk_id", "").startswith("faq_"):
             continue
         title = e.get("title", "")
-        text = e.get("text", "")
+        text = _normalize_faq_html(e.get("text", ""))
         parts = text.split("\n\n", 1)
         answer = parts[1].strip() if len(parts) > 1 else text
         cat = e.get("category") or "General"
@@ -1749,7 +1792,7 @@ async def create_faq(request: Request):
     """Create a new faq_NNN entry from a simple title + text payload."""
     body = await request.json()
     title = (body.get("title") or "").strip()
-    text = (body.get("text") or "").strip()
+    text = _normalize_faq_html((body.get("text") or "").strip())
     category = (body.get("category") or "").strip()
     if not title or not text:
         raise HTTPException(status_code=400, detail="title and text are required")
@@ -1785,7 +1828,7 @@ async def update_faq(chunk_id: str, request: Request):
     """Update title and/or text of any FAQ entry."""
     body = await request.json()
     title = (body.get("title") or "").strip()
-    text = (body.get("text") or "").strip()
+    text = _normalize_faq_html((body.get("text") or "").strip())
     entry = next((e for e in FAQ if e.get("chunk_id") == chunk_id), None)
     if not entry:
         raise HTTPException(status_code=404, detail=f"{chunk_id} not found")

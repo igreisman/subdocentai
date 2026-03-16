@@ -778,6 +778,53 @@
       margin-top: 12px;
     }
 
+    .faq-answer>*:first-child {
+      margin-top: 12px;
+    }
+
+    .faq-answer ul,
+    .faq-answer ol {
+      margin: 12px 0 0 20px;
+      padding-left: 20px;
+      color: #444d56;
+    }
+
+    .faq-answer li {
+      margin-top: 8px;
+      line-height: 1.7;
+    }
+
+    .faq-answer table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+      color: #444d56;
+    }
+
+    .faq-answer td,
+    .faq-answer th {
+      border: 1px solid #d0d7de;
+      padding: 8px 10px;
+      vertical-align: top;
+    }
+
+    .faq-answer strong,
+    .faq-answer em,
+    .faq-answer a,
+    .faq-answer span,
+    .faq-answer div {
+      line-height: 1.7;
+    }
+
+    .faq-answer a {
+      color: #0366d6;
+    }
+
+    .faq-answer a:hover {
+      text-decoration: underline;
+    }
+
     /* ── Empty state ── */
     #no-results {
       display: none;
@@ -2112,8 +2159,115 @@
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    function hasHtmlContent(text) {
+      return /<\/?[a-z][\s\S]*>/i.test(text) || /&(?:nbsp|amp|lt|gt|quot|#39);/i.test(text);
+    }
+
+    function decodeStoredHtml(text) {
+      const value = String(text || '');
+      if (!/[&](?:lt|gt|amp|quot|nbsp|#39);/i.test(value)) return value;
+      const textarea = document.createElement('textarea');
+      textarea.innerHTML = value;
+      return textarea.value;
+    }
+
+    function normalizeRichHtml(html) {
+      const value = decodeStoredHtml(String(html || '').trim());
+      if (!value) return '';
+
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = value;
+
+      wrapper.querySelectorAll('span.ql-ui').forEach(node => node.remove());
+      wrapper.querySelectorAll('[data-row]').forEach(node => node.removeAttribute('data-row'));
+      wrapper.querySelectorAll('[style="color: black;"]').forEach(node => node.removeAttribute('style'));
+
+      wrapper.querySelectorAll('[class]').forEach(node => {
+        const classes = Array.from(node.classList);
+        let indentLevel = 0;
+        classes.forEach(cls => {
+          if (cls === 'ql-align-right') node.style.textAlign = 'right';
+          if (cls === 'ql-align-center') node.style.textAlign = 'center';
+          if (cls === 'ql-align-justify') node.style.textAlign = 'justify';
+          if (cls.startsWith('ql-indent-')) {
+            indentLevel = Number.parseInt(cls.slice('ql-indent-'.length), 10) || 0;
+          }
+        });
+        if (indentLevel > 0) node.style.marginLeft = `${indentLevel * 3}em`;
+        node.className = classes.filter(cls => !cls.startsWith('ql-')).join(' ');
+        if (!node.className) node.removeAttribute('class');
+      });
+
+      wrapper.querySelectorAll('ol').forEach(list => {
+        const items = Array.from(list.children).filter(node => node.tagName === 'LI');
+        const allBullets = items.length > 0 && items.every(item => item.getAttribute('data-list') === 'bullet');
+        if (allBullets) {
+          const ul = document.createElement('ul');
+          while (list.firstChild) {
+            const child = list.firstChild;
+            if (child.nodeType === Node.ELEMENT_NODE && child.hasAttribute('data-list')) {
+              child.removeAttribute('data-list');
+            }
+            ul.appendChild(child);
+          }
+          list.replaceWith(ul);
+          return;
+        }
+        items.forEach(item => item.removeAttribute('data-list'));
+      });
+
+      wrapper.querySelectorAll('ul > li[data-list], ol > li[data-list]').forEach(item => item.removeAttribute('data-list'));
+
+      while (wrapper.firstElementChild && wrapper.firstElementChild.matches('p') && !wrapper.firstElementChild.textContent.trim() && !wrapper.firstElementChild.querySelector('img,video,table,iframe')) {
+        wrapper.firstElementChild.remove();
+      }
+      while (wrapper.lastElementChild && wrapper.lastElementChild.matches('p') && !wrapper.lastElementChild.textContent.trim() && !wrapper.lastElementChild.querySelector('img,video,table,iframe')) {
+        wrapper.lastElementChild.remove();
+      }
+
+      return wrapper.innerHTML.trim();
+    }
+
+    function applyHighlightToHtml(html, query) {
+      if (!query) return html;
+      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`(${escaped})`, 'gi');
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = html;
+
+      const walk = node => {
+        Array.from(node.childNodes).forEach(child => {
+          if (child.nodeType === Node.TEXT_NODE) {
+            if (!child.textContent.trim()) return;
+            const highlighted = child.textContent.replace(re, '<mark>$1</mark>');
+            if (highlighted !== child.textContent) {
+              const fragment = document.createElement('span');
+              fragment.innerHTML = highlighted;
+              child.replaceWith(...fragment.childNodes);
+            }
+            return;
+          }
+
+          if (child.nodeType === Node.ELEMENT_NODE && child.tagName !== 'MARK') {
+            walk(child);
+          }
+        });
+      };
+
+      walk(wrapper);
+      return wrapper.innerHTML;
+    }
+
     function answerToHtml(text, query) {
-      return text.split(/\n+/).filter(p => p.trim()).map(p => `<p>${highlight(p.trim(), query)}</p>`).join('');
+      if (hasHtmlContent(text)) {
+        return applyHighlightToHtml(normalizeRichHtml(text), query);
+      }
+
+      return text
+        .split(/\n+/)
+        .filter(p => p.trim())
+        .map(p => `<p>${highlight(p.trim(), query)}</p>`)
+        .join('');
     }
 
     function render() {

@@ -411,23 +411,113 @@
       border-color: #58a6ff;
     }
 
-    #edit-text {
-      width: 100%;
+    .field-help {
+      color: #8b949e;
+      font-size: 12px;
+      line-height: 1.6;
+      margin-top: 6px;
+    }
+
+    .editor-shell {
       background: #0d1117;
       border: 1px solid #30363d;
       border-radius: 6px;
-      color: #c9d1d9;
-      font-size: 13px;
-      line-height: 1.6;
-      padding: 10px 12px;
-      resize: vertical;
-      min-height: 320px;
-      font-family: inherit;
+      overflow: hidden;
     }
 
-    #edit-text:focus {
-      outline: none;
+    .editor-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid #30363d;
+      background: #161b22;
+    }
+
+    .editor-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 6px 10px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .editor-btn:hover {
+      background: #30363d;
+    }
+
+    .editor-btn.active {
+      color: #58a6ff;
       border-color: #58a6ff;
+    }
+
+    .editor-divider {
+      width: 1px;
+      height: 24px;
+      background: #30363d;
+      margin: 0 2px;
+    }
+
+    #edit-html-editor,
+    #edit-html-source {
+      width: 100%;
+      min-height: 320px;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-size: 13px;
+      line-height: 1.7;
+      padding: 12px 14px;
+    }
+
+    #edit-html-editor {
+      outline: none;
+    }
+
+    #edit-html-editor:empty::before {
+      content: attr(data-placeholder);
+      color: #6e7681;
+    }
+
+    #edit-html-editor p,
+    #edit-html-editor ul,
+    #edit-html-editor ol,
+    #edit-html-editor blockquote {
+      margin-top: 12px;
+    }
+
+    #edit-html-editor>*:first-child {
+      margin-top: 0;
+    }
+
+    #edit-html-editor ul,
+    #edit-html-editor ol {
+      padding-left: 22px;
+    }
+
+    #edit-html-editor a {
+      color: #58a6ff;
+    }
+
+    #edit-html-source {
+      display: none;
+      border: none;
+      border-top: 1px solid #30363d;
+      font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      line-height: 1.6;
+      outline: none;
+      resize: vertical;
+    }
+
+    .editor-shell.source-mode #edit-html-editor {
+      display: none;
+    }
+
+    .editor-shell.source-mode #edit-html-source {
+      display: block;
     }
 
     #edit-category {
@@ -611,7 +701,7 @@
       </div>
       <div class="step">
         <div class="step-num">3</div>
-        <p>Type the <strong>Answer text</strong>. Plain paragraphs work best.</p>
+          <p>Type the <strong>Answer HTML</strong>. You can use tags like <code>&lt;p&gt;</code>, <code>&lt;strong&gt;</code>, <code>&lt;em&gt;</code>, lists, and links.</p>
       </div>
       <div class="step">
         <div class="step-num">4</div>
@@ -629,7 +719,7 @@
       </div>
       <div class="step">
         <div class="step-num">3</div>
-        <p>Edit the Title and/or Answer text, then click <strong>Save changes</strong>.</p>
+          <p>Edit the Title and/or Answer HTML, then click <strong>Save changes</strong>.</p>
       </div>
       <div class="step">
         <div class="step-num">4</div>
@@ -804,8 +894,26 @@
         <select id="edit-category">${catOpts}</select>
       </div>
       <div>
-        <div class="field-label">Answer Text</div>
-        <textarea id="edit-text" placeholder="Write the full answer here\u2026">${esc(text)}</textarea>
+        <div class="field-label">Answer HTML</div>
+        <div class="field-help">Use the toolbar for rich editing or switch to source mode to edit raw HTML directly.</div>
+        <div class="editor-shell" id="answer-editor-shell">
+          <div class="editor-toolbar">
+            <button type="button" class="editor-btn" data-cmd="bold"><strong>B</strong></button>
+            <button type="button" class="editor-btn" data-cmd="italic"><em>I</em></button>
+            <button type="button" class="editor-btn" data-cmd="underline"><u>U</u></button>
+            <span class="editor-divider"></span>
+            <button type="button" class="editor-btn" data-block="p">P</button>
+            <button type="button" class="editor-btn" data-block="h3">H3</button>
+            <button type="button" class="editor-btn" data-cmd="insertUnorderedList">• List</button>
+            <button type="button" class="editor-btn" data-cmd="insertOrderedList">1. List</button>
+            <button type="button" class="editor-btn" data-cmd="formatBlock" data-value="blockquote">Quote</button>
+            <span class="editor-divider"></span>
+            <button type="button" class="editor-btn" data-action="link">Link</button>
+            <button type="button" class="editor-btn" data-action="source" id="btn-source-toggle">Source</button>
+          </div>
+          <div id="edit-html-editor" contenteditable="true" data-placeholder="Write the full answer here…"></div>
+          <textarea id="edit-html-source" placeholder="Write the raw HTML here…"></textarea>
+        </div>
       </div>
       <div class="action-bar">
         <button class="btn btn-save" id="btn-save">Save${chunkId ? ' changes' : ''}</button>
@@ -835,7 +943,27 @@
         }
         dirty = true;
       });
-      document.getElementById('edit-text').addEventListener('input', () => { dirty = true; });
+      const editor = document.getElementById('edit-html-editor');
+      const source = document.getElementById('edit-html-source');
+      const initialHtml = decodeStoredHtml(text || '');
+      editor.innerHTML = initialHtml;
+      source.value = normalizeAnswerHtml(initialHtml);
+      editor.addEventListener('input', () => {
+        dirty = true;
+        syncSourceFromEditor();
+      });
+      source.addEventListener('input', () => {
+        dirty = true;
+      });
+      panel.querySelectorAll('.editor-btn[data-cmd]').forEach(btn => {
+        btn.addEventListener('click', () => runEditorCommand(btn));
+      });
+      panel.querySelectorAll('.editor-btn[data-block]').forEach(btn => {
+        btn.addEventListener('click', () => applyBlockFormat(btn.dataset.block));
+      });
+      panel.querySelectorAll('.editor-btn[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => handleEditorAction(btn.dataset.action));
+      });
       document.getElementById('btn-save').addEventListener('click', saveEntry);
       document.getElementById('btn-discard').addEventListener('click', () => {
         if (!dirty || confirm('Discard unsaved changes?')) {
@@ -857,13 +985,169 @@
       if (!chunkId) document.getElementById('edit-title').focus();
     }
 
+    function normalizeAnswerHtml(html) {
+      const cleaned = normalizeRichHtml(String(html || '').trim());
+      return ['<br>', '<div><br></div>', '<p><br></p>'].includes(cleaned) ? '' : cleaned;
+    }
+
+    function decodeStoredHtml(text) {
+      const value = String(text || '');
+      if (!/[&](?:lt|gt|amp|quot|nbsp|#39);/i.test(value)) return value;
+      const textarea = document.createElement('textarea');
+      textarea.innerHTML = value;
+      return textarea.value;
+    }
+
+    function normalizeRichHtml(html) {
+      const value = decodeStoredHtml(String(html || '').trim());
+      if (!value) return '';
+
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = value;
+
+      wrapper.querySelectorAll('span.ql-ui').forEach(node => node.remove());
+      wrapper.querySelectorAll('[data-row]').forEach(node => node.removeAttribute('data-row'));
+      wrapper.querySelectorAll('[style="color: black;"]').forEach(node => node.removeAttribute('style'));
+
+      wrapper.querySelectorAll('[class]').forEach(node => {
+        const classes = Array.from(node.classList);
+        let indentLevel = 0;
+        classes.forEach(cls => {
+          if (cls === 'ql-align-right') node.style.textAlign = 'right';
+          if (cls === 'ql-align-center') node.style.textAlign = 'center';
+          if (cls === 'ql-align-justify') node.style.textAlign = 'justify';
+          if (cls.startsWith('ql-indent-')) {
+            indentLevel = Number.parseInt(cls.slice('ql-indent-'.length), 10) || 0;
+          }
+        });
+        if (indentLevel > 0) node.style.marginLeft = `${indentLevel * 3}em`;
+        node.className = classes.filter(cls => !cls.startsWith('ql-')).join(' ');
+        if (!node.className) node.removeAttribute('class');
+      });
+
+      wrapper.querySelectorAll('ol').forEach(list => {
+        const items = Array.from(list.children).filter(node => node.tagName === 'LI');
+        const allBullets = items.length > 0 && items.every(item => item.getAttribute('data-list') === 'bullet');
+        if (allBullets) {
+          const ul = document.createElement('ul');
+          while (list.firstChild) {
+            const child = list.firstChild;
+            if (child.nodeType === Node.ELEMENT_NODE && child.hasAttribute('data-list')) {
+              child.removeAttribute('data-list');
+            }
+            ul.appendChild(child);
+          }
+          list.replaceWith(ul);
+          return;
+        }
+        items.forEach(item => item.removeAttribute('data-list'));
+      });
+
+      wrapper.querySelectorAll('ul > li[data-list], ol > li[data-list]').forEach(item => item.removeAttribute('data-list'));
+
+      while (wrapper.firstElementChild && wrapper.firstElementChild.matches('p') && !wrapper.firstElementChild.textContent.trim() && !wrapper.firstElementChild.querySelector('img,video,table,iframe')) {
+        wrapper.firstElementChild.remove();
+      }
+      while (wrapper.lastElementChild && wrapper.lastElementChild.matches('p') && !wrapper.lastElementChild.textContent.trim() && !wrapper.lastElementChild.querySelector('img,video,table,iframe')) {
+        wrapper.lastElementChild.remove();
+      }
+
+      return wrapper.innerHTML.trim();
+    }
+
+    function getEditorNodes() {
+      return {
+        shell: document.getElementById('answer-editor-shell'),
+        editor: document.getElementById('edit-html-editor'),
+        source: document.getElementById('edit-html-source'),
+        sourceBtn: document.getElementById('btn-source-toggle'),
+      };
+    }
+
+    function syncSourceFromEditor() {
+      const { editor, source } = getEditorNodes();
+      if (!editor || !source) return;
+      source.value = normalizeAnswerHtml(editor.innerHTML);
+    }
+
+    function syncEditorFromSource() {
+      const { editor, source } = getEditorNodes();
+      if (!editor || !source) return;
+      editor.innerHTML = normalizeAnswerHtml(source.value);
+    }
+
+    function isSourceMode() {
+      const { shell } = getEditorNodes();
+      return shell ? shell.classList.contains('source-mode') : false;
+    }
+
+    function toggleSourceMode() {
+      const { shell, source, editor, sourceBtn } = getEditorNodes();
+      if (!shell || !source || !editor || !sourceBtn) return;
+      const nextIsSource = !shell.classList.contains('source-mode');
+      if (nextIsSource) {
+        syncSourceFromEditor();
+        shell.classList.add('source-mode');
+        sourceBtn.classList.add('active');
+        source.focus();
+      } else {
+        syncEditorFromSource();
+        shell.classList.remove('source-mode');
+        sourceBtn.classList.remove('active');
+        editor.focus();
+      }
+    }
+
+    function focusHtmlEditor() {
+      const { editor } = getEditorNodes();
+      if (!editor) return false;
+      if (isSourceMode()) toggleSourceMode();
+      editor.focus();
+      return true;
+    }
+
+    function runEditorCommand(btn) {
+      if (!focusHtmlEditor()) return;
+      document.execCommand(btn.dataset.cmd, false, btn.dataset.value || null);
+      syncSourceFromEditor();
+      dirty = true;
+    }
+
+    function applyBlockFormat(tagName) {
+      if (!focusHtmlEditor()) return;
+      document.execCommand('formatBlock', false, tagName);
+      syncSourceFromEditor();
+      dirty = true;
+    }
+
+    function handleEditorAction(action) {
+      if (action === 'source') {
+        toggleSourceMode();
+        return;
+      }
+      if (action === 'link') {
+        if (!focusHtmlEditor()) return;
+        const url = prompt('Link URL:');
+        if (!url) return;
+        document.execCommand('createLink', false, url.trim());
+        syncSourceFromEditor();
+        dirty = true;
+      }
+    }
+
     // ── Save ────────────────────────────────────────────────────────────────────
     async function saveEntry() {
       const title = document.getElementById('edit-title').value.trim();
-      const text = document.getElementById('edit-text').value.trim();
+      const text = (() => {
+        if (isSourceMode()) {
+          return document.getElementById('edit-html-source').value.trim();
+        }
+        syncSourceFromEditor();
+        return document.getElementById('edit-html-source').value.trim();
+      })();
       const category = document.getElementById('edit-category').value;
       if (!title) { setActionStatus('Title is required.', 'err'); return; }
-      if (!text) { setActionStatus('Answer text is required.', 'err'); return; }
+      if (!text) { setActionStatus('Answer HTML is required.', 'err'); return; }
       setBtns(false); setActionStatus('');
       try {
         let res;
