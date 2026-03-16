@@ -1,172 +1,192 @@
-# USS Pampanito — AI Docent
+# SubmarineDocent
 
-**Application Overview & Technical Summary**
+Current site overview and technical summary.
 
----
+## What This Site Is
 
-## 1. What Is This?
+SubmarineDocent is no longer just a single Pampanito tour prototype. It is now a small FastAPI-backed historical site with several connected experiences:
 
-SubmarineDocent is a voice- and text-enabled Q&A assistant that answers visitor questions about the USS Pampanito (SS-383) and WWII submarine history. It runs as a local HTTPS server on a Mac or small Linux machine, serving a mobile web app to any visitor's phone or a shared kiosk tablet over the local network.
+- A public USS Pampanito audio tour and question-answering app.
+- A public diesel-electric submarine FAQ dashboard.
+- Special-history sections embedded in the FAQ site for Medal of Honor recipients, Eternal Patrol / lost submarines, incidents, and operations content.
+- Curator/admin tools for FAQ review, FAQ editing, and feedback review.
 
-Visitors speak or type a question and receive a spoken, historically accurate answer in seconds, drawn exclusively from verified museum-grade sources. No app download is required. No internet connection is needed during operation.
+The application is served from one Python backend in [api/main.py](/Users/irving/Documents/submarinedocent/api/main.py) and static frontend pages in [web](/Users/irving/Documents/submarinedocent/web).
 
----
+## Current Public Pages
 
-## 2. The Problem It Solves
+### 1. Pampanito tour app
 
-Museum visitors are curious. They stand inside a torpedo room and want to know whether sailors actually slept next to live torpedoes, or how many men were on the boat, or what a depth charge felt like from inside. Fixed audio narration cannot answer these questions; human docents cannot be everywhere at once.
+Primary visitor experience: [web/pampanito.html](/Users/irving/Documents/submarinedocent/web/pampanito.html)
 
-- Curiosity goes unrewarded — visitors leave with unanswered questions.
-- Non-English-speaking visitors receive no additional context.
-- Staff cannot scale to provide personalised responses to hundreds of visitors daily.
+- Mobile-first tour interface for USS Pampanito.
+- Supports narrated compartment audio plus visitor Q&A.
+- Uses `/ask`, `/tts`, `/transcribe`, `/health`, and `/contact`.
+- Intended to work as the on-ship or museum-floor docent experience.
 
-SubmarineDocent provides an always-available, on-premises AI guide that responds to natural spoken questions in real time.
+### 2. FAQ dashboard
 
----
+Primary historical reference hub: [web/faqs.html](/Users/irving/Documents/submarinedocent/web/faqs.html)
 
-## 3. Visitor Experience — How It Works
+- Dashboard of WWII diesel-electric submarine FAQ categories.
+- Public FAQ browser backed by `/api/faqs`.
+- Includes four special cards and dedicated in-page views for:
+ 	- U.S. Submarine Medal of Honor recipients.
+ 	- Lost submarines / Eternal Patrol.
+ 	- Submarine incidents database.
+ 	- Operations guide.
 
-| Step | What Happens |
-|------|-------------|
-| **1. Arrive at a compartment** | The visitor enters a compartment (e.g., Control Room, Forward Torpedo Room) and taps to hear the narrated audio for that space. |
-| **2. Listen to narration** | Pre-recorded audio plays — the same narration currently offered by the Pampanito tour. |
-| **3. Ask a question** | At any point, the visitor taps a microphone (or record) button and speaks naturally: "How did the torpedo work?" or "Where did the crew sleep?" |
-| **4. AI retrieves an answer** | The transcript is sent to the on-premises retrieval engine, which searches curated historical sources and assembles a direct spoken answer in under two seconds. |
-| **5. Answer plays aloud** | The answer is read aloud through the visitor's phone speaker or headphones, with a spoken location prefix when relevant (e.g., "In the Control Room…"). |
-| **6. Follow-ups offered** | The guide suggests related questions to keep exploration going. |
-| **7. Unanswered questions** | If the system cannot find a reliable answer, it says so honestly rather than guessing. |
+This page is currently the most developed general-purpose historical interface in the site.
 
----
+### 3. Eternal Patrol page
 
-## 4. Knowledge Sources
+Standalone lost-submarines page: [web/eternal-patrol.html](/Users/irving/Documents/submarinedocent/web/eternal-patrol.html)
 
-The AI guide answers exclusively from three curated, authoritative corpora. It does not search the internet and cannot fabricate information.
+- Fetches data from `/api/eternal-patrol` with JSONL fallback.
+- Shows aggregate statistics, searchable/filterable list, and modal details.
+- Modal now includes Construction before Loss Narrative.
 
-| Source | Size | Description |
-|--------|------|-------------|
-| **Pampanito Tour Script** | 213 chunks | The official compartment-by-compartment narration for all 11 interior compartments plus forward and after decks. Each chunk is tagged with a compartment ID, location context, and display citation. |
-| **Submarine FAQ Corpus** | 458 entries | Custom-authored Q&A pairs covering crew life, weapons, engineering, tactics, escape, medical, communications, and Pampanito-specific history. 226 entries (pam_001–pam_226) are Pampanito-focused; 232 entries cover WWII diesel-electric submarines broadly. |
-| **DieselSubs Shorts** | 31 chunks | Concise background explanations on submarine systems, operations, and history, used to supplement answers when the other sources are insufficient. |
+### 4. Feedback and curator tools
 
-**Total corpus:** 702 chunks. Every answer includes a citation identifying which source and chunk the information came from.
+- Feedback viewer / gate: [web/feedback.html](/Users/irving/Documents/submarinedocent/web/feedback.html)
+- FAQ review tool: [web/review.html](/Users/irving/Documents/submarinedocent/web/review.html)
+- FAQ editor and SQL import tool: [web/faq_editor.html](/Users/irving/Documents/submarinedocent/web/faq_editor.html)
 
----
+### 5. Landing page
 
-## 5. Key Features
+Current root landing page: [web/index.html](/Users/irving/Documents/submarinedocent/web/index.html)
 
-| Feature | Detail |
-|---------|--------|
-| **Voice input — iOS/desktop** | Browser Web Speech API (`webkitSpeechRecognition`) captures the question locally — no audio upload required. |
-| **Voice input — Android** | Audio is recorded via MediaRecorder and POSTed to the `/transcribe` endpoint; Groq Whisper (`whisper-large-v3-turbo`) transcribes it server-side (~0.3 s latency). Falls back to a text input row on browsers without microphone support. |
-| **Spoken answers** | Text-to-speech delivers answers aloud — eyes-free while exploring the boat. |
-| **Multilingual audio** | Answers available in English, Spanish, French, German, Japanese, and Chinese. |
-| **Location-aware retrieval** | The AI knows which compartment the visitor is standing in and weights results accordingly. |
-| **No internet required** | Fully self-contained — runs on a Mac or small server on or near the vessel. (Groq Whisper requires internet only if Android transcription is enabled.) |
-| **No app download** | Progressive Web App served over HTTPS — works in any modern smartphone browser. |
-| **Honest fallback** | If no reliable answer is found, the system says so rather than guessing. `partial_match` flag signals relevant-but-indirect answers. |
+- Still a placeholder “Coming Soon” page.
+- The backend redirects `/` to `/web/index.html` by default, except for `pampanito.*` hostnames which redirect to the Pampanito tour.
 
----
+## Current Backend Surface
 
-## 6. Technical Architecture
+Main application file: [api/main.py](/Users/irving/Documents/submarinedocent/api/main.py)
 
-The application is built on three layers: a browser-based frontend, an on-premises Python API server, and a local retrieval engine backed by curated JSONL corpora.
+### Public routes
 
-### 6.1 Frontend (`web/pampanito.html`)
+- `/` -> redirects to `/web/index.html` or `/web/pampanito.html` depending on host.
+- `/pampanito.html` -> redirects to the Pampanito app.
+- `/faqs`, `/faqs.html`, `/faq` -> redirect to the FAQ dashboard.
+- `/feedback.html`, `/review.html`, `/faq_editor.html` -> redirect to their matching web pages.
+- `/web/*` -> static file hosting for the frontend.
 
-A single-page application served directly by the backend. Designed for iOS Safari on iPhone as the primary visitor device, with full Android support.
+### Public API routes
 
-- **Compartment-aware navigation** — 11 compartments + fore/aft deck, each with a unique ID passed to the API.
-- **AudioContext playback** — GainNode normalises volume across narration, TTS answers, and pre-recorded fallback audio.
-- **Voice input (dual path)** — On startup, the client calls `/health`; if `transcribe_available` is true, it routes all voice input through Groq Whisper (record → upload path). Otherwise it uses the browser's native Web Speech API. Browsers without any microphone support show a text input row.
-- **Answer pipeline** — transcript POSTed to `/ask`; answer text POSTed to `/tts` for speech synthesis; audio streamed and played immediately.
-- **No-cache headers** — visitors always load the latest tour version without a hard refresh.
+- `GET /health`
+ 	- Returns service status, transcription availability, and corpus counts for tour, FAQ, and shorts corpora.
+- `POST /ask`
+ 	- Main question-answering endpoint used by the Pampanito app.
+- `POST /tts`
+ 	- Text-to-speech endpoint.
+- `POST /transcribe`
+ 	- Audio transcription endpoint.
+- `POST /contact`
+ 	- Visitor contact / unanswered-question handoff.
+- `GET /api/faqs`
+ 	- Returns published `faq_` entries grouped by category for the public FAQ page.
+- `GET /api/eternal-patrol`
+ 	- Returns the Eternal Patrol / lost submarines dataset.
+- `GET /api/incidents`
+ 	- Returns the submarine incidents dataset.
+- `POST /feedback`
+ 	- Accepts simple user feedback submissions.
+- `GET /feedback/list`
+ 	- Returns stored feedback entries, intended for admin use.
 
-### 6.2 API Server (`api/main.py`)
+### Admin / curator API routes
 
-FastAPI application hosted with Uvicorn behind a self-signed TLS certificate (required for microphone access on mobile browsers).
+- `GET /admin/generated-faqs`
+ 	- Returns generated FAQ candidates (`der_`, `pam_`, `fix_`).
+- `GET /admin/faqs`
+ 	- Returns full editable FAQ records.
+- `POST /admin/faq`
+ 	- Creates a new published FAQ.
+- `PUT /admin/faq/{chunk_id}`
+ 	- Updates an FAQ.
+- `POST /admin/faq/{chunk_id}/accept`
+ 	- Promotes a generated FAQ entry into a published `faq_` entry.
+- `DELETE /admin/faq/{chunk_id}`
+ 	- Removes generated FAQ entries.
+- `POST /admin/import-sql`
+ 	- Imports FAQ content from a phpMyAdmin SQL export.
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `POST /ask` | JSON: `question_text`, `compartment_id`, `playhead_time_ms` | Main Q&A endpoint. Runs retrieval + extractive synthesis; returns a structured answer with citations and `partial_match` flag. |
-| `POST /tts` | JSON: `text`, `language` | Converts answer text to speech; returns an MP3 audio stream. |
-| `POST /transcribe` | Multipart: audio file | Android speech path — sends audio to Groq Whisper; returns transcribed text. |
-| `POST /contact` | Multipart form | Captures visitor contact info and unanswered question for historian review. |
-| `GET /health` | — | Returns server status including `transcribe_available` flag (whether a Groq API key is configured). |
-| `GET /pampanito.html` | — | Serves the tour frontend. |
+## Data Sources in the Repo
 
-### 6.3 Retrieval Engine
+Primary corpora live in [corpora](/Users/irving/Documents/submarinedocent/corpora).
 
-A custom token-overlap retrieval system with vocabulary expansion — no vector database or LLM required at query time. Designed for high accuracy on a closed, domain-specific corpus.
+Current line counts:
 
-- **Tokenisation & stopword filtering** — query and corpus text are lowercased, punctuation-stripped, and filtered against a domain-tuned stopword list (including universal noise words like "submarine" that appear in every chunk, and prepositions such as "into", "upon", "through").
-- **Synonym expansion (`QUERY_SYNONYMS`)** — query tokens are expanded with domain synonyms before scoring. For example, "eat" expands to *ate, galley, mess, food, meal*; "fired" expands to *launch, launched, tube*; "depth" expands to *deep, feet, dive, running, failure*. This bridges the vocabulary gap between visitor phrasing and corpus language.
-- **Weighted corpus scoring** — Tour = 3.0×, FAQ = 1.2×, Shorts = 0.8×. Tour chunks in the visitor's current compartment score highest.
-- **FAQ title-match bonus** — FAQ chunks whose question title covers all synonym-expanded query tokens receive up to a 4× coverage bonus (`max(weight, weight × 4.0 × coverage)`), ensuring the most precisely targeted FAQ answer wins over tangentially related tour passages.
-- **Quantity boost** — for "how many" questions, chunks containing number words receive a 1.5× score multiplier.
-- **Intent detection** — detects WHERE questions (prepends "In the [location]." to the answer), HOW MANY questions (activates quantity checking), and Mark 14/18 comparison questions (activates comparison-language boost only when both marks or explicit comparison vocabulary are present).
+| Corpus | File | Count | Purpose |
+|---|---|---:|---|
+| Pampanito tour corpus | [corpora/pampanito_tour_corpus.jsonl](/Users/irving/Documents/submarinedocent/corpora/pampanito_tour_corpus.jsonl) | 213 | Tour narration / compartment knowledge |
+| Diesel submarine FAQ corpus | [corpora/dieselsubs_faq_corpus.jsonl](/Users/irving/Documents/submarinedocent/corpora/dieselsubs_faq_corpus.jsonl) | 455 | Master FAQ corpus including published and generated entries |
+| Published FAQ entries | [corpora/dieselsubs_faq_corpus.jsonl](/Users/irving/Documents/submarinedocent/corpora/dieselsubs_faq_corpus.jsonl) | 229 | Public `faq_` entries exposed through `/api/faqs` |
+| DieselSubs shorts | [corpora/dieselsubs_shorts_corpus.jsonl](/Users/irving/Documents/submarinedocent/corpora/dieselsubs_shorts_corpus.jsonl) | 31 | Supplementary historical snippets |
+| Eternal Patrol | [corpora/eternal_patrol.jsonl](/Users/irving/Documents/submarinedocent/corpora/eternal_patrol.jsonl) | 65 | Lost submarines data |
+| Incidents | [corpora/incidents.jsonl](/Users/irving/Documents/submarinedocent/corpora/incidents.jsonl) | 16 | Incidents database records |
 
-### 6.4 Extractive Answer Synthesis
+Other notable data/config files:
 
-Answers are assembled by extracting the most relevant sentences from the top-ranked corpus chunk — no LLM generation in the default deployment. This guarantees factual fidelity and eliminates hallucination risk.
+- [corpora/retrieval_config.yaml](/Users/irving/Documents/submarinedocent/corpora/retrieval_config.yaml)
+- [corpora/system_prompt_ai_docent.md](/Users/irving/Documents/submarinedocent/corpora/system_prompt_ai_docent.md)
+- [feedback.jsonl](/Users/irving/Documents/submarinedocent/feedback.jsonl)
+- [corpora/api_contract.json](/Users/irving/Documents/submarinedocent/corpora/api_contract.json)
 
-- Sentences are filtered and ranked by synonym-expanded term overlap with the query.
-- A second chunk is consulted if the first does not yield a complete answer.
-- Speech filler words ("uh", "um", "er") are automatically stripped from oral-history transcript chunks before the answer is read aloud.
-- A `partial_match` flag is returned when the answer is topically relevant but does not directly answer the question. The frontend plays a recorded "I don't have a direct answer, but here's what I know" prefix before reading the answer.
+## How the Site Behaves Today
 
----
+### Pampanito experience
 
-## 7. Answer Quality & Partial Match Logic
+The Pampanito app remains the AI-docent portion of the project:
 
-A key reliability feature is the system's ability to distinguish between a direct answer and a relevant-but-indirect answer.
+- compartment-aware visitor Q&A
+- text-to-speech answers
+- optional server-side transcription
+- visitor contact escalation when no good answer is available
 
-| Condition | Example |
-|-----------|---------|
-| None of the core query terms appear in the assembled answer | Question about "escape hatches" but answer discusses hull construction |
-| "How many X" question but no sentence contains both X and a number | "How many torpedoes" but answer only says they were stored forward |
-| Question contains a superlative (worst, best, hardest…) but the answer does not address the judgment | "What was the worst bunk to sleep in" — answer describes bunks but cannot rank them |
+### FAQ and history experience
 
-When `partial_match` is `true`, the frontend plays a soft spoken prefix before reading the answer, setting visitor expectations correctly. If no relevant content is found at all, a separate "nothing found" audio clip plays.
+The FAQ site has grown into a broader historical reference portal:
 
----
+- category browsing across published diesel-electric submarine FAQs
+- embedded special sections for awardees, losses, incidents, and operations
+- dashboard-style navigation rather than a single search page
 
-## 8. Deployment
+### Curator workflow
 
-| Component | Detail |
-|-----------|--------|
-| **Hardware** | Mac (MacBook Pro, Mac Mini, or equivalent). No GPU required. |
-| **Network** | Local Wi-Fi access point. Visitors connect via QR code or direct URL. Internet not required except for optional Groq Whisper transcription. |
-| **TLS** | Self-signed certificate on port 8443 — required by browsers for microphone access (HTTPS). |
-| **Python stack** | Python 3.10+, FastAPI, Uvicorn, OpenAI SDK (TTS), Groq API (Whisper transcription). All dependencies in a local virtual environment. |
-| **Server startup** | Single command: `bash start_https.sh` — kills any prior instance, sources environment variables, starts Uvicorn. |
-| **Environment** | `.env.local` — `GROQ_API_KEY` for Android transcription, other service keys as needed. |
-| **LLM flag** | `USE_LLM=false` (default) — fully local, no LLM calls for Q&A. API stub present for future GPT-based synthesis. |
+Curators can now:
 
----
+- review generated FAQ candidates
+- edit or create FAQ entries directly
+- import FAQ material from SQL exports
+- review accumulated visitor feedback
 
-## 9. Current Status
+## Deployment and Hosting Model
 
-**The application is a fully functional prototype.** It covers all 11 interior compartments plus the fore and aft decks of the Pampanito, and the AI guide can answer 226 custom-authored questions about the ship and her crew, plus hundreds more from the broader WWII submarine corpus.
+Repository memory and config indicate the current deployment model is:
 
-| Capability | Status |
-|------------|--------|
-| Voice Q&A — iOS / desktop | ✓ Web Speech API |
-| Voice Q&A — Android | ✓ Groq Whisper record mode |
-| Text input fallback | ✓ All browsers |
-| Multilingual TTS (6 languages) | ✓ |
-| Compartment-aware retrieval | ✓ |
-| Sub-2-second response time | ✓ |
-| Honest partial-answer signalling | ✓ |
-| 226 custom Pampanito FAQs | ✓ pam_001–pam_226 |
-| LLM-backed synthesis | Stubbed — not enabled |
+- FastAPI backend with static frontend assets
+- Render deployment via [render.yaml](/Users/irving/Documents/submarinedocent/render.yaml)
+- workspace rooted at `/Users/irving/Documents/submarinedocent`
 
-**Near-term roadmap:**
+The repo still contains local HTTPS startup helpers used during local/dev or on-prem usage:
 
-- Expand FAQ corpus to ~300 entries (batch 13+)
-- Pre-cached TTS audio for the most common questions — instant playback without API latency
-- Expanded corpus coverage: crew oral histories, patrol logs, post-war interviews
-- QR code self-check-in for analytics (compartment traffic, popular questions)
+- [serve_https.py](/Users/irving/Documents/submarinedocent/serve_https.py)
+- [start_https.sh](/Users/irving/Documents/submarinedocent/start_https.sh)
 
----
+## Current State Summary
 
-*USS Pampanito — SS-383 | Fisherman's Wharf, San Francisco | AI Docent Prototype | 2026*
+As of March 2026, the site is best understood as a multi-surface historical web application with one backend and several distinct user experiences:
+
+- The Pampanito tour app is functional and still central.
+- The FAQ site is the main public historical dashboard.
+- Eternal Patrol and Incidents are now real data-backed features, not placeholders.
+- Admin tooling for FAQ curation is present and working.
+- The top-level landing page is still a placeholder and does not yet present the full site clearly.
+
+## Recommended Next Documentation Updates
+
+- Replace the placeholder root landing page with a true home page that matches the actual site structure.
+- Add a dedicated architecture doc for the FAQ dashboard and history datasets.
+- Add a curator workflow doc covering review, edit, import, and feedback moderation.
+- Add a route map doc separating public, admin, and data endpoints.

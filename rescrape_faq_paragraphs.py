@@ -91,6 +91,11 @@ def main():
         if ch.get("doc_type") != "dieselsubs_faq":
             continue
 
+        # faq_NNN entries are the curated, authoritative versions — never overwrite them
+        if ch.get("chunk_id", "").startswith("faq_"):
+            skipped += 1
+            continue
+
         slug = ch.get("slug", "")
         if not slug:
             skipped += 1

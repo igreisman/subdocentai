@@ -12,10 +12,30 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
+      padding-top: 72px;
       background: #0f0f0f;
       color: #f0f0f0;
       font-family: sans-serif;
       text-align: center;
+    }
+
+    .site-warning {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      background: #3b2f12;
+      border-bottom: 1px solid #6f5b28;
+      color: #f4e6b8;
+      padding: 12px 20px;
+      text-align: center;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .site-warning strong {
+      color: #fff3cd;
     }
 
     h1 {
@@ -31,6 +51,8 @@
 </head>
 
 <body>
+  <div class="site-warning"><strong>Work in progress:</strong> this site is still being developed, and some content and
+    historical data remain unverified.</div>
   <div>
     <h1>Coming Soon</h1>
     <p>We're working on something great. Check back later.</p>

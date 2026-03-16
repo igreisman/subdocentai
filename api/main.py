@@ -1,6 +1,4 @@
-# api/main.py
 from __future__ import annotations
-
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -58,6 +56,20 @@ if os.path.isdir(WEB_DIR):
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/web/review.html")
 
+    # Convenience redirect: /faq_editor.html → /web/faq_editor.html
+    @app.get("/faq_editor.html", include_in_schema=False)
+    def redirect_faq_editor_html():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/web/faq_editor.html")
+
+    # Public FAQ page shortcuts
+    @app.get("/faqs", include_in_schema=False)
+    @app.get("/faqs.html", include_in_schema=False)
+    @app.get("/faq", include_in_schema=False)
+    def redirect_faqs_html():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/web/faqs.html")
+
     # Serve pampanito.html with no-cache so Safari always loads the latest version
     @app.get("/web/pampanito.html", include_in_schema=False)
     def serve_tour_html():
@@ -88,8 +100,41 @@ if os.path.isdir(_RENDER_DATA_DIR):
 else:
     FAQ_PATH = _BUNDLED_FAQ_PATH
 
+
+# Path for incidents corpus
+INCIDENTS_PATH = os.path.join(CORPORA_DIR, "incidents.jsonl")
+
 # Feature flag: keep demo fully local today; later, flip to true with funding.
 USE_LLM = os.getenv("USE_LLM", "false").lower() in ("1", "true", "yes")
+def load_incidents():
+    """Load incidents corpus from JSONL file."""
+    if not os.path.exists(INCIDENTS_PATH):
+        print(f"❌ File not found: {INCIDENTS_PATH}")
+        return []
+    data = []
+    with open(INCIDENTS_PATH, "r", encoding="utf-8-sig") as f:
+        for i, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                data.append(json.loads(line))
+            except Exception as e:
+                print(f"⚠️ JSON parse error on line {i} in {INCIDENTS_PATH}: {e}")
+                break
+    print(f"✅ Loaded {len(data)} records from {os.path.basename(INCIDENTS_PATH)}")
+    return data
+
+# Load incidents corpus at startup
+INCIDENTS = load_incidents()
+# ------------------------------------------------------------
+# Incidents API endpoint
+# ------------------------------------------------------------
+
+@app.get("/api/incidents")
+def get_incidents():
+    """Return all submarine incidents."""
+    return {"incidents": INCIDENTS}
 
 # Groq key — used for Whisper transcription (whisper-large-v3-turbo, ~0.3s latency)
 _GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
@@ -1629,11 +1674,98 @@ def get_generated_faqs():
     return [e for e in FAQ if e.get("chunk_id", "").split("_")[0] in _GENERATED_PREFIXES]
 
 
+@app.get("/admin/faqs")
+def get_all_faqs():
+    """Return all FAQ entries for the editor tool."""
+    return [{"chunk_id": e.get("chunk_id", ""), "title": e.get("title", ""), "text": e.get("text", ""), "category": e.get("category", "")} for e in FAQ]
+
+
+# ── Eternal Patrol ────────────────────────────────────────────────────────────
+
+_ETERNAL_PATROL_PATH = os.path.join(CORPORA_DIR, "eternal_patrol.jsonl")
+_eternal_patrol_cache: list | None = None
+
+def _load_eternal_patrol() -> list:
+    global _eternal_patrol_cache
+    if _eternal_patrol_cache is not None:
+        return _eternal_patrol_cache
+    boats = []
+    if os.path.exists(_ETERNAL_PATROL_PATH):
+        with open(_ETERNAL_PATROL_PATH, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        boats.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
+    boats.sort(key=lambda b: b.get("date_lost", ""))
+    _eternal_patrol_cache = boats
+    return boats
+
+
+@app.get("/api/eternal-patrol")
+def eternal_patrol():
+    """Return all submarines on eternal patrol."""
+    return _load_eternal_patrol()
+
+
+@app.get("/api/faqs")
+def public_faqs():
+    """Return all published faq_ entries grouped by category, for the public FAQ page."""
+    from collections import defaultdict
+    groups: dict[str, list] = defaultdict(list)
+    for e in FAQ:
+        if not e.get("chunk_id", "").startswith("faq_"):
+            continue
+        title = e.get("title", "")
+        text = e.get("text", "")
+        parts = text.split("\n\n", 1)
+        answer = parts[1].strip() if len(parts) > 1 else text
+        cat = e.get("category") or "General"
+        groups[cat].append({"id": e["chunk_id"], "title": title, "answer": answer})
+    return [{"category": cat, "faqs": groups[cat]} for cat in sorted(groups.keys())]
+
+
+@app.post("/admin/faq")
+async def create_faq(request: Request):
+    """Create a new faq_NNN entry from a simple title + text payload."""
+    body = await request.json()
+    title = (body.get("title") or "").strip()
+    text = (body.get("text") or "").strip()
+    category = (body.get("category") or "").strip()
+    if not title or not text:
+        raise HTTPException(status_code=400, detail="title and text are required")
+    with _faq_write_lock:
+        faq_nums = [
+            int(e["chunk_id"].split("_")[1])
+            for e in FAQ
+            if e.get("chunk_id", "").startswith("faq_") and e["chunk_id"].split("_")[1].isdigit()
+        ]
+        new_num = max(faq_nums) + 1 if faq_nums else 1
+        new_id = f"faq_{new_num}"
+        new_entry: Dict[str, Any] = {
+            "chunk_id": new_id,
+            "doc_type": "dieselsubs_faq",
+            "source": "manual_editor",
+            "display_citation": f"SubmarineDocent FAQ — {title}",
+            "title": title,
+            "text": text,
+            "category": category,
+            "slug": _make_slug(title),
+            "topic_tags": [],
+            "authority_level": "reference_faq",
+            "era": "ww2",
+            "platform": ["us_diesel_electric_submarines"],
+        }
+        FAQ.append(new_entry)
+        _save_faq_corpus()
+    return {"status": "created", "chunk_id": new_id}
+
+
 @app.put("/admin/faq/{chunk_id}")
 async def update_faq(chunk_id: str, request: Request):
-    """Update title and/or text of a generated FAQ entry."""
-    if chunk_id.split("_")[0] not in _GENERATED_PREFIXES:
-        raise HTTPException(status_code=400, detail="Only der_, pam_, fix_ entries can be edited here")
+    """Update title and/or text of any FAQ entry."""
     body = await request.json()
     title = (body.get("title") or "").strip()
     text = (body.get("text") or "").strip()
@@ -1645,6 +1777,8 @@ async def update_faq(chunk_id: str, request: Request):
             entry["title"] = title
         if text:
             entry["text"] = text
+        if "category" in body:
+            entry["category"] = (body.get("category") or "").strip()
         _save_faq_corpus()
     return {"status": "saved", "chunk_id": chunk_id}
 
@@ -1693,6 +1827,35 @@ def delete_faq(chunk_id: str):
         FAQ.pop(idx)
         _save_faq_corpus()
     return {"status": "deleted", "chunk_id": chunk_id}
+
+
+@app.post("/admin/import-sql")
+async def import_sql(sql_file: UploadFile = File(...)):
+    """
+    Import FAQ corpus from an uploaded phpMyAdmin SQL dump.
+
+    Staff workflow (no technical help needed):
+      1. phpMyAdmin → Export → download .sql file
+      2. Open /faq_editor.html → click "Import from dieselsubs.com" → pick the file
+      3. Done — corpus updated immediately, no server restart required.
+    """
+    import sys
+    sys.path.insert(0, BASE_DIR)
+    try:
+        from sync_from_sql import sync_from_string
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"sync_from_sql not found: {e}")
+
+    content = await sql_file.read()
+    sql_text = content.decode("utf-8", errors="replace")
+
+    try:
+        with _faq_write_lock:
+            stats = sync_from_string(sql_text, FAQ, _save_faq_corpus)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse SQL: {e}")
+
+    return {"status": "ok", **stats}
 
 
 # ------------------------------------------------------------
