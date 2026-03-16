@@ -1,7 +1,7 @@
 from __future__ import annotations
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import io
 import json
@@ -28,11 +28,28 @@ app.add_middleware(
 # Serve web/ as static files at /
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(BASE_DIR, "web")
+LEGACY_DOMAIN_HOSTS = {"submarinedocent.com", "www.submarinedocent.com"}
+LEGACY_DOMAIN_TARGET = "https://submarinedocent.org"
+
+
+def _request_host(request: Request) -> str:
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    return host.split(",", 1)[0].strip().split(":", 1)[0].lower()
+
+
+@app.middleware("http")
+async def redirect_legacy_domain(request: Request, call_next):
+    host = _request_host(request)
+    if host in LEGACY_DOMAIN_HOSTS:
+        target = f"{LEGACY_DOMAIN_TARGET}{request.url.path}"
+        if request.url.query:
+            target = f"{target}?{request.url.query}"
+        return RedirectResponse(url=target, status_code=308)
+    return await call_next(request)
 
 @app.get("/", include_in_schema=False)
 def root_redirect(request: Request):
-    from fastapi.responses import RedirectResponse
-    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    host = _request_host(request)
     if host.startswith("pampanito."):
         return RedirectResponse(url="/web/pampanito.html")
     return RedirectResponse(url="/web/faqs.html")
@@ -41,25 +58,21 @@ if os.path.isdir(WEB_DIR):
     # Convenience redirect: /pampanito.html → /web/pampanito.html
     @app.get("/pampanito.html", include_in_schema=False)
     def redirect_tour_html():
-        from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/web/pampanito.html")
 
     # Convenience redirect: /feedback.html → /web/feedback.html
     @app.get("/feedback.html", include_in_schema=False)
     def redirect_feedback_html():
-        from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/web/feedback.html")
 
     # Convenience redirect: /review.html → /web/review.html
     @app.get("/review.html", include_in_schema=False)
     def redirect_review_html():
-        from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/web/review.html")
 
     # Convenience redirect: /faq_editor.html → /web/faq_editor.html
     @app.get("/faq_editor.html", include_in_schema=False)
     def redirect_faq_editor_html():
-        from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/web/faq_editor.html")
 
     # Public FAQ page shortcuts
@@ -67,13 +80,11 @@ if os.path.isdir(WEB_DIR):
     @app.get("/faqs.html", include_in_schema=False)
     @app.get("/faq", include_in_schema=False)
     def redirect_faqs_html():
-        from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/web/faqs.html")
 
     @app.get("/index.html", include_in_schema=False)
     @app.get("/web/index.html", include_in_schema=False)
     def redirect_index_html():
-        from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/web/faqs.html")
 
     # Serve pampanito.html with no-cache so Safari always loads the latest version
