@@ -75,6 +75,11 @@ if os.path.isdir(WEB_DIR):
     def redirect_faq_editor_html():
         return RedirectResponse(url="/web/faq_editor.html")
 
+    # Convenience redirect: /edit.html → /web/edit.html
+    @app.get("/edit.html", include_in_schema=False)
+    def redirect_edit_html():
+        return RedirectResponse(url="/web/edit.html")
+
     # Public FAQ page shortcuts
     @app.get("/faqs", include_in_schema=False)
     @app.get("/faqs.html", include_in_schema=False)
@@ -1823,7 +1828,16 @@ def get_generated_faqs():
 @app.get("/admin/faqs")
 def get_all_faqs():
     """Return all FAQ entries for the editor tool."""
-    return [{"chunk_id": e.get("chunk_id", ""), "title": e.get("title", ""), "text": e.get("text", ""), "category": e.get("category", "")} for e in FAQ]
+    return [
+        {
+            "chunk_id": e.get("chunk_id", ""),
+            "title": e.get("title", ""),
+            "text": e.get("text", ""),
+            "category": e.get("category", ""),
+            "display_order": e.get("display_order"),
+        }
+        for e in FAQ
+    ]
 
 
 @app.get("/api/faq-categories")
@@ -1866,6 +1880,14 @@ def eternal_patrol():
 def public_faqs():
     """Return all published faq_ entries grouped by category, for the public FAQ page."""
     from collections import defaultdict
+
+    def _display_order_key(entry: dict[str, Any]) -> tuple[int, int | str]:
+        raw_order = entry.get("display_order")
+        try:
+            return (0, int(raw_order))
+        except (TypeError, ValueError):
+            return (1, entry.get("id", ""))
+
     groups: dict[str, list] = defaultdict(list)
     for e in FAQ:
         if not e.get("chunk_id", "").startswith("faq_"):
@@ -1875,7 +1897,16 @@ def public_faqs():
         parts = text.split("\n\n", 1)
         answer = parts[1].strip() if len(parts) > 1 else text
         cat = e.get("category") or "General"
-        groups[cat].append({"id": e["chunk_id"], "title": title, "answer": answer})
+        groups[cat].append(
+            {
+                "id": e["chunk_id"],
+                "title": title,
+                "answer": answer,
+                "display_order": e.get("display_order"),
+            }
+        )
+    for cat, faqs in groups.items():
+        groups[cat] = sorted(faqs, key=_display_order_key)
     ordered_categories = [entry["title"] for entry in _get_category_records() if entry.get("title") in groups]
     unordered_categories = sorted(cat for cat in groups.keys() if cat not in set(ordered_categories))
     return [{"category": cat, "faqs": groups[cat]} for cat in [*ordered_categories, *unordered_categories]]

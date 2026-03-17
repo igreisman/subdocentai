@@ -163,6 +163,38 @@
       margin-bottom: 24px;
       font-size: 1.1em;
     }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .copy-link-btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid #d1d5da;
+      background: #fff;
+      color: #586069;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .copy-link-btn:hover {
+      background: #f3f6fa;
+      border-color: #b8c2cc;
+    }
+
+    .copy-link-btn.is-copied {
+      background: #1f7a3e;
+      border-color: #1f7a3e;
+      color: #fff;
+    }
   </style>
 </head>
 
@@ -170,8 +202,9 @@
   <div class="site-warning"><strong>Work in progress:</strong> this site is still being developed, and some content and
     historical data remain unverified.</div>
   <div class="container">
-    <div class="mb-3">
+    <div class="top-actions">
       <a href="memorial.html" class="boat-link">&larr; Back to Memorial</a>
+      <button id="copy-page-link" type="button" class="copy-link-btn">Copy Link</button>
     </div>
     <div class="row mb-4">
       <div class="col-12">
@@ -276,6 +309,33 @@
     </table>
     <div class="alert">No submarines found matching your criteria.</div>
     <script>
+      function flashCopiedButton(button) {
+        const originalText = button.dataset.originalText || button.textContent;
+        button.dataset.originalText = originalText;
+        button.textContent = 'Copied';
+        button.classList.add('is-copied');
+        window.setTimeout(() => {
+          button.textContent = originalText;
+          button.classList.remove('is-copied');
+        }, 1400);
+      }
+
+      async function copyPageLink() {
+        const url = new URL(window.location.href);
+        const era = document.getElementById('era').value;
+        const search = document.getElementById('search').value.trim();
+        url.searchParams.delete('era');
+        url.searchParams.delete('q');
+        if (era && era !== 'all') {
+          url.searchParams.set('era', era);
+        }
+        if (search) {
+          url.searchParams.set('q', search);
+        }
+        await navigator.clipboard.writeText(url.toString());
+        flashCopiedButton(document.getElementById('copy-page-link'));
+      }
+
       async function fetchSubmarines() {
         // Try API endpoint first, fallback to static file
         let response;
@@ -411,6 +471,13 @@
         const stats = computeStats(data);
         document.getElementById('stat-boats').textContent = stats.totalBoats;
         document.getElementById('stat-lives').textContent = stats.totalLives;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('era')) {
+          document.getElementById('era').value = params.get('era');
+        }
+        if (params.get('q')) {
+          document.getElementById('search').value = params.get('q');
+        }
 
         function update() {
           const era = document.getElementById('era').value;
@@ -421,6 +488,9 @@
 
         document.getElementById('era').addEventListener('change', update);
         document.getElementById('search').addEventListener('input', update);
+        document.getElementById('copy-page-link').addEventListener('click', () => {
+          copyPageLink().catch(() => { });
+        });
         update();
       }
       main();

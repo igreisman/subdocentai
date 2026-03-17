@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editor Hub</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel-2: #0f141b;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-2: #e3b341;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(88, 166, 255, 0.16), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(227, 179, 65, 0.12), transparent 24%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .shell {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 40px 24px 56px;
+    }
+
+    .eyebrow {
+      color: var(--accent-2);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 52px);
+      line-height: 1.02;
+      letter-spacing: -0.03em;
+    }
+
+    .lead {
+      max-width: 760px;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.65;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+      margin-bottom: 34px;
+    }
+
+    .toplink {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--text);
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .toplink:hover {
+      border-color: var(--accent);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 220px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+    }
+
+    .card-id {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: rgba(88, 166, 255, 0.12);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .card h2 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.1;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+      flex: 1;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      border-radius: 12px;
+      padding: 0 14px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      color: var(--text);
+      background: var(--panel-2);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #08111b;
+      border-color: transparent;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    @media (max-width: 720px) {
+      .topbar {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="shell">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">SubmarineDocent Admin</div>
+        <h1>Editor Hub</h1>
+        <p class="lead">A single place to jump into the current editing workflows for FAQ content, reference data, and
+          special-history pages.</p>
+      </div>
+      <a class="toplink" href="/web/faqs.html">Open Public Site</a>
+    </div>
+
+    <section class="grid">
+      <article class="card">
+        <div class="card-id">01</div>
+        <h2>FAQs</h2>
+        <p>Edit published FAQ entries, categories assigned to each FAQ, and answer HTML content.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/web/faq_editor.html">Open FAQ Editor</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-id">02</div>
+        <h2>Categories</h2>
+        <p>Manage the category list, sort order, and category metadata used by the FAQ dashboard.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/web/edit_categories.html">Open Categories</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-id">03</div>
+        <h2>Lost Boats</h2>
+        <p>Jump to the current editing context for the Eternal Patrol and lost submarines content.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/web/edit_lost_boats.html">Open Lost Boats</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-id">04</div>
+        <h2>Glossary</h2>
+        <p>Reserved space for glossary editing workflows and terminology management.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/web/edit_glossary.html">Open Glossary</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-id">05</div>
+        <h2>Incidents</h2>
+        <p>Open the incidents editing landing page and current source details for the incidents dataset.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/web/edit_incidents.html">Open Incidents</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-id">06</div>
+        <h2>Operations Page</h2>
+        <p>Open the current operations-page editing landing page for structure, copy, and related FAQ links.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/web/edit_operations.html">Open Operations</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-id">07</div>
+        <h2>Memorial Page</h2>
+        <p>Open the current memorial-page editing landing page for linked memorial content and special-history paths.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/web/edit_memorial.html">Open Memorial</a>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+
+</html>

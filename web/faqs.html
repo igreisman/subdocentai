@@ -95,11 +95,16 @@
     }
 
     #dash-search-wrap {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
       margin-bottom: 28px;
     }
 
     #dash-search {
       width: 100%;
+      flex: 1 1 320px;
       max-width: 480px;
       padding: 10px 16px;
       border: 1px solid #d1d5da;
@@ -118,6 +123,46 @@
 
     #dash-search::placeholder {
       color: #9ea5af;
+    }
+
+    .share-link-btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .share-link-btn-light {
+      background: #f6f8fa;
+      border: 1px solid #d1d5da;
+      color: #586069;
+    }
+
+    .share-link-btn-light:hover {
+      background: #e8eaed;
+    }
+
+    .share-link-btn-dark {
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      color: #fff;
+    }
+
+    .share-link-btn-dark:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .share-link-btn.is-copied {
+      background: #1f7a3e;
+      border-color: #1f7a3e;
+      color: #fff;
+    }
+
+    .view-bar-spacer {
+      flex: 1 1 auto;
     }
 
     #dashboard h2 {
@@ -1152,6 +1197,7 @@
   <div id="dashboard">
     <div id="dash-search-wrap">
       <input id="dash-search" type="search" placeholder="Search questions and answers&hellip;" autocomplete="off" />
+      <button id="btn-copy-dashboard" type="button" class="share-link-btn share-link-btn-light">Copy Link</button>
     </div>
     <h2>Browse by Category</h2>
     <div id="cat-grid">
@@ -1164,6 +1210,7 @@
     <div id="back-bar">
       <button id="btn-back">&#8592; All categories</button>
       <input id="search" type="search" placeholder="Search questions and answers&hellip;" autocomplete="off" />
+      <button id="btn-copy-faq" type="button" class="share-link-btn share-link-btn-light">Copy Link</button>
     </div>
     <nav id="cat-nav" aria-label="FAQ category filter">
       <label class="cat-filter-label" for="cat-select">Categories</label>
@@ -1184,6 +1231,8 @@
     <div id="moh-back-bar">
       <button id="btn-moh-back">&#8592; All categories</button>
       <h2>🎖️ U.S. Submarine Medal of Honor Recipients</h2>
+      <span class="view-bar-spacer"></span>
+      <button id="btn-copy-moh" type="button" class="share-link-btn share-link-btn-dark">Copy Link</button>
     </div>
     <div id="moh-content">
       <h1>U.S. Submarine Medal of Honor Recipients</h1>
@@ -1287,6 +1336,8 @@
     <div id="ls-back-bar">
       <button id="btn-ls-back">&#8592; All categories</button>
       <h2>⚓ Submarines on Eternal Patrol</h2>
+      <span class="view-bar-spacer"></span>
+      <button id="btn-copy-ls" type="button" class="share-link-btn share-link-btn-dark">Copy Link</button>
     </div>
     <div id="ls-content">
       <h1>Submarines on Eternal Patrol</h1>
@@ -1331,6 +1382,8 @@
       <button id="btn-incidents-back">&#8592; All categories</button>
       <span style="font-size:2.2rem;line-height:1;">⚠️</span>
       <h1 style="font-size:2.5rem;font-weight:800;margin:0;">Submarine Incidents</h1>
+      <span class="view-bar-spacer"></span>
+      <button id="btn-copy-incidents" type="button" class="share-link-btn share-link-btn-light">Copy Link</button>
     </div>
     <div id="incidents-content" style="max-width:860px;margin:0 auto;">
       <p class="lead" style="font-size:1.25rem;color:#222;margin-bottom:28px;">A comprehensive record of US submarine
@@ -1408,6 +1461,38 @@
     let incidents = null;
     let incidentsSearchQuery = '';
 
+    function writeTextToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+
+      return new Promise((resolve, reject) => {
+        try {
+          const input = document.createElement('input');
+          input.value = text;
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand('copy');
+          input.remove();
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }
+
+    function flashCopiedButton(button) {
+      if (!button) return;
+      const originalText = button.dataset.originalText || button.textContent;
+      button.dataset.originalText = originalText;
+      button.textContent = 'Copied';
+      button.classList.add('is-copied');
+      window.setTimeout(() => {
+        button.textContent = originalText;
+        button.classList.remove('is-copied');
+      }, 1400);
+    }
+
     function getCategorySortOrder(category) {
       if (categorySortOrder.has(category)) {
         return categorySortOrder.get(category);
@@ -1421,6 +1506,27 @@
         if (orderDelta !== 0) return orderDelta;
         return (a.category || '').localeCompare(b.category || '');
       });
+    }
+
+    function getFaqDisplayOrder(faq, index) {
+      const parsed = Number(faq?.display_order);
+      if (Number.isFinite(parsed)) {
+        return [0, parsed, index];
+      }
+      return [1, index, index];
+    }
+
+    function sortFaqsByDisplayOrder(faqs) {
+      return faqs
+        .map((faq, index) => ({ faq, index }))
+        .sort((a, b) => {
+          const [rankA, orderA, fallbackA] = getFaqDisplayOrder(a.faq, a.index);
+          const [rankB, orderB, fallbackB] = getFaqDisplayOrder(b.faq, b.index);
+          if (rankA !== rankB) return rankA - rankB;
+          if (orderA !== orderB) return orderA - orderB;
+          return fallbackA - fallbackB;
+        })
+        .map(entry => entry.faq);
     }
 
     async function init() {
@@ -1441,18 +1547,39 @@
         buildDashboard();
         buildCategoryNav();
 
-        // Deep-link support: ?lost_sub=... or ?q=... or ?cat=...
         const params = new URLSearchParams(location.search);
+        const initialCategory = params.get('cat');
+        const initialFaqQuery = params.get('q');
+        const initialView = params.get('view');
+        lsEraFilter = params.get('ls_era') || 'all';
+        lsSearchQuery = (params.get('ls_q') || '').trim();
+        incidentsSearchQuery = (params.get('inc_q') || '').trim();
+
+        if (initialCategory) {
+          activeCategory = initialCategory;
+        }
+
+        document.getElementById('ls-era-filter').value = lsEraFilter;
+        document.getElementById('ls-search-filter').value = lsSearchQuery;
+        document.getElementById('incidents-search').value = incidentsSearchQuery;
+
         if (params.get('lost_sub')) {
           pendingLostSubKey = params.get('lost_sub').trim();
           showLostSubsView();
-        } else if (params.get('q')) {
-          searchQuery = params.get('q').trim();
+        } else if (initialView === 'lost-subs') {
+          showLostSubsView();
+        } else if (initialView === 'moh') {
+          showMohView();
+        } else if (initialView === 'incidents') {
+          showIncidentsView();
+        } else if (initialView === 'operations') {
+          showOperationsView();
+        } else if (initialFaqQuery) {
+          searchQuery = initialFaqQuery.trim();
           document.getElementById('dash-search').value = searchQuery;
           document.getElementById('search').value = searchQuery;
           showFaqView();
-        } else if (params.get('cat')) {
-          activeCategory = params.get('cat');
+        } else if (initialCategory) {
           showFaqView();
         }
       } catch (e) {
@@ -1550,7 +1677,10 @@
   </script>
 
   <div id="operations-view" style="display:none;max-width:900px;margin:0 auto 40px auto;padding:32px 0;">
-    <button id="btn-operations-back" style="margin-bottom:18px;">&#8592; All categories</button>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
+      <button id="btn-operations-back">&#8592; All categories</button>
+      <button id="btn-copy-operations" type="button" class="share-link-btn share-link-btn-light">Copy Link</button>
+    </div>
     <h1 style="font-size:2.2em;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:12px;"><span
         style="font-size:1.1em;">⚓</span> Submarine Operations</h1>
     <p class="lead" style="font-size:1.15em;color:#444;margin-bottom:32px;">Explore the fascinating world of submarine
@@ -2037,6 +2167,66 @@
     document.getElementById('btn-moh-back').addEventListener('click', showDashboard);
     document.getElementById('btn-ls-back').addEventListener('click', showDashboard);
 
+    function getActiveVisitorView() {
+      if (document.getElementById('operations-view').style.display === 'block') return 'operations';
+      if (document.getElementById('incidents-view').style.display === 'block') return 'incidents';
+      if (document.getElementById('lost-subs-view').style.display === 'block') return 'lost-subs';
+      if (document.getElementById('moh-view').style.display === 'block') return 'moh';
+      if (document.getElementById('faq-view').style.display === 'block') return 'faq';
+      return 'dashboard';
+    }
+
+    function clearVisitorShareParams(url) {
+      ['view', 'q', 'cat', 'lost_sub', 'ls_era', 'ls_q', 'inc_q'].forEach(name => {
+        url.searchParams.delete(name);
+      });
+    }
+
+    function getVisitorShareUrl() {
+      const currentUrl = new URL(window.location.href);
+      const url = new URL(window.location.href);
+      const activeView = getActiveVisitorView();
+
+      clearVisitorShareParams(url);
+
+      if (activeView === 'faq') {
+        if (activeCategory !== 'all') {
+          url.searchParams.set('cat', activeCategory);
+        }
+        if (searchQuery) {
+          url.searchParams.set('q', searchQuery);
+        }
+      } else if (activeView === 'moh') {
+        url.searchParams.set('view', 'moh');
+      } else if (activeView === 'lost-subs') {
+        const activeLostSub = currentUrl.searchParams.get('lost_sub');
+        url.searchParams.set('view', 'lost-subs');
+        if (lsEraFilter !== 'all') {
+          url.searchParams.set('ls_era', lsEraFilter);
+        }
+        if (lsSearchQuery) {
+          url.searchParams.set('ls_q', lsSearchQuery);
+        }
+        if (activeLostSub) {
+          url.searchParams.set('lost_sub', activeLostSub);
+        }
+      } else if (activeView === 'incidents') {
+        url.searchParams.set('view', 'incidents');
+        if (incidentsSearchQuery) {
+          url.searchParams.set('inc_q', incidentsSearchQuery);
+        }
+      } else if (activeView === 'operations') {
+        url.searchParams.set('view', 'operations');
+      }
+
+      return url.toString();
+    }
+
+    async function copyVisitorLink(button) {
+      await writeTextToClipboard(getVisitorShareUrl());
+      flashCopiedButton(button);
+    }
+
     // ── Lost Submarines ──────────────────────────────────────────────────────
     let lsBoats = null;
     let lsEraFilter = 'all';
@@ -2076,27 +2266,8 @@
     }
 
     async function copyLostSubLink(boat, button) {
-      const url = getLostSubShareUrl(boat);
-      try {
-        await navigator.clipboard.writeText(url);
-      } catch (error) {
-        const input = document.createElement('input');
-        input.value = url;
-        document.body.appendChild(input);
-        input.select();
-        document.execCommand('copy');
-        input.remove();
-      }
-
-      if (!button) return;
-      const originalText = button.dataset.originalText || button.textContent;
-      button.dataset.originalText = originalText;
-      button.textContent = 'Copied';
-      button.classList.add('is-copied');
-      window.setTimeout(() => {
-        button.textContent = originalText;
-        button.classList.remove('is-copied');
-      }, 1400);
+      await writeTextToClipboard(getLostSubShareUrl(boat));
+      flashCopiedButton(button);
     }
 
     function closeBoatModal() {
@@ -2155,7 +2326,7 @@
                 </div>
                 <div class="ls-modal-date">${boat.date_lost ? escHtml(boat.date_lost) : ''}</div>
                 <div class="ls-modal-actions">
-                  <button type="button" class="ls-copy-link-btn" id="ls-copy-link-btn">Copy link</button>
+                  <button type="button" class="ls-copy-link-btn" id="ls-copy-link-btn">Copy Link</button>
                 </div>
               </div>
               <div class="ls-modal-section ls-modal-infobox">
@@ -2284,6 +2455,21 @@
       lsSearchQuery = e.target.value.trim();
       renderLostSubs();
     });
+
+    ['btn-copy-dashboard', 'btn-copy-faq', 'btn-copy-moh', 'btn-copy-ls', 'btn-copy-incidents', 'btn-copy-operations']
+      .forEach(id => {
+        const button = document.getElementById(id);
+        if (!button) return;
+        button.addEventListener('click', () => {
+          copyVisitorLink(button).catch(() => {
+            const originalText = button.dataset.originalText || 'Copy Link';
+            button.textContent = 'Copy failed';
+            window.setTimeout(() => {
+              button.textContent = originalText;
+            }, 1400);
+          });
+        });
+      });
 
     function setCategory(cat) {
       activeCategory = cat;
@@ -2440,7 +2626,9 @@
         .filter(g => activeCategory === 'all' || g.category === activeCategory)
         .map(g => ({
           category: g.category,
-          faqs: g.faqs.filter(f => !q || (f.title + ' ' + f.answer).toLowerCase().includes(q))
+          faqs: sortFaqsByDisplayOrder(
+            g.faqs.filter(f => !q || (f.title + ' ' + f.answer).toLowerCase().includes(q))
+          )
         }))
         .filter(g => g.faqs.length > 0);
 

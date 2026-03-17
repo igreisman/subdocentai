@@ -60,6 +60,29 @@
       color: #c9d8f0;
     }
 
+    #copyPageLinkBtn {
+      background: none;
+      border: 1px solid #2a3a5a;
+      border-radius: 6px;
+      color: #607090;
+      font-size: 13px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+
+    #copyPageLinkBtn:hover {
+      color: #c9d8f0;
+      border-color: #405981;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    #copyPageLinkBtn.is-copied {
+      color: #fff;
+      border-color: #1f7a3e;
+      background: #1f7a3e;
+    }
+
     #headerLang {
       margin-top: 6px;
       background: #0d1525;
@@ -669,7 +692,8 @@
         <option value="ja">日本語</option>
       </select>
     </div>
-    <div style="flex:1;display:flex;justify-content:flex-end">
+    <div style="flex:1;display:flex;justify-content:flex-end;gap:8px;align-items:flex-start;">
+      <button id="copyPageLinkBtn" type="button">Copy Link</button>
       <button id="settingsBtn">⚙</button>
     </div>
   </header>
@@ -835,9 +859,28 @@
     const answerText = document.getElementById('answerText');
     const settingsModal = document.getElementById('settingsModal');
     const settingsBtn = document.getElementById('settingsBtn');
+    const copyPageLinkBtn = document.getElementById('copyPageLinkBtn');
     if (DEBUG) settingsBtn.style.display = 'block';
     const settApiBase = document.getElementById('settApiBase');
     const settElKey = document.getElementById('settElKey');
+
+    function flashCopiedButton(button) {
+      const originalText = button.dataset.originalText || button.textContent;
+      button.dataset.originalText = originalText;
+      button.textContent = 'Copied';
+      button.classList.add('is-copied');
+      window.setTimeout(() => {
+        button.textContent = originalText;
+        button.classList.remove('is-copied');
+      }, 1400);
+    }
+
+    copyPageLinkBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        flashCopiedButton(copyPageLinkBtn);
+      } catch (_) { }
+    });
     const settElVoice = document.getElementById('settElVoice');
     const settAudioBase = document.getElementById('settAudioBase');
 

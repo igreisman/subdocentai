@@ -30,6 +30,33 @@
       gap: 16px;
     }
 
+    .header-spacer {
+      flex: 1 1 auto;
+    }
+
+    #copyPageLinkBtn {
+      background: none;
+      border: 1px solid #2a3a5a;
+      border-radius: 6px;
+      color: #607090;
+      font-size: 13px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+
+    #copyPageLinkBtn:hover {
+      color: #c9d8f0;
+      border-color: #405981;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    #copyPageLinkBtn.is-copied {
+      color: #fff;
+      border-color: #1f7a3e;
+      background: #1f7a3e;
+    }
+
     header h1 {
       font-size: 17px;
       font-weight: 700;
@@ -263,6 +290,8 @@
   <header>
     <h1>Feedback</h1>
     <span class="sub">USS Pampanito AI Docent</span>
+    <span class="header-spacer"></span>
+    <button id="copyPageLinkBtn" type="button">Copy Link</button>
   </header>
 
   <div id="toolbar">
@@ -311,6 +340,17 @@
     let allEntries = [];
     let activeFilter = 'all';
 
+    function flashCopiedButton(button) {
+      const originalText = button.dataset.originalText || button.textContent;
+      button.dataset.originalText = originalText;
+      button.textContent = 'Copied';
+      button.classList.add('is-copied');
+      window.setTimeout(() => {
+        button.textContent = originalText;
+        button.classList.remove('is-copied');
+      }, 1400);
+    }
+
     // ── Load ───────────────────────────────────────────────────────────────────
     async function loadFeedback() {
       try {
@@ -329,6 +369,18 @@
       activeFilter = btn.dataset.filter;
       document.querySelectorAll('.filt').forEach(b => b.classList.toggle('active', b === btn));
       render();
+    });
+
+    document.getElementById('copyPageLinkBtn').addEventListener('click', async () => {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('filter');
+        if (activeFilter !== 'all') {
+          url.searchParams.set('filter', activeFilter);
+        }
+        await navigator.clipboard.writeText(url.toString());
+        flashCopiedButton(document.getElementById('copyPageLinkBtn'));
+      } catch (_) { }
     });
 
     // ── Render ─────────────────────────────────────────────────────────────────
@@ -404,6 +456,16 @@
         });
       });
     }
+
+    (function applyInitialFilterFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const requestedFilter = params.get('filter');
+      if (!requestedFilter) return;
+      const button = document.querySelector(`.filt[data-filter="${requestedFilter}"]`);
+      if (!button) return;
+      activeFilter = requestedFilter;
+      document.querySelectorAll('.filt').forEach(b => b.classList.toggle('active', b === button));
+    })();
   </script>
 </body>
 
