@@ -423,6 +423,9 @@
       border: 1px solid #30363d;
       border-radius: 6px;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: min(70vh, 720px);
     }
 
     .editor-toolbar {
@@ -433,6 +436,10 @@
       padding: 10px;
       border-bottom: 1px solid #30363d;
       background: #161b22;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 1;
     }
 
     .editor-btn {
@@ -465,12 +472,14 @@
     #edit-html-editor,
     #edit-html-source {
       width: 100%;
-      min-height: 320px;
+      min-height: 0;
+      flex: 1 1 auto;
       background: #0d1117;
       color: #c9d1d9;
       font-size: 13px;
       line-height: 1.7;
       padding: 12px 14px;
+      overflow-y: auto;
     }
 
     #edit-html-editor {
@@ -509,7 +518,7 @@
       font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       line-height: 1.6;
       outline: none;
-      resize: vertical;
+      resize: none;
     }
 
     .editor-shell.source-mode #edit-html-editor {
@@ -702,7 +711,8 @@
       <div class="step">
         <div class="step-num">3</div>
         <p>Type the <strong>Answer HTML</strong>. You can use tags like <code>&lt;p&gt;</code>,
-          <code>&lt;strong&gt;</code>, <code>&lt;em&gt;</code>, lists, and links.</p>
+          <code>&lt;strong&gt;</code>, <code>&lt;em&gt;</code>, lists, and links.
+        </p>
       </div>
       <div class="step">
         <div class="step-num">4</div>

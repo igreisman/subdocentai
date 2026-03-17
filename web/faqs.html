@@ -657,47 +657,62 @@
       color: #9ea5af;
     }
 
-    /* ── Category tabs ── */
+    /* ── Category filter ── */
     #cat-nav {
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
+      align-items: center;
+      gap: 12px;
       padding: 12px 24px;
       background: #fff;
       border-bottom: 1px solid #e1e4e8;
     }
 
-    .cat-btn {
-      padding: 5px 12px;
-      border: 1px solid #d1d5da;
-      border-radius: 20px;
-      background: #fff;
-      color: #586069;
-      cursor: pointer;
+    .cat-filter-label {
       font-size: 13px;
+      font-weight: 600;
+      color: #586069;
       white-space: nowrap;
-      transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
 
-    .cat-btn:hover {
-      background: #f0f3f6;
+    #cat-select {
+      min-width: 280px;
+      max-width: 100%;
+      padding: 8px 36px 8px 12px;
+      border: 1px solid #d1d5da;
+      border-radius: 8px;
+      background: #fff;
+      color: #24292e;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1.4;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, #586069 50%), linear-gradient(135deg, #586069 50%, transparent 50%);
+      background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+    }
+
+    #cat-select:hover {
       border-color: #b0b7c0;
     }
 
-    .cat-btn.active {
-      background: #0366d6;
+    #cat-select:focus {
+      outline: none;
       border-color: #0366d6;
-      color: #fff;
-      font-weight: 600;
+      box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.12);
     }
 
-    /* ── Stats bar ── */
-    #stats-bar {
-      padding: 8px 24px;
-      font-size: 12px;
-      color: #6a737d;
-      background: #f6f8fa;
-      border-bottom: 1px solid #e1e4e8;
+    @media (max-width: 700px) {
+      #cat-nav {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      #cat-select {
+        min-width: 0;
+        width: 100%;
+      }
     }
 
     /* ── Main content ── */
@@ -963,6 +978,35 @@
       margin-bottom: 2px;
     }
 
+    .ls-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+
+    .ls-copy-link-btn {
+      border: 1px solid #d0b13c;
+      background: #fff9db;
+      color: #7a5d00;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 10px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .ls-copy-link-btn:hover {
+      background: #fff2b3;
+      border-color: #b8960c;
+    }
+
+    .ls-copy-link-btn.is-copied {
+      background: #e8fff0;
+      border-color: #2da44e;
+      color: #1a7f37;
+    }
+
     .ls-modal-section {
       margin-bottom: 14px;
     }
@@ -1121,10 +1165,12 @@
       <button id="btn-back">&#8592; All categories</button>
       <input id="search" type="search" placeholder="Search questions and answers&hellip;" autocomplete="off" />
     </div>
-    <nav id="cat-nav">
-      <button class="cat-btn active" data-cat="all">All categories</button>
+    <nav id="cat-nav" aria-label="FAQ category filter">
+      <label class="cat-filter-label" for="cat-select">Categories</label>
+      <select id="cat-select">
+        <option value="all">All categories</option>
+      </select>
     </nav>
-    <div id="stats-bar">Loading&hellip;</div>
     <div id="content">
       <div id="no-results">
         <h3>No results found</h3>
@@ -1395,9 +1441,12 @@
         buildDashboard();
         buildCategoryNav();
 
-        // Deep-link support: ?q=... or ?cat=...
+        // Deep-link support: ?lost_sub=... or ?q=... or ?cat=...
         const params = new URLSearchParams(location.search);
-        if (params.get('q')) {
+        if (params.get('lost_sub')) {
+          pendingLostSubKey = params.get('lost_sub').trim();
+          showLostSubsView();
+        } else if (params.get('q')) {
           searchQuery = params.get('q').trim();
           document.getElementById('dash-search').value = searchQuery;
           document.getElementById('search').value = searchQuery;
@@ -1940,18 +1989,15 @@
     // ...existing code...
 
     function buildCategoryNav() {
-      const nav = document.getElementById('cat-nav');
-      Array.from(nav.querySelectorAll('.cat-btn')).forEach(btn => {
-        if (btn.dataset.cat !== 'all') btn.remove();
-      });
+      const select = document.getElementById('cat-select');
+      select.innerHTML = '<option value="all">All categories</option>';
       sortGroupsByCategoryOrder(allGroups).forEach(group => {
-        const btn = document.createElement('button');
-        btn.className = 'cat-btn';
-        btn.dataset.cat = group.category;
-        btn.textContent = group.category;
-        btn.addEventListener('click', () => setCategory(group.category));
-        nav.appendChild(btn);
+        const option = document.createElement('option');
+        option.value = group.category;
+        option.textContent = group.category;
+        select.appendChild(option);
       });
+      select.value = activeCategory;
     }
 
     function showFaqView() {
@@ -1984,7 +2030,7 @@
       searchQuery = '';
       document.getElementById('search').value = '';
       document.getElementById('dash-search').value = '';
-      document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === 'all'));
+      document.getElementById('cat-select').value = 'all';
     }
 
     document.getElementById('btn-back').addEventListener('click', showDashboard);
@@ -1995,9 +2041,172 @@
     let lsBoats = null;
     let lsEraFilter = 'all';
     let lsSearchQuery = '';
+    let pendingLostSubKey = null;
+
+    function slugifyLinkValue(value) {
+      return String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    function getLostSubLinkKey(boat) {
+      return slugifyLinkValue(boat.designation || boat.boat_number || boat.name || '');
+    }
+
+    function lostSubMatchesKey(boat, key) {
+      const wanted = slugifyLinkValue(key);
+      return [boat.designation, boat.boat_number, boat.name].some(value => slugifyLinkValue(value) === wanted);
+    }
+
+    function updateLostSubUrl(boat) {
+      const url = new URL(window.location.href);
+      if (boat) {
+        url.searchParams.set('lost_sub', getLostSubLinkKey(boat));
+      } else {
+        url.searchParams.delete('lost_sub');
+      }
+      history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+
+    function getLostSubShareUrl(boat) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('lost_sub', getLostSubLinkKey(boat));
+      return url.toString()
+    }
+
+    async function copyLostSubLink(boat, button) {
+      const url = getLostSubShareUrl(boat);
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch (error) {
+        const input = document.createElement('input');
+        input.value = url;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        input.remove();
+      }
+
+      if (!button) return;
+      const originalText = button.dataset.originalText || button.textContent;
+      button.dataset.originalText = originalText;
+      button.textContent = 'Copied';
+      button.classList.add('is-copied');
+      window.setTimeout(() => {
+        button.textContent = originalText;
+        button.classList.remove('is-copied');
+      }, 1400);
+    }
+
+    function closeBoatModal() {
+      const modal = document.getElementById('ls-modal');
+      if (modal) {
+        modal.classList.remove('open');
+        setTimeout(() => { modal.style.display = 'none'; }, 200);
+        document.body.style.overflow = '';
+      }
+      updateLostSubUrl(null);
+    }
+
+    function showBoatModal(boat, options = {}) {
+      if (!boat) return;
+      const { updateUrl = true } = options;
+      let modal = document.getElementById('ls-modal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'ls-modal';
+        modal.innerHTML = `
+            <div class="ls-modal-backdrop"></div>
+            <div class="ls-modal-content">
+              <button class="ls-modal-close" aria-label="Close">&times;</button>
+              <div id="ls-modal-body"></div>
+            </div>
+          `;
+        document.body.appendChild(modal);
+        modal.querySelector('.ls-modal-close').onclick = closeBoatModal;
+        modal.querySelector('.ls-modal-backdrop').onclick = closeBoatModal;
+      }
+
+      const body = modal.querySelector('#ls-modal-body');
+      function imgPath(src) {
+        if (!src) return null;
+        if (src.startsWith('images/')) return '/web/' + src;
+        if (src.startsWith('/web/')) return src;
+        return src;
+      }
+
+      let galleryHtml = '';
+      for (let i = 1; i <= 10; ++i) {
+        const img = boat[`image${i}`];
+        if (img) {
+          const subtitle = boat[`image${i}_subtitle`] || '';
+          galleryHtml += `<div class="ls-modal-gallery-img"><img src="${imgPath(img)}" alt="Extra image"/><div class="ls-modal-gallery-caption">${escHtml(subtitle)}</div></div>`;
+        }
+      }
+
+      body.innerHTML = `
+          <div class="ls-modal-flexrow">
+            <div class="ls-modal-maincol">
+              <div class="ls-modal-header">
+                <div class="ls-modal-title-row">
+                  <span class="ls-modal-designation">${boat.designation ? escHtml(boat.designation) : ''}</span>
+                  <span class="ls-modal-name">${boat.name ? escHtml(boat.name) : ''}</span>
+                </div>
+                <div class="ls-modal-date">${boat.date_lost ? escHtml(boat.date_lost) : ''}</div>
+                <div class="ls-modal-actions">
+                  <button type="button" class="ls-copy-link-btn" id="ls-copy-link-btn">Copy link</button>
+                </div>
+              </div>
+              <div class="ls-modal-section ls-modal-infobox">
+                <div class="ls-modal-infocol">
+                  ${boat.designation ? `<div class="ls-modal-field"><strong>Hull Number:</strong> ${escHtml(boat.designation)}</div>` : ''}
+                  ${boat.last_captain ? `<div class="ls-modal-field"><strong>Last Captain:</strong> ${escHtml(boat.last_captain)}</div>` : ''}
+                  ${boat.fatalities_text != null ? `<div class="ls-modal-field"><strong>Fatalities:</strong> ${escHtml(String(boat.fatalities_text))}</div>` : ''}
+                </div>
+                <div class="ls-modal-infocol">
+                  ${boat.date_lost ? `<div class="ls-modal-field"><strong>Date Lost:</strong> ${escHtml(boat.date_lost)}</div>` : ''}
+                  ${boat.location ? `<div class="ls-modal-field"><strong>Location:</strong> ${escHtml(boat.location)}</div>` : ''}
+                  ${boat.cause ? `<div class="ls-modal-field"><strong>Cause:</strong> ${escHtml(boat.cause)}</div>` : ''}
+                </div>
+              </div>
+              ${boat.construction ? `<div class="ls-modal-section"><div class="ls-modal-label">Construction</div><div class="ls-modal-narrative">${escHtml(boat.construction)}</div></div>` : ''}
+              ${boat.loss_narrative ? `<div class="ls-modal-section"><div class="ls-modal-label">Loss Narrative</div><div class="ls-modal-narrative">${escHtml(boat.loss_narrative)}</div></div>` : ''}
+              ${boat.prior_history ? `<div class="ls-modal-section"><div class="ls-modal-label">Prior History</div><div class="ls-modal-narrative">${escHtml(boat.prior_history)}</div></div>` : ''}
+              ${boat.notes ? `<div class="ls-modal-section"><div class="ls-modal-label">Notes</div><div class="ls-modal-narrative">${escHtml(boat.notes)}</div></div>` : ''}
+              ${galleryHtml ? `<div class="ls-modal-section"><div class="ls-modal-label">Gallery</div><div class="ls-modal-gallery">${galleryHtml}</div></div>` : ''}
+            </div>
+            <div class="ls-modal-sidecol">
+              ${boat.photo_boat ? `<div class="ls-modal-photo-card"><div class="ls-modal-photo-label">Submarine Photo</div><img src="${imgPath(boat.photo_boat)}" alt="Submarine photo"/></div>` : ''}
+              ${boat.photo_captain ? `<div class="ls-modal-photo-card"><div class="ls-modal-photo-label">Captain Photo</div><img src="${imgPath(boat.photo_captain)}" alt="Captain photo"/></div>` : ''}
+            </div>
+          </div>
+        `;
+      modal.style.display = 'block';
+      setTimeout(() => { modal.classList.add('open'); }, 10);
+      document.body.style.overflow = 'hidden';
+      const copyButton = modal.querySelector('#ls-copy-link-btn');
+      if (copyButton) {
+        copyButton.onclick = () => copyLostSubLink(boat, copyButton);
+      }
+      if (updateUrl) updateLostSubUrl(boat);
+    }
+
+    function maybeOpenLostSubFromQuery() {
+      if (!pendingLostSubKey || !lsBoats) return;
+      const boat = lsBoats.find(entry => lostSubMatchesKey(entry, pendingLostSubKey));
+      pendingLostSubKey = null;
+      if (boat) {
+        showBoatModal(boat, { updateUrl: false });
+      }
+    }
 
     async function initLostSubs() {
-      if (lsBoats !== null) { renderLostSubs(); return; }
+      if (lsBoats !== null) {
+        renderLostSubs();
+        maybeOpenLostSubFromQuery();
+        return;
+      }
       const grid = document.getElementById('ls-grid');
       grid.innerHTML = '<div style="text-align:center;padding:40px;color:#6a737d">Loading&hellip;</div>';
       try {
@@ -2006,6 +2215,7 @@
         lsBoats = await res.json();
         buildLsStats();
         renderLostSubs();
+        maybeOpenLostSubFromQuery();
       } catch (e) {
         grid.innerHTML = '<div style="text-align:center;padding:40px;color:#c0392b">Error loading data: ' + escHtml(e.message) + '</div>';
       }
@@ -2064,89 +2274,6 @@
           showBoatModal(filtered[idx]);
         });
       });
-      // Modal for lost sub details
-      function showBoatModal(boat) {
-        let modal = document.getElementById('ls-modal');
-        if (!modal) {
-          modal = document.createElement('div');
-          modal.id = 'ls-modal';
-          modal.innerHTML = `
-              <div class="ls-modal-backdrop"></div>
-              <div class="ls-modal-content">
-                <button class="ls-modal-close" aria-label="Close">&times;</button>
-                <div id="ls-modal-body"></div>
-              </div>
-            `;
-          document.body.appendChild(modal);
-          modal.querySelector('.ls-modal-close').onclick = closeBoatModal;
-          modal.querySelector('.ls-modal-backdrop').onclick = closeBoatModal;
-        }
-        // Fill modal body with images and gallery support
-        const body = modal.querySelector('#ls-modal-body');
-        // Helper for image path normalization
-        function imgPath(src) {
-          if (!src) return null;
-          if (src.startsWith('images/')) return '/web/' + src;
-          if (src.startsWith('/web/')) return src;
-          return src;
-        }
-        // Extra images gallery
-        let galleryHtml = '';
-        for (let i = 1; i <= 10; ++i) {
-          const img = boat[`image${i}`];
-          if (img) {
-            const subtitle = boat[`image${i}_subtitle`] || '';
-            galleryHtml += `<div class="ls-modal-gallery-img"><img src="${imgPath(img)}" alt="Extra image"/><div class="ls-modal-gallery-caption">${escHtml(subtitle)}</div></div>`;
-          }
-        }
-        body.innerHTML = `
-            <div class="ls-modal-flexrow">
-              <div class="ls-modal-maincol">
-                <div class="ls-modal-header">
-                  <div class="ls-modal-title-row">
-                    <span class="ls-modal-designation">${boat.designation ? escHtml(boat.designation) : ''}</span>
-                    <span class="ls-modal-name">${boat.name ? escHtml(boat.name) : ''}</span>
-                  </div>
-                  <div class="ls-modal-date">${boat.date_lost ? escHtml(boat.date_lost) : ''}</div>
-                </div>
-                <div class="ls-modal-section ls-modal-infobox">
-                  <div class="ls-modal-infocol">
-                    ${boat.designation ? `<div class="ls-modal-field"><strong>Hull Number:</strong> ${escHtml(boat.designation)}</div>` : ''}
-                    ${boat.last_captain ? `<div class="ls-modal-field"><strong>Last Captain:</strong> ${escHtml(boat.last_captain)}</div>` : ''}
-                    ${boat.fatalities_text != null ? `<div class="ls-modal-field"><strong>Fatalities:</strong> ${escHtml(String(boat.fatalities_text))}</div>` : ''}
-                  </div>
-                  <div class="ls-modal-infocol">
-                    ${boat.date_lost ? `<div class="ls-modal-field"><strong>Date Lost:</strong> ${escHtml(boat.date_lost)}</div>` : ''}
-                    ${boat.location ? `<div class="ls-modal-field"><strong>Location:</strong> ${escHtml(boat.location)}</div>` : ''}
-                    ${boat.cause ? `<div class="ls-modal-field"><strong>Cause:</strong> ${escHtml(boat.cause)}</div>` : ''}
-                  </div>
-                </div>
-                ${boat.construction ? `<div class="ls-modal-section"><div class="ls-modal-label">Construction</div><div class="ls-modal-narrative">${escHtml(boat.construction)}</div></div>` : ''}
-                ${boat.loss_narrative ? `<div class="ls-modal-section"><div class="ls-modal-label">Loss Narrative</div><div class="ls-modal-narrative">${escHtml(boat.loss_narrative)}</div></div>` : ''}
-                ${boat.prior_history ? `<div class="ls-modal-section"><div class="ls-modal-label">Prior History</div><div class="ls-modal-narrative">${escHtml(boat.prior_history)}</div></div>` : ''}
-                ${boat.notes ? `<div class="ls-modal-section"><div class="ls-modal-label">Notes</div><div class="ls-modal-narrative">${escHtml(boat.notes)}</div></div>` : ''}
-                ${galleryHtml ? `<div class="ls-modal-section"><div class="ls-modal-label">Gallery</div><div class="ls-modal-gallery">${galleryHtml}</div></div>` : ''}
-              </div>
-              <div class="ls-modal-sidecol">
-                ${boat.photo_boat ? `<div class="ls-modal-photo-card"><div class="ls-modal-photo-label">Submarine Photo</div><img src="${imgPath(boat.photo_boat)}" alt="Submarine photo"/></div>` : ''}
-                ${boat.photo_captain ? `<div class="ls-modal-photo-card"><div class="ls-modal-photo-label">Captain Photo</div><img src="${imgPath(boat.photo_captain)}" alt="Captain photo"/></div>` : ''}
-              </div>
-            </div>
-          `;
-        modal.style.display = 'block';
-        setTimeout(() => { modal.classList.add('open'); }, 10);
-        document.body.style.overflow = 'hidden';
-      }
-
-      function closeBoatModal() {
-        const modal = document.getElementById('ls-modal');
-        if (modal) {
-          modal.classList.remove('open');
-          setTimeout(() => { modal.style.display = 'none'; }, 200);
-          document.body.style.overflow = '';
-        }
-      }
-      // ...existing code...
     }
 
     document.getElementById('ls-era-filter').addEventListener('change', e => {
@@ -2160,9 +2287,13 @@
 
     function setCategory(cat) {
       activeCategory = cat;
-      document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+      document.getElementById('cat-select').value = cat;
       render();
     }
+
+    document.getElementById('cat-select').addEventListener('change', e => {
+      setCategory(e.target.value);
+    });
 
     document.getElementById('search').addEventListener('input', e => {
       searchQuery = e.target.value.trim();
@@ -2174,7 +2305,7 @@
       if (searchQuery) {
         document.getElementById('search').value = searchQuery;
         activeCategory = 'all';
-        document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === 'all'));
+        document.getElementById('cat-select').value = 'all';
         showFaqView();
       }
     });
@@ -2313,13 +2444,6 @@
         }))
         .filter(g => g.faqs.length > 0);
 
-      const total = groups.reduce((n, g) => n + g.faqs.length, 0);
-      const totalAll = allGroups.reduce((n, g) => n + g.faqs.length, 0);
-      document.getElementById('stats-bar').textContent =
-        q || activeCategory !== 'all'
-          ? `${total} of ${totalAll} questions match`
-          : `${totalAll} questions in ${allGroups.length} categories`;
-
       if (groups.length === 0) {
         content.querySelectorAll('.cat-section').forEach(el => el.remove());
         noResults.style.display = 'block';
@@ -2338,11 +2462,10 @@
           section = document.createElement('div');
           section.className = 'cat-section';
           section.dataset.cat = group.category;
-          section.innerHTML = `<h2>${escHtml(group.category)}</h2>`;
           content.appendChild(section);
-        } else {
-          Array.from(section.querySelectorAll('.faq-item')).forEach(el => el.remove());
         }
+        section.innerHTML = activeCategory === 'all' ? `<h2>${escHtml(group.category)}</h2>` : '';
+        Array.from(section.querySelectorAll('.faq-item')).forEach(el => el.remove());
         group.faqs.forEach(faq => {
           const item = document.createElement('div');
           item.className = 'faq-item';
