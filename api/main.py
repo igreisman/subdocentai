@@ -104,6 +104,7 @@ CORPORA_DIR = os.path.join(BASE_DIR, "corpora")
 
 TOUR_PATH = os.path.join(CORPORA_DIR, "pampanito_tour_corpus.jsonl")
 SHORTS_PATH = os.path.join(CORPORA_DIR, "dieselsubs_shorts_corpus.jsonl")
+_BUNDLED_CATEGORIES_PATH = os.path.join(CORPORA_DIR, "dieselsubs_faq_categories.jsonl")
 
 # FAQ corpus — use Render persistent disk (/data) if mounted, else local corpora/
 _BUNDLED_FAQ_PATH = os.path.join(CORPORA_DIR, "dieselsubs_faq_corpus.jsonl")
@@ -116,6 +117,15 @@ if os.path.isdir(_RENDER_DATA_DIR):
         print(f"✅ Seeded persistent disk FAQ corpus from bundled copy")
 else:
     FAQ_PATH = _BUNDLED_FAQ_PATH
+
+if os.path.isdir(_RENDER_DATA_DIR):
+    CATEGORIES_PATH = os.path.join(_RENDER_DATA_DIR, "dieselsubs_faq_categories.jsonl")
+    if not os.path.exists(CATEGORIES_PATH) and os.path.exists(_BUNDLED_CATEGORIES_PATH):
+        import shutil
+        shutil.copy2(_BUNDLED_CATEGORIES_PATH, CATEGORIES_PATH)
+        print(f"✅ Seeded persistent disk FAQ categories from bundled copy")
+else:
+    CATEGORIES_PATH = _BUNDLED_CATEGORIES_PATH
 
 
 # Path for incidents corpus
@@ -192,7 +202,8 @@ print("Loading corpora...")
 TOUR = load_jsonl(TOUR_PATH)
 FAQ = load_jsonl(FAQ_PATH)
 SHORTS = load_jsonl(SHORTS_PATH)
-print(f"Loaded: {len(TOUR)} tour, {len(FAQ)} faq, {len(SHORTS)} shorts chunks")
+CATEGORIES = load_jsonl(CATEGORIES_PATH)
+print(f"Loaded: {len(TOUR)} tour, {len(FAQ)} faq, {len(SHORTS)} shorts chunks, {len(CATEGORIES)} categories")
 
 
 
@@ -1667,6 +1678,7 @@ def synthesize_openai_stub(
 
 _GENERATED_PREFIXES = {"der", "pam", "fix"}
 _faq_write_lock = threading.Lock()
+_category_write_lock = threading.Lock()
 
 
 def _normalize_faq_html(text: str) -> str:
@@ -1728,6 +1740,80 @@ def _make_slug(title: str) -> str:
     return s[:120]
 
 
+def _save_categories_corpus() -> None:
+    """Atomically rewrite the FAQ categories JSONL file from the in-memory category list."""
+    tmp = CATEGORIES_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        for entry in sorted(CATEGORIES, key=lambda e: (int(e.get("sort_order") or 0), (e.get("title") or "").lower())):
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    os.replace(tmp, CATEGORIES_PATH)
+
+
+def _get_category_records() -> list[dict[str, Any]]:
+    records: dict[str, dict[str, Any]] = {}
+    max_sort_order = 0
+
+    for entry in CATEGORIES:
+        title = (entry.get("title") or entry.get("name") or "").strip()
+        if not title:
+            continue
+        sort_order = int(entry.get("sort_order") or 0)
+        max_sort_order = max(max_sort_order, sort_order)
+        records[title] = {
+            "chunk_id": entry.get("chunk_id") or f"faq_category_{entry.get('category_id', _make_slug(title))}",
+            "category_id": entry.get("category_id"),
+            "title": title,
+            "slug": entry.get("slug") or _make_slug(title),
+            "description": entry.get("description") or "",
+            "sort_order": sort_order,
+        }
+
+    extra_sort_order = max_sort_order + 10
+    for entry in FAQ:
+        title = (entry.get("category") or "").strip()
+        if not title or title in records:
+            continue
+        records[title] = {
+            "chunk_id": f"faq_category_{_make_slug(title)}",
+            "category_id": None,
+            "title": title,
+            "slug": _make_slug(title),
+            "description": "",
+            "sort_order": extra_sort_order,
+        }
+        extra_sort_order += 10
+
+    return sorted(records.values(), key=lambda e: (int(e.get("sort_order") or 0), e.get("title", "").lower()))
+
+
+def _ensure_category_exists(category: str) -> None:
+    title = (category or "").strip()
+    if not title:
+        return
+    if any((entry.get("title") or entry.get("name") or "").strip() == title for entry in CATEGORIES):
+        return
+
+    existing_ids = [int(entry.get("category_id")) for entry in CATEGORIES if str(entry.get("category_id", "")).isdigit()]
+    existing_orders = [int(entry.get("sort_order") or 0) for entry in CATEGORIES]
+    next_id = max(existing_ids) + 1 if existing_ids else 1
+    next_order = max(existing_orders) + 10 if existing_orders else 0
+    CATEGORIES.append({
+        "chunk_id": f"faq_category_{next_id}",
+        "doc_type": "dieselsubs_faq_category",
+        "source": "manual_editor",
+        "category_id": next_id,
+        "title": title,
+        "slug": _make_slug(title),
+        "description": "",
+        "text": title,
+        "sort_order": next_order,
+        "era": "ww2",
+        "platform": ["us_diesel_electric_submarines"],
+        "display_citation": f"SubmarineDocent FAQ Category — {title}",
+    })
+    _save_categories_corpus()
+
+
 @app.get("/admin/generated-faqs")
 def get_generated_faqs():
     """Return all der_, pam_, fix_ entries for the review tool."""
@@ -1738,6 +1824,12 @@ def get_generated_faqs():
 def get_all_faqs():
     """Return all FAQ entries for the editor tool."""
     return [{"chunk_id": e.get("chunk_id", ""), "title": e.get("title", ""), "text": e.get("text", ""), "category": e.get("category", "")} for e in FAQ]
+
+
+@app.get("/api/faq-categories")
+def get_faq_categories():
+    """Return FAQ categories in configured display order."""
+    return _get_category_records()
 
 
 # ── Eternal Patrol ────────────────────────────────────────────────────────────
@@ -1784,7 +1876,9 @@ def public_faqs():
         answer = parts[1].strip() if len(parts) > 1 else text
         cat = e.get("category") or "General"
         groups[cat].append({"id": e["chunk_id"], "title": title, "answer": answer})
-    return [{"category": cat, "faqs": groups[cat]} for cat in sorted(groups.keys())]
+    ordered_categories = [entry["title"] for entry in _get_category_records() if entry.get("title") in groups]
+    unordered_categories = sorted(cat for cat in groups.keys() if cat not in set(ordered_categories))
+    return [{"category": cat, "faqs": groups[cat]} for cat in [*ordered_categories, *unordered_categories]]
 
 
 @app.post("/admin/faq")
@@ -1797,6 +1891,8 @@ async def create_faq(request: Request):
     if not title or not text:
         raise HTTPException(status_code=400, detail="title and text are required")
     with _faq_write_lock:
+        with _category_write_lock:
+            _ensure_category_exists(category)
         faq_nums = [
             int(e["chunk_id"].split("_")[1])
             for e in FAQ
@@ -1833,6 +1929,9 @@ async def update_faq(chunk_id: str, request: Request):
     if not entry:
         raise HTTPException(status_code=404, detail=f"{chunk_id} not found")
     with _faq_write_lock:
+        with _category_write_lock:
+            if "category" in body:
+                _ensure_category_exists(body.get("category") or "")
         if title:
             entry["title"] = title
         if text:

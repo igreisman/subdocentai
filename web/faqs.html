@@ -1355,16 +1355,42 @@
     let allGroups = [];
     let activeCategory = 'all';
     let searchQuery = '';
+    let categorySortOrder = new Map();
 
     // Incidents view globals
     let incidents = null;
     let incidentsSearchQuery = '';
 
+    function getCategorySortOrder(category) {
+      if (categorySortOrder.has(category)) {
+        return categorySortOrder.get(category);
+      }
+      return Number.MAX_SAFE_INTEGER;
+    }
+
+    function sortGroupsByCategoryOrder(groups) {
+      return groups.slice().sort((a, b) => {
+        const orderDelta = getCategorySortOrder(a.category) - getCategorySortOrder(b.category);
+        if (orderDelta !== 0) return orderDelta;
+        return (a.category || '').localeCompare(b.category || '');
+      });
+    }
+
     async function init() {
       try {
-        const res = await fetch('/api/faqs');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        allGroups = await res.json();
+        const [faqRes, categoryRes] = await Promise.all([
+          fetch('/api/faqs'),
+          fetch('/api/faq-categories').catch(() => null),
+        ]);
+        if (!faqRes.ok) throw new Error(`HTTP ${faqRes.status}`);
+        allGroups = await faqRes.json();
+        if (categoryRes && categoryRes.ok) {
+          const categories = await categoryRes.json();
+          categorySortOrder = new Map(
+            categories.map((category, index) => [category.title, Number(category.sort_order ?? index * 10)])
+          );
+          allGroups = sortGroupsByCategoryOrder(allGroups);
+        }
         buildDashboard();
         buildCategoryNav();
 
@@ -1914,7 +1940,10 @@
 
     function buildCategoryNav() {
       const nav = document.getElementById('cat-nav');
-      allGroups.forEach(group => {
+      Array.from(nav.querySelectorAll('.cat-btn')).forEach(btn => {
+        if (btn.dataset.cat !== 'all') btn.remove();
+      });
+      sortGroupsByCategoryOrder(allGroups).forEach(group => {
         const btn = document.createElement('button');
         btn.className = 'cat-btn';
         btn.dataset.cat = group.category;
@@ -2275,7 +2304,7 @@
       const content = document.getElementById('content');
       const noResults = document.getElementById('no-results');
 
-      const groups = allGroups
+      const groups = sortGroupsByCategoryOrder(allGroups)
         .filter(g => activeCategory === 'all' || g.category === activeCategory)
         .map(g => ({
           category: g.category,

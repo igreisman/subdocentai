@@ -767,7 +767,19 @@
     'use strict';
 
     const API = '';
+    const DEFAULT_CATEGORIES = [
+      'Attacks and Battles, Small and Large',
+      'Crews Aboard US Subs in WW2',
+      'Diving and Surfacing',
+      'Hull and Compartments',
+      'Japanese Submarines',
+      'Life Aboard US WW2 Subs',
+      'Operating US Subs in WW2',
+      'Torpedoes',
+      'US WW2 Subs in General',
+    ];
     let allFaqs = [];
+    let faqCategories = [...DEFAULT_CATEGORIES];
     let filtered = [];
     let selected = null;   // entry object being edited; null when composing a new FAQ
     let isNew = false;
@@ -775,12 +787,43 @@
     let activePrefix = 'all';
     let searchVal = '';
 
+    function setFaqCategories(names) {
+      const seen = new Set();
+      faqCategories = (Array.isArray(names) ? names : DEFAULT_CATEGORIES)
+        .map(name => (name || '').trim())
+        .filter(name => {
+          if (!name || seen.has(name)) return false;
+          seen.add(name);
+          return true;
+        });
+      if (faqCategories.length === 0) {
+        faqCategories = [...DEFAULT_CATEGORIES];
+      }
+    }
+
+    function getCategoryNames(selectedCategory) {
+      const category = (selectedCategory || '').trim();
+      if (category && !faqCategories.includes(category)) {
+        return [...faqCategories, category];
+      }
+      return faqCategories;
+    }
+
     // ── Load ────────────────────────────────────────────────────────────────────
     async function init() {
       try {
-        const res = await fetch(`${API}/admin/faqs`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        allFaqs = await res.json();
+        const [faqRes, categoryRes] = await Promise.all([
+          fetch(`${API}/admin/faqs`),
+          fetch(`${API}/api/faq-categories`).catch(() => null),
+        ]);
+        if (!faqRes.ok) throw new Error(`HTTP ${faqRes.status}`);
+        allFaqs = await faqRes.json();
+        if (categoryRes && categoryRes.ok) {
+          const categories = await categoryRes.json();
+          setFaqCategories(categories.map(entry => entry.title));
+        } else {
+          setFaqCategories(DEFAULT_CATEGORIES);
+        }
         applyFilter();
         document.getElementById('loading').classList.add('hidden');
       } catch (e) {
@@ -858,23 +901,9 @@
     // ── Render editor ───────────────────────────────────────────────────────────
     function renderEdit(title, text, chunkId, category) {
       category = category || '';
-      const CATEGORIES = [
-        'Attacks and Battles, Small and Large',
-        'Crews Aboard US Subs in WW2',
-        'Diving and Surfacing',
-        'Hull and Compartments',
-        'Japanese Submarines',
-        'Life Aboard US WW2 Subs',
-        'Operating US Subs in WW2',
-        'Torpedoes',
-        'US WW2 Subs in General',
-      ];
-      // Merge any custom category not in the built-in list
-      const allCats = category && !CATEGORIES.includes(category)
-        ? [...CATEGORIES, category].sort()
-        : CATEGORIES;
+      const allCats = getCategoryNames(category);
       const catOpts = '<option value="">\u2014 Uncategorized \u2014</option>' +
-        allCats.map(c => `<option value="${c}"${c === category ? ' selected' : ''}>${c}</option>`).join('') +
+        allCats.map(c => `<option value="${esc(c)}"${c === category ? ' selected' : ''}>${esc(c)}</option>`).join('') +
         '<option value="__new__">\u2795 New category\u2026</option>';
       const prefix = chunkId ? chunkId.split('_')[0] : 'new';
       const badgeClass = ['faq', 'der', 'pam', 'fix'].includes(prefix) ? `badge-${prefix}` : 'badge-unk';
@@ -928,6 +957,9 @@
           const name = prompt('New category name:');
           if (name && name.trim()) {
             const trimmed = name.trim();
+            if (!faqCategories.includes(trimmed)) {
+              faqCategories = [...faqCategories, trimmed];
+            }
             // Add option before the "＋ New category…" sentinel and select it
             const sel = e.target;
             const sentinel = sel.querySelector('option[value="__new__"]');
