@@ -48,14 +48,14 @@ Standalone lost-submarines page: [web/eternal-patrol.html](/Users/irving/Documen
 
 ### 4. Feedback and curator tools
 
-- Feedback viewer / gate: [web/feedback.html](/Users/irving/Documents/submarinedocent/web/feedback.html)
+- Auth-protected feedback viewer: [web/feedback.html](/Users/irving/Documents/submarinedocent/web/feedback.html)
 - FAQ review tool: [web/review.html](/Users/irving/Documents/submarinedocent/web/review.html)
 - FAQ editor and SQL import tool: [web/faq_editor.html](/Users/irving/Documents/submarinedocent/web/faq_editor.html)
 
 ### 5. Site entry behavior
 
-- The backend now redirects `/` to [web/faqs.html](/Users/irving/Documents/submarinedocent/web/faqs.html) by default.
-- `pampanito.*` hostnames still redirect to the Pampanito tour.
+- The backend now redirects `/` to [web/faqs.html](/Users/irving/Documents/submarinedocent/web/faqs.html) for returning visitors and [web/welcome.html](/Users/irving/Documents/submarinedocent/web/welcome.html) by default.
+- Tour-host routing is now configuration-driven through `TOUR_HOST_PREFIXES` rather than hardcoded to one hostname pattern.
 - Legacy `/index.html` requests are redirected to the FAQ dashboard.
 
 ## Current Backend Surface
@@ -64,11 +64,11 @@ Main application file: [api/main.py](/Users/irving/Documents/submarinedocent/api
 
 ### Public routes
 
-- `/` -> redirects to `/web/faqs.html` or `/web/pampanito.html` depending on host.
+- `/` -> redirects according to host configuration and first-visit/returning-visitor settings.
 - `/index.html`, `/web/index.html` -> redirect to the FAQ dashboard.
 - `/pampanito.html` -> redirects to the Pampanito app.
 - `/faqs`, `/faqs.html`, `/faq` -> redirect to the FAQ dashboard.
-- `/feedback.html`, `/review.html`, `/faq_editor.html` -> redirect to their matching web pages.
+- `/feedback.html`, `/review.html`, `/faq_editor.html` -> redirect to their matching web pages and require admin auth.
 - `/web/*` -> static file hosting for the frontend.
 
 ### Public API routes
@@ -92,7 +92,7 @@ Main application file: [api/main.py](/Users/irving/Documents/submarinedocent/api
 - `POST /feedback`
   - Accepts simple user feedback submissions.
 - `GET /feedback/list`
-  - Returns stored feedback entries, intended for admin use.
+  - Returns stored feedback entries and now requires admin auth.
 
 ### Admin / curator API routes
 
@@ -113,7 +113,7 @@ Main application file: [api/main.py](/Users/irving/Documents/submarinedocent/api
 
 ## Data Sources in the Repo
 
-Primary corpora live in [corpora](/Users/irving/Documents/submarinedocent/corpora).
+Primary corpora live in [corpora](/Users/irving/Documents/submarinedocent/corpora). A redistribution-safe sample dataset also exists under [sample_data/corpora](/Users/irving/Documents/submarinedocent/sample_data/corpora) for open-source demos.
 
 Current line counts:
 

@@ -190,6 +190,39 @@
       color: #607090;
     }
 
+    #tourModeSwitch {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 10px auto 0;
+      padding: 4px;
+      background: #111b2d;
+      border: 1px solid #223554;
+      border-radius: 999px;
+    }
+
+    .tour-mode-btn {
+      border: none;
+      background: transparent;
+      color: #7f93b3;
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+
+    .tour-mode-btn:hover {
+      color: #d9e5f8;
+    }
+
+    .tour-mode-btn.active {
+      background: #2e5da0;
+      color: #fff;
+    }
+
     /* ── Waveform / progress ─────────────────────────── */
     #progressWrap {
       width: 100%;
@@ -214,6 +247,83 @@
       font-size: 12px;
       color: #607090;
       font-variant-numeric: tabular-nums;
+    }
+
+    #cueMarkers {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .cue-marker {
+      position: absolute;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #f4c542;
+      border: 2px solid #0a0f1a;
+      box-shadow: 0 0 0 2px rgba(244, 197, 66, 0.18);
+      transform: translate(-50%, -50%);
+      opacity: 0.95;
+    }
+
+    #tourVisualPanel {
+      width: 100%;
+      background: #10192b;
+      border: 1px solid #1e2d4a;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+    }
+
+    #tourVisualFrame {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #060a12;
+      overflow: hidden;
+    }
+
+    #tourVisualImage {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    #tourVideo {
+      width: 100%;
+      height: 100%;
+      display: none;
+      object-fit: cover;
+      background: #000;
+    }
+
+    #tourVisualPanel.is-empty {
+      display: none;
+    }
+
+    #tourVisualPanel.is-transitioning #tourVisualImage {
+      opacity: 0.72;
+      transform: scale(1.02);
+    }
+
+    #tourVisualMeta {
+      padding: 14px 16px 16px;
+    }
+
+    #tourVisualTitle {
+      font-size: 15px;
+      font-weight: 700;
+      color: #d9e5f8;
+      margin-bottom: 6px;
+    }
+
+    #tourVisualCaption {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #90a4c4;
     }
 
     /* ── Transport controls ──────────────────────────── */
@@ -339,6 +449,14 @@
       font-size: 14px;
       line-height: 1.5;
       color: #c9d8f0;
+    }
+
+    #answerDebug {
+      margin-top: 10px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #7d95b8;
+      word-break: break-word;
     }
 
     .partial-match-note {
@@ -589,57 +707,6 @@
       display: none;
     }
 
-    /* ── Password gate ───────────────────────────────── */
-    #pwGate {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      background: #0a0f1a;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    #pwBox {
-      background: #0d1525;
-      border: 1px solid #1e2d4a;
-      border-radius: 12px;
-      padding: 36px 32px;
-      text-align: center;
-      max-width: 320px;
-      width: 90%;
-    }
-
-    #pwBox h2 {
-      color: #c9d8f0;
-      font-size: 1.2rem;
-      margin-bottom: 18px;
-      letter-spacing: .03em;
-    }
-
-    #pwInput {
-      width: 100%;
-      padding: 10px 14px;
-      font-size: 1.1rem;
-      letter-spacing: .15em;
-      border-radius: 8px;
-      border: 1px solid #1e2d4a;
-      background: #131d30;
-      color: #e8e8e8;
-      text-align: center;
-      outline: none;
-    }
-
-    #pwInput:focus {
-      border-color: #3a6fd8;
-    }
-
-    #pwError {
-      color: #e05555;
-      font-size: .85rem;
-      margin-top: 10px;
-      min-height: 1.2em;
-    }
   </style>
 </head>
 
@@ -648,41 +715,10 @@
   <div class="site-warning"><strong>Work in progress:</strong> this site is still being developed, and some content and
     historical data remain unverified.</div>
 
-  <!-- Password gate -->
-  <div id="pwGate">
-    <div id="pwBox">
-      <h2>Password?</h2>
-      <input id="pwInput" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" maxlength="4" />
-      <div id="pwError"></div>
-    </div>
-  </div>
-  <script>
-    (function () {
-      const gate = document.getElementById('pwGate');
-      // Skip password gate on local machine
-      if (['localhost', '127.0.0.1', '::1', '192.168.0.108'].includes(location.hostname)) {
-        gate.style.display = 'none';
-        return;
-      }
-      const input = document.getElementById('pwInput');
-      const err = document.getElementById('pwError');
-      input.addEventListener('input', function () {
-        if (input.value.length < 4) return;
-        if (input.value === '1941') {
-          gate.style.display = 'none';
-        } else {
-          err.textContent = 'Incorrect — try again.';
-          input.value = '';
-        }
-      });
-      input.focus();
-    })();
-  </script>
-
   <header>
     <div style="flex:1"></div>
     <div style="text-align:center">
-      <h1>USS Pampanito (SS-383)<br>AI Docent</h1>
+      <h1>USS Pampanito (SS-383)<br>Docent</h1>
       <select id="headerLang">
         <option value="en">English</option>
         <option value="fr">Français</option>
@@ -693,7 +729,6 @@
       </select>
     </div>
     <div style="flex:1;display:flex;justify-content:flex-end;gap:8px;align-items:flex-start;">
-      <button id="copyPageLinkBtn" type="button">Copy Link</button>
       <button id="settingsBtn">⚙</button>
     </div>
   </header>
@@ -702,6 +737,10 @@
     <!-- Compartment display -->
     <div id="compartmentBadge">
       <div id="stopsWrap"><select id="stopsSelect"></select><span id="selectSizer"></span></div>
+      <div id="tourModeSwitch" role="group" aria-label="Tour mode">
+        <button class="tour-mode-btn" id="tourModeAudioBtn" type="button" data-mode="audio">Audio Tour</button>
+        <button class="tour-mode-btn" id="tourModeVideoBtn" type="button" data-mode="video">Video Tour</button>
+      </div>
       <div id="progressMeta">
         <div id="trackCounter">Track — of —</div>
         <button class="tBtn" id="playPauseBtn" title="Play/Pause">▶</button>
@@ -714,8 +753,20 @@
     <div style="width:100%">
       <div id="progressWrap">
         <div id="progressBar"></div>
+        <div id="cueMarkers" aria-hidden="true"></div>
       </div>
     </div>
+
+    <section id="tourVisualPanel" aria-live="polite">
+      <div id="tourVisualFrame">
+        <img id="tourVisualImage" alt="USS Pampanito audio tour visual" />
+        <video id="tourVideo" preload="auto" playsinline></video>
+      </div>
+      <div id="tourVisualMeta">
+        <div id="tourVisualTitle"></div>
+        <div id="tourVisualCaption"></div>
+      </div>
+    </section>
 
     <div id="askStatus">
       <span id="askStatusMsg"></span>
@@ -731,6 +782,7 @@
     <div id="answerPanel">
       <div id="questionEcho"></div>
       <div id="answerText"></div>
+      <div id="answerDebug"></div>
       <!-- Feedback widget -->
       <div id="feedbackRow">
         <div id="feedbackButtons">
@@ -757,7 +809,7 @@
     <div class="field">
       <label>API Base URL</label>
       <input id="settApiBase" value="" />
-      <div class="hint">e.g. https://192.168.0.108:8443</div>
+      <div class="hint">e.g. https://museum-docent.local:8443, or leave blank to use this page's origin</div>
     </div>
     <div class="field">
       <label>ElevenLabs API Key <span style="color:#4a5a7a;">(optional — for AI voice)</span></label>
@@ -770,9 +822,9 @@
       <div class="hint">Default: Sarah (neutral US English)</div>
     </div>
     <div class="field">
-      <label>Audio Base URL</label>
+      <label>Tour Audio Base URL</label>
       <input id="settAudioBase" value="" />
-      <div class="hint">e.g. http://192.168.1.23:5500/audio — or leave blank to use relative /audio/</div>
+      <div class="hint">e.g. https://media-host.local/tour — or leave blank to use relative /tour/</div>
     </div>
     <div class="field">
       <label>FAQ Audio Language</label>
@@ -791,6 +843,8 @@
       <button id="settSave" class="primary">Save</button>
     </div>
   </dialog>
+
+  <script src="/web/pampanito-tour-cues.js?v=20260319b"></script>
 
   <script>
     // ── Debug mode ────────────────────────────────────────────────────────────
@@ -813,20 +867,84 @@
       { file: "13_forward_deck.mp3", compartment: "forward_deck", label: "Forward Deck" },
     ];
 
+    const TOUR_MEDIA = window.PAMPANITO_TOUR_MEDIA || {};
+    const TOUR_PLAYBACK_MEDIA = TOUR_MEDIA.trackPlaybackMedia || {};
+    const VIDEO_EXTENSIONS = ['mp4', 'mov', 'm4v', 'webm'];
+    const DEFAULT_TOUR_VISUAL = TOUR_MEDIA.defaultVisual || {
+      src: '/web/images/USS_Pampanito 2560x1440.jpg',
+      alt: 'USS Pampanito underway',
+      title: 'USS Pampanito (SS-383)',
+      caption: 'Timed images for each stop appear here as the tour audio reaches key moments.'
+    };
+    const TRACK_VISUAL_DEFAULTS = TOUR_MEDIA.trackVisualDefaults || {};
+    const TOUR_IMAGE_CUES = TOUR_MEDIA.trackImageCues || {};
+
     // ── State ──────────────────────────────────────────────────────────────────
     let currentIdx = 0;
     let isPlaying = false;
     let wasPlaying = false; // remember play state when interrupted
     let playedTracks = new Set();
+    let activeTourVisualKey = '';
+    const missingVideoSources = new Set();
+    let lastVideoVariant = '';
+    let pendingTrackSeek = null;
+    let pendingTrackResume = false;
+    let pendingVideoFrameSeek = false;
 
     // ── Settings ───────────────────────────────────────────────────────────────
+    function getDefaultApiBase() {
+      // Legacy local HTTPS/static split used 8444 for static files and 8443 for API.
+      if (location.port === '8444') {
+        return `${location.protocol}//${location.hostname}:8443`;
+      }
+      return window.location.origin;
+    }
+
+    function isPrivateNetworkHost(hostname) {
+      if (!hostname) return false;
+      if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+      if (/^192\.168\./.test(hostname)) return true;
+      if (/^10\./.test(hostname)) return true;
+      const match172 = hostname.match(/^172\.(\d{1,3})\./);
+      if (match172) {
+        const secondOctet = Number(match172[1]);
+        if (secondOctet >= 16 && secondOctet <= 31) return true;
+      }
+      return false;
+    }
+
+    function normalizeApiBase(storedApiBase) {
+      const defaultApiBase = getDefaultApiBase();
+      const currentIsLocal = isPrivateNetworkHost(window.location.hostname);
+      if (!storedApiBase) return defaultApiBase;
+
+      try {
+        const storedUrl = new URL(storedApiBase, window.location.origin);
+        if (currentIsLocal && !isPrivateNetworkHost(storedUrl.hostname)) {
+          return defaultApiBase;
+        }
+        if (currentIsLocal && storedUrl.hostname === window.location.hostname && storedUrl.port !== window.location.port) {
+          // Keep the explicit 8443 API target only for the legacy 8444 static server flow.
+          if (!(window.location.port === '8444' && storedUrl.port === '8443')) {
+            return defaultApiBase;
+          }
+        }
+        return storedUrl.origin;
+      } catch (e) {
+        return defaultApiBase;
+      }
+    }
+
     function loadSettings() {
+      const normalizedApiBase = normalizeApiBase(localStorage.getItem('tour_apiBase'));
+      const storedAudioBase = localStorage.getItem('tour_audioBase') || '';
       return {
-        apiBase: localStorage.getItem('tour_apiBase') || (location.hostname === 'localhost' || location.hostname === '192.168.0.108' ? `${location.protocol}//${location.hostname}:8443` : `${location.protocol}//${location.hostname}`),
+        apiBase: normalizedApiBase,
         elKey: localStorage.getItem('tour_elKey') || '',
         elVoice: localStorage.getItem('tour_elVoice') || 'EXAVITQu4vr4xnSDxMaL',
-        audioBase: localStorage.getItem('tour_audioBase') || '',
+        audioBase: normalizeTrackAudioBase(storedAudioBase),
         lang: localStorage.getItem('tour_lang') || 'en',
+        tourMode: localStorage.getItem('tour_mode') || 'auto',
       };
     }
 
@@ -836,19 +954,44 @@
       localStorage.setItem('tour_elVoice', s.elVoice);
       localStorage.setItem('tour_audioBase', s.audioBase);
       localStorage.setItem('tour_lang', s.lang);
+      localStorage.setItem('tour_mode', s.tourMode || 'auto');
+    }
+
+    function normalizeTrackAudioBase(storedAudioBase) {
+      if (!storedAudioBase) return 'tour';
+      const trimmed = storedAudioBase.replace(/\/$/, '');
+      if (trimmed === 'audio' || trimmed === '/web/audio') return 'tour';
+      try {
+        const url = new URL(trimmed, window.location.origin);
+        if (url.origin === window.location.origin && url.pathname === '/web/audio') {
+          return `${url.origin}/web/tour`;
+        }
+      } catch (e) {
+        return trimmed;
+      }
+      return trimmed;
     }
 
     function getAudioUrl(file) {
-      const base = (loadSettings().audioBase || 'audio').replace(/\/$/, '');
+      const base = 'audio';
+      return `${base}/${file}`;
+    }
+
+    function getTrackAudioUrl(file) {
+      const base = (loadSettings().audioBase || 'tour').replace(/\/$/, '');
       return `${base}/${file}`;
     }
 
     // ── DOM refs ───────────────────────────────────────────────────────────────
     const player = document.getElementById('player');
+    const tourVideo = document.getElementById('tourVideo');
     const trackCounter = document.getElementById('trackCounter');
     const progressBar = document.getElementById('progressBar');
     const progressWrap = document.getElementById('progressWrap');
+    const cueMarkers = document.getElementById('cueMarkers');
     const timecodeEl = document.getElementById('timecode');
+    const tourModeAudioBtn = document.getElementById('tourModeAudioBtn');
+    const tourModeVideoBtn = document.getElementById('tourModeVideoBtn');
     const playPauseBtn = document.getElementById('playPauseBtn');
     const micBtn = document.getElementById('micBtn');
     const stopsSelect = document.getElementById('stopsSelect');
@@ -857,32 +1000,66 @@
     const answerPanel = document.getElementById('answerPanel');
     const questionEcho = document.getElementById('questionEcho');
     const answerText = document.getElementById('answerText');
+    const answerDebug = document.getElementById('answerDebug');
+    const tourVisualPanel = document.getElementById('tourVisualPanel');
+    const tourVisualImage = document.getElementById('tourVisualImage');
+    const tourVisualTitle = document.getElementById('tourVisualTitle');
+    const tourVisualCaption = document.getElementById('tourVisualCaption');
     const settingsModal = document.getElementById('settingsModal');
     const settingsBtn = document.getElementById('settingsBtn');
-    const copyPageLinkBtn = document.getElementById('copyPageLinkBtn');
     if (DEBUG) settingsBtn.style.display = 'block';
     const settApiBase = document.getElementById('settApiBase');
     const settElKey = document.getElementById('settElKey');
-
-    function flashCopiedButton(button) {
-      const originalText = button.dataset.originalText || button.textContent;
-      button.dataset.originalText = originalText;
-      button.textContent = 'Copied';
-      button.classList.add('is-copied');
-      window.setTimeout(() => {
-        button.textContent = originalText;
-        button.classList.remove('is-copied');
-      }, 1400);
-    }
-
-    copyPageLinkBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(window.location.href);
-        flashCopiedButton(copyPageLinkBtn);
-      } catch (_) { }
-    });
     const settElVoice = document.getElementById('settElVoice');
     const settAudioBase = document.getElementById('settAudioBase');
+
+    function getActivePlayer() {
+      return tourVideo.style.display !== 'none' ? tourVideo : player;
+    }
+
+    function showTourVisualPanel() {
+      tourVisualPanel.classList.remove('is-empty');
+    }
+
+    function hideTourVisualPanel() {
+      tourVisualPanel.classList.add('is-empty');
+    }
+
+    function getStoredTourMode() {
+      const mode = loadSettings().tourMode;
+      return mode === 'audio' || mode === 'video' ? mode : 'auto';
+    }
+
+    function getTourMode(track = TRACKS[currentIdx]) {
+      const storedMode = getStoredTourMode();
+      if (storedMode === 'audio' || storedMode === 'video') return storedMode;
+      return trackHasVideo(track) ? 'video' : 'audio';
+    }
+
+    function updateTourModeButtons() {
+      const isVideo = getTourMode() === 'video';
+      tourModeAudioBtn.classList.toggle('active', !isVideo);
+      tourModeVideoBtn.classList.toggle('active', isVideo);
+      tourModeAudioBtn.setAttribute('aria-pressed', String(!isVideo));
+      tourModeVideoBtn.setAttribute('aria-pressed', String(isVideo));
+      cueMarkers.style.display = 'none';
+    }
+
+    function setTourMode(mode, preserveProgress = true) {
+      const nextMode = mode === 'video' ? 'video' : 'audio';
+      const settings = loadSettings();
+      if (getStoredTourMode() === nextMode) {
+        updateTourModeButtons();
+        return;
+      }
+      const activePlayer = getActivePlayer();
+      pendingTrackSeek = preserveProgress ? (activePlayer.currentTime || 0) : null;
+      pendingTrackResume = preserveProgress ? isPlaying : false;
+      settings.tourMode = nextMode;
+      saveSettings(settings);
+      updateTourModeButtons();
+      loadTrack(currentIdx);
+    }
 
     // ── Stops select ──────────────────────────────────────────────────────────
     function fitSelect() {
@@ -926,26 +1103,258 @@
     });
 
     // ── Track loading ──────────────────────────────────────────────────────────
+    function parseCueTime(value) {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      const text = String(value || '').trim();
+      if (!text) return 0;
+      if (/^\d+(?:\.\d+)?$/.test(text)) return Number(text);
+      const parts = text.split(':').map(Number);
+      if (parts.some(part => Number.isNaN(part))) return 0;
+      let seconds = 0;
+      for (const part of parts) seconds = seconds * 60 + part;
+      return seconds;
+    }
+
+    function getPreferredVideoVariant() {
+      const ua = navigator.userAgent || '';
+      const isIPhone = /iPhone|iPod/i.test(ua);
+      const isAndroidPhone = /Android/i.test(ua) && /Mobile/i.test(ua);
+      const isOtherPhone = /Windows Phone|webOS|BlackBerry/i.test(ua);
+      const isPhoneByUA = isIPhone || isAndroidPhone || isOtherPhone;
+      if (isPhoneByUA) return 'mobile';
+      return window.matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop';
+    }
+
+    function getVariantSrc(playbackMedia, variant) {
+      if (!playbackMedia) return '';
+      const srcKey = `${variant}Src`;
+      const fileKey = `${variant}File`;
+      if (playbackMedia[srcKey]) return playbackMedia[srcKey];
+      if (playbackMedia[fileKey]) return `/web/videos/${playbackMedia[fileKey]}`;
+      return '';
+    }
+
+    function getAutoVideoCandidates(track = TRACKS[currentIdx], preferredVariant = getPreferredVideoVariant()) {
+      const compartment = track.compartment;
+      const orderedVariants = preferredVariant === 'mobile'
+        ? ['mobile', 'desktop']
+        : ['desktop', 'mobile'];
+      const candidates = [];
+      for (const variant of orderedVariants) {
+        for (const ext of VIDEO_EXTENSIONS) {
+          candidates.push(`/web/videos/${compartment}-${variant}.${ext}`);
+          candidates.push(`/web/videos/${compartment}/${variant}.${ext}`);
+          candidates.push(`/web/videos/${compartment}/${compartment}-${variant}.${ext}`);
+        }
+      }
+      for (const ext of VIDEO_EXTENSIONS) {
+        candidates.push(`/web/videos/${compartment}.${ext}`);
+        candidates.push(`/web/videos/${compartment}/${compartment}.${ext}`);
+        candidates.push(`/web/videos/${compartment}/tour.${ext}`);
+      }
+      return candidates.filter((candidate, index, list) => list.indexOf(candidate) === index);
+    }
+
+    function getTrackPlaybackMedia(track = TRACKS[currentIdx]) {
+      const configured = TOUR_PLAYBACK_MEDIA[track.compartment];
+      if (configured) return configured;
+      return {
+        type: 'video',
+        title: track.label,
+        caption: `${track.label} movie exported for the tour.`
+      };
+    }
+
+    function getPlaybackMediaCandidates(track = TRACKS[currentIdx], playbackMedia = getTrackPlaybackMedia(track)) {
+      if (!playbackMedia || playbackMedia.type !== 'video') return [];
+      const preferredVariant = getPreferredVideoVariant();
+      const candidates = [];
+
+      const preferredSrc = getVariantSrc(playbackMedia, preferredVariant);
+      const alternateSrc = getVariantSrc(playbackMedia, preferredVariant === 'mobile' ? 'desktop' : 'mobile');
+      if (preferredSrc) candidates.push(preferredSrc);
+      if (alternateSrc) candidates.push(alternateSrc);
+      if (playbackMedia.src) candidates.push(playbackMedia.src);
+      if (playbackMedia.file) candidates.push(`/web/videos/${playbackMedia.file}`);
+
+      return (candidates.length ? candidates : getAutoVideoCandidates(track, preferredVariant))
+        .filter((candidate, index, list) => list.indexOf(candidate) === index)
+        .filter(candidate => !missingVideoSources.has(candidate));
+    }
+
+    function getPlaybackMediaSrc(playbackMedia, track = TRACKS[currentIdx]) {
+      const candidates = getPlaybackMediaCandidates(track, playbackMedia);
+      return candidates[0] || '';
+    }
+
+    function trackHasVideo(track = TRACKS[currentIdx]) {
+      const playbackMedia = getTrackPlaybackMedia(track);
+      return !!(playbackMedia && playbackMedia.type === 'video' && getPlaybackMediaSrc(playbackMedia, track));
+    }
+
+    function trackUsesVideo(track = TRACKS[currentIdx]) {
+      return getTourMode() === 'video' && trackHasVideo(track);
+    }
+
+    function getTrackImageCues(track = TRACKS[currentIdx]) {
+      return (TOUR_IMAGE_CUES[track.compartment] || [])
+        .map((cue) => ({ ...cue, time: parseCueTime(cue.time) }))
+        .sort((a, b) => a.time - b.time);
+    }
+
+    function getTrackBaseVisual(track = TRACKS[currentIdx]) {
+      const visual = TRACK_VISUAL_DEFAULTS[track.compartment] || DEFAULT_TOUR_VISUAL;
+      return {
+        src: visual.src,
+        alt: visual.alt,
+        title: visual.title || track.label,
+        caption: visual.caption || `Timed visuals for ${track.label} will appear here when available.`
+      };
+    }
+
+    function getVisualForTime(track, currentTime) {
+      const cues = getTrackImageCues(track);
+      let currentCue = null;
+      for (const cue of cues) {
+        if (currentTime >= cue.time) currentCue = cue;
+        else break;
+      }
+      return currentCue || getTrackBaseVisual(track);
+    }
+
+    function showImageVisual() {
+      tourVideo.pause();
+      tourVideo.style.display = 'none';
+      tourVisualImage.style.display = 'block';
+      showTourVisualPanel();
+    }
+
+    function showVideoVisual(playbackMedia, track = TRACKS[currentIdx]) {
+      const src = encodeURI(getPlaybackMediaSrc(playbackMedia, track));
+      const nextKey = `video|${src}|${playbackMedia.title || ''}|${playbackMedia.caption || ''}`;
+      if (activeTourVisualKey !== nextKey) {
+        tourVisualPanel.classList.add('is-transitioning');
+        activeTourVisualKey = nextKey;
+        tourVideo.src = src;
+        tourVideo.removeAttribute('poster');
+        tourVisualTitle.textContent = playbackMedia.title || track.label;
+        tourVisualCaption.textContent = playbackMedia.caption || `Movie playback for ${track.label}.`;
+        window.setTimeout(() => tourVisualPanel.classList.remove('is-transitioning'), 220);
+      }
+      tourVisualImage.style.display = 'none';
+      tourVideo.style.display = 'block';
+      showTourVisualPanel();
+      pendingVideoFrameSeek = true;
+      tourVideo.load();
+      lastVideoVariant = getPreferredVideoVariant();
+    }
+
+    function clearVideoVisual() {
+      const t = TRACKS[currentIdx];
+      const src = getPlaybackMediaSrc(getTrackPlaybackMedia(t), t);
+      if (src) missingVideoSources.add(src);
+      activeTourVisualKey = '';
+      tourVideo.pause();
+      tourVideo.removeAttribute('src');
+      tourVideo.load();
+      tourVideo.style.display = 'none';
+      tourVisualImage.style.display = 'none';
+      tourVisualTitle.textContent = '';
+      tourVisualCaption.textContent = '';
+      hideTourVisualPanel();
+    }
+
+    function retryVideoVisual() {
+      const track = TRACKS[currentIdx];
+      const playbackMedia = getTrackPlaybackMedia(track);
+      const failedSrc = tourVideo.currentSrc || tourVideo.src;
+      if (failedSrc) {
+        const failedPath = failedSrc.replace(location.origin, '');
+        missingVideoSources.add(decodeURI(failedPath));
+      }
+      const nextSrc = getPlaybackMediaSrc(playbackMedia, track);
+      if (!nextSrc) {
+        clearVideoVisual();
+        return;
+      }
+      activeTourVisualKey = '';
+      showVideoVisual(playbackMedia, track);
+    }
+
+    function setTourVisual(visual) {
+      if (getTourMode() !== 'audio') return;
+      hideTourVisualPanel();
+      tourVisualImage.style.display = 'none';
+      tourVideo.style.display = 'none';
+      const resolvedSrc = encodeURI(visual.src);
+      const nextKey = `${resolvedSrc}|${visual.title || ''}|${visual.caption || ''}`;
+      if (activeTourVisualKey === nextKey) return;
+      activeTourVisualKey = nextKey;
+      tourVisualImage.src = resolvedSrc;
+      tourVisualImage.alt = visual.alt || visual.title || 'USS Pampanito audio tour visual';
+      tourVisualTitle.textContent = visual.title || TRACKS[currentIdx].label;
+      tourVisualCaption.textContent = visual.caption || '';
+    }
+
+    function updateTourVisualForCurrentTime() {
+      const track = TRACKS[currentIdx];
+      if (trackUsesVideo(track)) return;
+      const currentTime = getActivePlayer().currentTime || 0;
+      setTourVisual(getVisualForTime(track, currentTime));
+    }
+
+    function renderCueMarkers() {
+      cueMarkers.innerHTML = '';
+      cueMarkers.style.display = 'none';
+      if (trackUsesVideo() || getTourMode() === 'audio') return;
+      const duration = getActivePlayer().duration || 0;
+      if (!duration) return;
+      const cues = getTrackImageCues();
+      cues.forEach((cue) => {
+        const marker = document.createElement('span');
+        marker.className = 'cue-marker';
+        marker.style.left = `${Math.max(0, Math.min(100, (cue.time / duration) * 100))}%`;
+        marker.title = `${cue.title} (${fmt(cue.time)})`;
+        cueMarkers.appendChild(marker);
+      });
+    }
+
     function loadTrack(idx) {
       currentIdx = idx;
       const t = TRACKS[idx];
-      player.src = getAudioUrl(t.file);
-      player.load();
+      player.pause();
+      tourVideo.pause();
+      player.removeAttribute('src');
+      tourVideo.removeAttribute('src');
+      hideTourVisualPanel();
+      const playbackMedia = getTrackPlaybackMedia(t);
       trackCounter.textContent = `Stop ${idx + 1} of ${TRACKS.length}`;
       progressBar.style.width = '0%';
+      cueMarkers.innerHTML = '';
       timecodeEl.textContent = '0:00 / 0:00';
       answerPanel.classList.remove('visible');
+      activeTourVisualKey = '';
+      if (trackUsesVideo(t)) {
+        showVideoVisual(playbackMedia, t);
+      } else {
+        tourVideo.style.display = 'none';
+        tourVisualImage.style.display = 'none';
+        hideTourVisualPanel();
+        player.src = getTrackAudioUrl(t.file);
+        player.load();
+        setTourVisual(getTrackBaseVisual(t));
+      }
       updatePlaylistHighlight();
     }
 
     function play() {
-      player.play().catch(() => { });
+      getActivePlayer().play().catch(() => { });
       isPlaying = true;
       playPauseBtn.textContent = '⏸';
     }
 
     function pause() {
-      player.pause();
+      getActivePlayer().pause();
       isPlaying = false;
       playPauseBtn.textContent = '▶';
     }
@@ -953,7 +1362,7 @@
     // ── Transport ──────────────────────────────────────────────────────────────
     playPauseBtn.onclick = () => { unlockAudio(); isPlaying ? pause() : play(); };
 
-    player.addEventListener('ended', () => {
+    function onTrackEnded() {
       playedTracks.add(currentIdx);
       updatePlaylistHighlight();
       if (currentIdx < TRACKS.length - 1) {
@@ -963,23 +1372,73 @@
         isPlaying = false;
         playPauseBtn.textContent = '▶';
       }
+    }
+
+    function onTrackLoadedMetadata() {
+      const activePlayer = getActivePlayer();
+      if (pendingTrackSeek != null && activePlayer.duration) {
+        activePlayer.currentTime = Math.min(pendingTrackSeek, activePlayer.duration);
+      }
+      timecodeEl.textContent = `0:00 / ${fmt(activePlayer.duration || 0)}`;
+      renderCueMarkers();
+      updateTourVisualForCurrentTime();
+      const shouldResume = pendingTrackResume;
+      pendingTrackSeek = null;
+      pendingTrackResume = false;
+      if (shouldResume) play();
+    }
+
+    tourVideo.addEventListener('loadeddata', () => {
+      if (pendingVideoFrameSeek) {
+        pendingVideoFrameSeek = false;
+        try {
+          tourVideo.currentTime = 0.001;
+        } catch (_) { }
+      }
+      showTourVisualPanel();
+    });
+
+    function onTrackTimeUpdate() {
+      const activePlayer = getActivePlayer();
+      const cur = activePlayer.currentTime || 0;
+      const dur = activePlayer.duration || 0;
+      if (dur > 0) progressBar.style.width = `${(cur / dur) * 100}%`;
+      timecodeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
+      updateTourVisualForCurrentTime();
+    }
+
+    player.addEventListener('ended', () => {
+      if (getActivePlayer() !== player) return;
+      onTrackEnded();
+    });
+    tourVideo.addEventListener('ended', () => {
+      if (getActivePlayer() !== tourVideo) return;
+      onTrackEnded();
     });
 
     player.addEventListener('loadedmetadata', () => {
-      timecodeEl.textContent = `0:00 / ${fmt(player.duration || 0)}`;
+      if (getActivePlayer() !== player) return;
+      onTrackLoadedMetadata();
+    });
+    tourVideo.addEventListener('loadedmetadata', () => {
+      if (getActivePlayer() !== tourVideo) return;
+      onTrackLoadedMetadata();
     });
 
     player.addEventListener('timeupdate', () => {
-      const cur = player.currentTime || 0;
-      const dur = player.duration || 0;
-      if (dur > 0) progressBar.style.width = `${(cur / dur) * 100}%`;
-      timecodeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
+      if (getActivePlayer() !== player) return;
+      onTrackTimeUpdate();
+    });
+    tourVideo.addEventListener('timeupdate', () => {
+      if (getActivePlayer() !== tourVideo) return;
+      onTrackTimeUpdate();
     });
 
     progressWrap.onclick = (e) => {
       const rect = progressWrap.getBoundingClientRect();
       const pct = (e.clientX - rect.left) / rect.width;
-      if (player.duration) player.currentTime = pct * player.duration;
+      const activePlayer = getActivePlayer();
+      if (activePlayer.duration) activePlayer.currentTime = pct * activePlayer.duration;
     };
 
     function fmt(s) {
@@ -988,9 +1447,59 @@
       return `${m}:${String(sec).padStart(2, '0')}`;
     }
 
+    tourVisualImage.addEventListener('error', () => {
+      const fallback = getTrackBaseVisual();
+      const fallbackSrc = encodeURI(fallback.src);
+      if (tourVisualImage.src.endsWith(fallbackSrc)) return;
+      activeTourVisualKey = '';
+      setTourVisual(fallback);
+    });
+
+    tourVideo.addEventListener('error', () => {
+      if (trackUsesVideo()) {
+        retryVideoVisual();
+        return;
+      }
+      clearVideoVisual();
+    });
+
+    window.addEventListener('resize', () => {
+      const preferredVariant = getPreferredVideoVariant();
+      if (preferredVariant === lastVideoVariant) return;
+      const track = TRACKS[currentIdx];
+      if (!trackUsesVideo(track) || getActivePlayer() !== tourVideo) return;
+      const currentTime = tourVideo.currentTime || 0;
+      const wasVideoPlaying = !tourVideo.paused;
+      activeTourVisualKey = '';
+      showVideoVisual(getTrackPlaybackMedia(track), track);
+      tourVideo.addEventListener('loadedmetadata', function syncCurrentTimeOnce() {
+        tourVideo.removeEventListener('loadedmetadata', syncCurrentTimeOnce);
+        if (currentTime > 0 && tourVideo.duration) {
+          tourVideo.currentTime = Math.min(currentTime, tourVideo.duration);
+        }
+        if (wasVideoPlaying) {
+          tourVideo.play().catch(() => { });
+        }
+      });
+    });
+
+    [tourModeAudioBtn, tourModeVideoBtn].forEach((button) => {
+      button.addEventListener('click', () => setTourMode(button.dataset.mode, true));
+    });
+
     // ── Rendering helpers ──────────────────────────────────────────────────────
     const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const bold = s => s.replace(/\b(NOTE|WARNING|IMPORTANT|CAUTION):/g, '<strong>$1:</strong>');
+
+    function containsHtmlMarkup(text) {
+      return /<\/?(?:p|br|em|strong|ul|ol|li|div|span)\b/i.test(text || '');
+    }
+
+    function htmlToPlainText(html) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html || '';
+      return (tmp.textContent || tmp.innerText || '').replace(/\u00a0/g, ' ').trim();
+    }
 
     function renderBlock(p) {
       const lines = p.split('\n').map(l => l.trim()).filter(l => l);
@@ -1077,16 +1586,29 @@
       const disclaimer = data.partial_match
         ? `<p class="partial-match-note">I don’t have a direct answer to that, but here’s something related:</p>`
         : '';
+      if (containsHtmlMarkup(text)) {
+        answerText.innerHTML = disclaimer + text;
+        return;
+      }
       const nlIdx = text.indexOf('\n\n');
       if (nlIdx !== -1) {
         const q = text.slice(0, nlIdx);
         const body = text.slice(nlIdx + 2);
-        const rendered = body.split('\n\n').map(renderBlock).join('');
+        const rendered = containsHtmlMarkup(body) ? body : body.split('\n\n').map(renderBlock).join('');
         const faqBadge = data.faq_id ? ` <span class="faq-id">(${esc(data.faq_id)})</span>` : '';
         answerText.innerHTML = disclaimer + `<div class="faq-question">${esc(q)}${faqBadge}</div><div class="faq-body">${rendered}</div>`;
       } else {
         answerText.innerHTML = disclaimer + `<span>${esc(text)}</span>`;
       }
+    }
+
+    function renderAnswerDebug(question, data) {
+      const s = loadSettings();
+      const firstCitation = (data.citations && data.citations[0]) || null;
+      const citationLabel = firstCitation
+        ? `${firstCitation.source_id || 'unknown'} / ${firstCitation.chunk_id || 'unknown'}`
+        : 'none';
+      answerDebug.textContent = `API: ${s.apiBase} | Question: ${question} | FAQ: ${data.faq_id || 'none'} | Source: ${citationLabel}`;
     }
 
     // ── Audio engine (AudioContext-based — survives iOS autoplay restrictions) ──
@@ -1217,6 +1739,7 @@
       };
       const resetSpeakBtn = () => {
         showAskBtn();
+        if (wasPlaying) setTimeout(() => play(), 2000);
       };
 
       // 1. Pre-recorded FAQ MP3 — fast timeout so a missing file doesn't block
@@ -1291,7 +1814,7 @@
       const payload = {
         compartment_id: t.compartment,
         audio_track_id: t.compartment,
-        playhead_time_ms: Math.floor((player.currentTime || 0) * 1000),
+        playhead_time_ms: Math.floor((getActivePlayer().currentTime || 0) * 1000),
         question_text: questionText,
         answer_mode: 'standard',
       };
@@ -1321,6 +1844,47 @@
     const textAskInput = document.getElementById('textAskInput');
     const textAskSend = document.getElementById('textAskSend');
 
+    function applyVoiceMode(hint) {
+      if (isAndroid) {
+        if (transcribeAvailable) {
+          enableRecordMode(hint || 'Tap 🎤 to record your question');
+          return;
+        }
+        if (SpeechRec) {
+          useRecordMode = false;
+          showAskBtn();
+          if (hint) {
+            askStatus.style.display = '';
+            askStatus.textContent = hint;
+          }
+          return;
+        }
+        showTextFallback(hint);
+        return;
+      }
+
+      if (!SpeechRec) {
+        showTextFallback(hint);
+        return;
+      }
+
+      useRecordMode = false;
+      showAskBtn();
+      if (hint) {
+        askStatus.style.display = '';
+        askStatus.textContent = hint;
+      }
+    }
+
+    function getVoiceUnavailableReason() {
+      const reasons = [];
+      if (!window.isSecureContext) reasons.push('page is not in a secure context');
+      if (!SpeechRec) reasons.push('native browser speech API was not detected');
+      if (isAndroid && transcribeAvailable) reasons.push('Android is configured to use server transcription in this app');
+      if (!transcribeAvailable) reasons.push('server transcription is disabled');
+      return reasons.join('; ');
+    }
+
     function showTextFallback(hint) {
       // Switch the mic button to a keyboard icon and show the text row
       micBtn.textContent = '⌨️';
@@ -1331,7 +1895,7 @@
       };
       textAskRow.style.display = 'flex';
       textAskInput.focus();
-      if (hint) askStatus.textContent = hint;
+      askStatus.textContent = hint || `Voice unavailable: ${getVoiceUnavailableReason()}. Type your question below.`;
     }
 
     function enableRecordMode(hint) {
@@ -1360,27 +1924,37 @@
     // and on any browser without SpeechRecognition.  Desktop browsers get native
     // SpeechRecognition which auto-detects silence — no tap-to-stop needed.
     const isAndroid = /android/i.test(navigator.userAgent);
-    if (isAndroid || !SpeechRec) {
-      enableRecordMode('Tap 🎤 to record your question');
-    } else {
-      showAskBtn();
-    }
+    applyVoiceMode('Tap 🎤 to record your question');
 
     // Background health check — if server has no Groq key, ensure Android falls
     // back to text input and desktop stays in native-speech mode.
     (async () => {
+      const tryHealth = async (apiBase) => {
+        const resp = await fetch(`${apiBase}/health`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return resp.json();
+      };
+
       try {
         const s = loadSettings();
-        const resp = await fetch(`${s.apiBase}/health`);
-        if (resp.ok) {
-          const d = await resp.json();
-          transcribeAvailable = !!d.transcribe_available;
-          if (!transcribeAvailable) {
-            if (isAndroid || !SpeechRec) {
-              showTextFallback('Speech recognition not available — type your question below.');
-            }
-            // Desktop with native SpeechRec: already in native mode, nothing to change
+        let d;
+        try {
+          d = await tryHealth(s.apiBase);
+        } catch (err) {
+          const fallbackApiBase = getDefaultApiBase();
+          if (fallbackApiBase !== s.apiBase) {
+            d = await tryHealth(fallbackApiBase);
+            saveSettings({ ...s, apiBase: fallbackApiBase });
           }
+        }
+        if (!d) return;
+        transcribeAvailable = !!d.transcribe_available;
+        if (transcribeAvailable) {
+          applyVoiceMode('Tap 🎤 to record your question');
+        } else if (isAndroid && SpeechRec) {
+          applyVoiceMode('Server transcription is disabled. Using browser speech recognition instead.');
+        } else if (isAndroid || !SpeechRec) {
+          showTextFallback(`Voice unavailable: ${getVoiceUnavailableReason()}. Type your question below.`);
         }
       } catch (e) { /* keep current mode */ }
     })();
@@ -1586,7 +2160,9 @@
       [/mk\.?\s*14/gi, 'Mark 14'],
       [/mk\.?\s*18/gi, 'Mark 18'],
       // Phonetic STT substitutions
-      [/\bbanks\b/gi, 'bunks'],   // "banks" heard instead of "bunks"
+      [/\bbanks\b/gi, 'bunks'],    // "banks" heard instead of "bunks"
+      [/\bhot\s+punk\b/gi, 'hot bunk'],  // "hot punk" heard instead of "hot bunk"
+      [/\bpunks?\b/gi, 'bunk'],   // "punk" heard instead of "bunk"
       // "where is" → "were" before crew/people nouns (common ASR error)
       [/\bwhere\s+is\s+(submariners?|sailors?|officers?|crewmen?|crew\b|men\b)/gi, 'were $1'],
       // Sub systems
@@ -1824,6 +2400,7 @@
       askStatus.textContent = `Heard: "${question}"`;
       questionEcho.textContent = `"${question}"`;
       answerText.textContent = '';
+      answerDebug.textContent = `API: ${loadSettings().apiBase}`;
       resetFeedback();
       answerPanel.classList.add('visible');
 
@@ -1881,7 +2458,10 @@
         }
 
         renderAnswer(data);
-        const answerPlain = (data.answer_short || '').replace(/\n+/g, ' ');
+        renderAnswerDebug(question, data);
+        const answerPlain = containsHtmlMarkup(data.answer_short || '')
+          ? htmlToPlainText(data.answer_short || '')
+          : (data.answer_short || '').replace(/\n+/g, ' ');
         answerPanel.classList.add('visible');
         askStatus.textContent = '';
         askStatus.style.display = 'none';
@@ -1892,6 +2472,7 @@
         playFaqAudioOrSpeak(data, answerPlain);
       } catch (err) {
         answerText.textContent = `Error: ${err.message}`;
+        answerDebug.textContent = `API: ${loadSettings().apiBase}`;
         askStatus.textContent = '';
       }
     }
@@ -1914,14 +2495,16 @@
         elVoice: settElVoice.value.trim() || 'EXAVITQu4vr4xnSDxMaL',
         audioBase: settAudioBase.value.trim().replace(/\/+$/, ''),
         lang: document.getElementById('settLang').value,
+        tourMode: getTourMode(),
       });
       document.getElementById('headerLang').value = document.getElementById('settLang').value;
-      const src = player.src;
+      const src = getActivePlayer().src;
       if (!src) loadTrack(currentIdx);
       settingsModal.close();
     };
 
     // ── Init ───────────────────────────────────────────────────────────────────
+    updateTourModeButtons();
     buildPlaylist();
     loadTrack(0);
 

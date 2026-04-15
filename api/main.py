@@ -1,14 +1,19 @@
 from __future__ import annotations
+import base64
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+import html
 import io
 import json
 import os
 import re
+import secrets
 import smtplib
 import threading
+import shutil
+import unicodedata
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -28,13 +33,145 @@ app.add_middleware(
 # Serve web/ as static files at /
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(BASE_DIR, "web")
-LEGACY_DOMAIN_HOSTS = {"submarinedocent.com", "www.submarinedocent.com"}
-LEGACY_DOMAIN_TARGET = "https://submarinedocent.org"
+
+
+def _env_flag(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _resolve_path_setting(raw_value: str, default_path: str) -> str:
+    value = (raw_value or "").strip()
+    if not value:
+        return default_path
+    if os.path.isabs(value):
+        return value
+    return os.path.abspath(os.path.join(BASE_DIR, value))
+
+
+DEFAULT_CORPORA_DIR = os.path.join(BASE_DIR, "corpora")
+SAMPLE_CORPORA_DIR = os.path.join(BASE_DIR, "sample_data", "corpora")
+REQUIRED_CORPORA_FILES = (
+    "pampanito_tour_corpus.jsonl",
+    "dieselsubs_faq_corpus.jsonl",
+    "dieselsubs_faq_categories.jsonl",
+    "dieselsubs_shorts_corpus.jsonl",
+    "dieselsubs_glossary.jsonl",
+    "dieselsubs_operations_guide.jsonl",
+    "dieselsubs_operations_guide_faq_schema.jsonl",
+    "dieselsubs_operations_guide_single_record_html.jsonl",
+    "incidents.jsonl",
+    "eternal_patrol.jsonl",
+)
+
+
+def _corpora_has_required_files(directory: str) -> bool:
+    return all(os.path.exists(os.path.join(directory, filename)) for filename in REQUIRED_CORPORA_FILES)
+
+
+def _determine_corpora_dir(
+    requested_root: str,
+    explicit_sample_mode: bool,
+    default_dir: str,
+    sample_dir: str,
+) -> Tuple[str, bool, bool]:
+    if requested_root:
+        resolved_dir = _resolve_path_setting(requested_root, default_dir)
+        return resolved_dir, os.path.abspath(resolved_dir) == os.path.abspath(sample_dir), False
+
+    if explicit_sample_mode:
+        return sample_dir, True, False
+
+    if _corpora_has_required_files(default_dir):
+        return default_dir, False, False
+
+    if _corpora_has_required_files(sample_dir):
+        print("⚠️ Default corpora missing; falling back to bundled sample corpus")
+        return sample_dir, True, True
+
+    return default_dir, False, False
+
+
+REQUESTED_CONTENT_ROOT = os.getenv("CONTENT_ROOT", "").strip()
+CORPORA_DIR, SAMPLE_CONTENT_MODE, AUTO_SAMPLE_FALLBACK = _determine_corpora_dir(
+    REQUESTED_CONTENT_ROOT,
+    _env_flag("SAMPLE_CONTENT_MODE"),
+    DEFAULT_CORPORA_DIR,
+    SAMPLE_CORPORA_DIR,
+)
+
+
+def _csv_env(name: str, default: str) -> Tuple[str, ...]:
+    raw_value = os.getenv(name, default)
+    return tuple(part.strip() for part in raw_value.split(",") if part.strip())
+
+
+LEGACY_DOMAIN_HOSTS = set(_csv_env("LEGACY_DOMAIN_HOSTS", "submarinedocent.com,www.submarinedocent.com"))
+LEGACY_DOMAIN_TARGET = os.getenv("LEGACY_DOMAIN_TARGET", "https://submarinedocent.org").strip()
+TOUR_HOST_PREFIXES = _csv_env("TOUR_HOST_PREFIXES", "pampanito.")
+DEFAULT_ROOT_REDIRECT = os.getenv("DEFAULT_ROOT_REDIRECT", "/web/welcome.html").strip() or "/web/welcome.html"
+RETURNING_VISITOR_REDIRECT = os.getenv("RETURNING_VISITOR_REDIRECT", "/web/faqs.html").strip() or "/web/faqs.html"
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
+PREVIEW_USERNAME = os.getenv("PREVIEW_USERNAME", "").strip()
+PREVIEW_PASSWORD = os.getenv("PREVIEW_PASSWORD", "").strip()
+ADMIN_PAGE_PATHS = {
+    "/feedback.html",
+    "/web/feedback.html",
+    "/review.html",
+    "/web/review.html",
+    "/faq_editor.html",
+    "/web/faq_editor.html",
+    "/edit.html",
+    "/web/edit.html",
+}
+PREVIEW_PAGE_PATHS = {
+    "/pampanito.html",
+    "/web/pampanito.html",
+    "/web/pampanito-tour-cues.js",
+}
 
 
 def _request_host(request: Request) -> str:
     host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
     return host.split(",", 1)[0].strip().split(":", 1)[0].lower()
+
+
+def _is_tour_host(host: str) -> bool:
+    return any(host.startswith(prefix) for prefix in TOUR_HOST_PREFIXES)
+
+
+def _is_admin_path(path: str) -> bool:
+    return (
+        path.startswith("/admin/")
+        or path == "/feedback/list"
+        or path in ADMIN_PAGE_PATHS
+        or (path.startswith("/web/edit_") and path.endswith(".html"))
+    )
+
+
+def _is_preview_path(path: str) -> bool:
+    return path in PREVIEW_PAGE_PATHS
+
+
+def _check_basic_auth(request: Request, username: str, password: str) -> bool:
+    header = request.headers.get("authorization", "")
+    if not header.startswith("Basic "):
+        return False
+    try:
+        raw_value = header.split(" ", 1)[1]
+        decoded = base64.b64decode(raw_value).decode("utf-8")
+        provided_user, provided_password = decoded.split(":", 1)
+    except Exception:
+        return False
+    return secrets.compare_digest(provided_user, username) and secrets.compare_digest(provided_password, password)
+
+
+def _basic_auth_challenge(realm: str, detail: str, status_code: int = 401) -> PlainTextResponse:
+    return PlainTextResponse(
+        detail,
+        status_code=status_code,
+        headers={"WWW-Authenticate": f'Basic realm="{realm}"'},
+    )
 
 
 @app.middleware("http")
@@ -47,12 +184,32 @@ async def redirect_legacy_domain(request: Request, call_next):
         return RedirectResponse(url=target, status_code=308)
     return await call_next(request)
 
+
+@app.middleware("http")
+async def protect_sensitive_routes(request: Request, call_next):
+    path = request.url.path
+    if _is_admin_path(path):
+        if not ADMIN_USERNAME or not ADMIN_PASSWORD:
+            return _basic_auth_challenge(
+                "SubmarineDocent Admin",
+                "Admin access is disabled. Set ADMIN_USERNAME and ADMIN_PASSWORD to enable it.",
+                status_code=503,
+            )
+        if not _check_basic_auth(request, ADMIN_USERNAME, ADMIN_PASSWORD):
+            return _basic_auth_challenge("SubmarineDocent Admin", "Authentication required.")
+    elif _is_preview_path(path) and PREVIEW_USERNAME and PREVIEW_PASSWORD:
+        if not _check_basic_auth(request, PREVIEW_USERNAME, PREVIEW_PASSWORD):
+            return _basic_auth_challenge("SubmarineDocent Preview", "Authentication required.")
+    return await call_next(request)
+
 @app.get("/", include_in_schema=False)
 def root_redirect(request: Request):
     host = _request_host(request)
-    if host.startswith("pampanito."):
+    if host and _is_tour_host(host):
         return RedirectResponse(url="/web/pampanito.html")
-    return RedirectResponse(url="/web/faqs.html")
+    if request.cookies.get("visited") == "1":
+        return RedirectResponse(url=RETURNING_VISITOR_REDIRECT)
+    return RedirectResponse(url=DEFAULT_ROOT_REDIRECT)
 
 if os.path.isdir(WEB_DIR):
     # Convenience redirect: /pampanito.html → /web/pampanito.html
@@ -65,6 +222,14 @@ if os.path.isdir(WEB_DIR):
     def redirect_feedback_html():
         return RedirectResponse(url="/web/feedback.html")
 
+    # Convenience redirect: /welcome.html → /web/welcome.html
+    @app.get("/welcome.html", include_in_schema=False)
+    def redirect_welcome_html(request: Request):
+        target = "/web/welcome.html"
+        if request.url.query:
+            target = f"{target}?{request.url.query}"
+        return RedirectResponse(url=target)
+
     # Convenience redirect: /review.html → /web/review.html
     @app.get("/review.html", include_in_schema=False)
     def redirect_review_html():
@@ -74,6 +239,21 @@ if os.path.isdir(WEB_DIR):
     @app.get("/faq_editor.html", include_in_schema=False)
     def redirect_faq_editor_html():
         return RedirectResponse(url="/web/faq_editor.html")
+
+    # Convenience redirect: /edit_glossary.html → /web/edit_glossary.html
+    @app.get("/edit_glossary.html", include_in_schema=False)
+    def redirect_edit_glossary_html():
+        return RedirectResponse(url="/web/edit_glossary.html")
+
+    # Convenience redirect: /edit_operations.html → /web/edit_operations.html
+    @app.get("/edit_operations.html", include_in_schema=False)
+    def redirect_edit_operations_html():
+        return RedirectResponse(url="/web/edit_operations.html")
+
+    # Convenience redirect: /edit_incidents.html → /web/edit_incidents.html
+    @app.get("/edit_incidents.html", include_in_schema=False)
+    def redirect_edit_incidents_html():
+        return RedirectResponse(url="/web/edit_incidents.html")
 
     # Convenience redirect: /edit.html → /web/edit.html
     @app.get("/edit.html", include_in_schema=False)
@@ -86,6 +266,11 @@ if os.path.isdir(WEB_DIR):
     @app.get("/faq", include_in_schema=False)
     def redirect_faqs_html():
         return RedirectResponse(url="/web/faqs.html")
+
+    @app.get("/glossary", include_in_schema=False)
+    @app.get("/glossary.html", include_in_schema=False)
+    def redirect_glossary_html():
+        return RedirectResponse(url="/web/glossary.html")
 
     @app.get("/index.html", include_in_schema=False)
     @app.get("/web/index.html", include_in_schema=False)
@@ -104,17 +289,47 @@ if os.path.isdir(WEB_DIR):
                 "Expires": "0",
             },
         )
+
+    @app.get("/web/pampanito-tour-cues.js", include_in_schema=False)
+    def serve_pampanito_tour_cues_js():
+        return FileResponse(
+            os.path.join(WEB_DIR, "pampanito-tour-cues.js"),
+            media_type="application/javascript",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
+    @app.get("/web/edit_operations.html", include_in_schema=False)
+    def serve_edit_operations_html():
+        return FileResponse(
+            os.path.join(WEB_DIR, "edit_operations.html"),
+            media_type="text/html",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
     app.mount("/web", StaticFiles(directory=WEB_DIR, html=True), name="web")
-CORPORA_DIR = os.path.join(BASE_DIR, "corpora")
+ETERNAL_PATROL_IMAGE_DIR = os.path.join(WEB_DIR, "images", "extracted")
 
 TOUR_PATH = os.path.join(CORPORA_DIR, "pampanito_tour_corpus.jsonl")
 SHORTS_PATH = os.path.join(CORPORA_DIR, "dieselsubs_shorts_corpus.jsonl")
+GLOSSARY_PATH = os.path.join(CORPORA_DIR, "dieselsubs_glossary.jsonl")
+OPERATIONS_GUIDE_PATH = os.path.join(CORPORA_DIR, "dieselsubs_operations_guide.jsonl")
+OPERATIONS_GUIDE_FAQ_SCHEMA_PATH = os.path.join(CORPORA_DIR, "dieselsubs_operations_guide_faq_schema.jsonl")
+OPERATIONS_GUIDE_SINGLE_HTML_PATH = os.path.join(CORPORA_DIR, "dieselsubs_operations_guide_single_record_html.jsonl")
 _BUNDLED_CATEGORIES_PATH = os.path.join(CORPORA_DIR, "dieselsubs_faq_categories.jsonl")
 
 # FAQ corpus — use Render persistent disk (/data) if mounted, else local corpora/
 _BUNDLED_FAQ_PATH = os.path.join(CORPORA_DIR, "dieselsubs_faq_corpus.jsonl")
 _RENDER_DATA_DIR = "/data"
-if os.path.isdir(_RENDER_DATA_DIR):
+_using_nondefault_corpora = os.path.abspath(CORPORA_DIR) != os.path.abspath(DEFAULT_CORPORA_DIR)
+if not _using_nondefault_corpora and os.path.isdir(_RENDER_DATA_DIR):
     FAQ_PATH = os.path.join(_RENDER_DATA_DIR, "dieselsubs_faq_corpus.jsonl")
     if not os.path.exists(FAQ_PATH) and os.path.exists(_BUNDLED_FAQ_PATH):
         import shutil
@@ -123,7 +338,7 @@ if os.path.isdir(_RENDER_DATA_DIR):
 else:
     FAQ_PATH = _BUNDLED_FAQ_PATH
 
-if os.path.isdir(_RENDER_DATA_DIR):
+if not _using_nondefault_corpora and os.path.isdir(_RENDER_DATA_DIR):
     CATEGORIES_PATH = os.path.join(_RENDER_DATA_DIR, "dieselsubs_faq_categories.jsonl")
     if not os.path.exists(CATEGORIES_PATH) and os.path.exists(_BUNDLED_CATEGORIES_PATH):
         import shutil
@@ -136,29 +351,139 @@ else:
 # Path for incidents corpus
 INCIDENTS_PATH = os.path.join(CORPORA_DIR, "incidents.jsonl")
 
+# Whisper domain vocabulary prompt — persisted to a text file so it can be
+# edited via the admin UI without touching source code.
+_WHISPER_PROMPT_PATH = os.path.join(CORPORA_DIR, "whisper_prompt.txt")
+_WHISPER_PROMPT_DEFAULT = (
+    "USS Pampanito, submarine, torpedo, periscope, conning tower, "
+    "hot bunk, hot bunking, hot racking, watertight door, ballast tank, "
+    "diesel engine, electric motor, sonar, hydrophone, deck gun, "
+    "wardroom, galley, maneuvering room, engine room, forward torpedo room, "
+    "after torpedo room, crew's mess, radio room, control room, "
+    "snorkel, trim tank, bow plane, stern plane, "
+    "Gato class, fleet submarine, war patrol, depth charge, "
+    "skipper, officer of the deck, chief of the watch, "
+    "WWII, World War Two, Pacific, Japanese, Navy"
+)
+
+def _load_whisper_prompt() -> str:
+    try:
+        text = open(_WHISPER_PROMPT_PATH, encoding="utf-8").read().strip()
+        return text if text else _WHISPER_PROMPT_DEFAULT
+    except FileNotFoundError:
+        return _WHISPER_PROMPT_DEFAULT
+
+_whisper_prompt_lock = threading.Lock()
+_WHISPER_PROMPT: str = _load_whisper_prompt()
+
+_incidents_cache: list[dict[str, Any]] | None = None
+
 # Feature flag: keep demo fully local today; later, flip to true with funding.
 USE_LLM = os.getenv("USE_LLM", "false").lower() in ("1", "true", "yes")
-def load_incidents():
+
+
+def _incident_sort_key(entry: dict[str, Any]) -> tuple[str, str, int]:
+    date_value = str(entry.get("date_sort") or entry.get("date") or "").strip()
+    name = str(entry.get("submarine_name") or "").strip().casefold()
+    try:
+        incident_id = int(entry.get("id") or 0)
+    except (TypeError, ValueError):
+        incident_id = 0
+    return (date_value, name, incident_id)
+
+
+def _normalize_incident_text(value: Any) -> str:
+    return str(value or "").replace("\r\n", "\n").strip()
+
+
+def _normalize_incident_date_sort(date_value: str) -> str:
+    value = _normalize_incident_text(date_value)
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        return value
+    return ""
+
+
+def _load_incidents() -> list[dict[str, Any]]:
     """Load incidents corpus from JSONL file."""
+    global _incidents_cache
+    if _incidents_cache is not None:
+        return _incidents_cache
+
     if not os.path.exists(INCIDENTS_PATH):
         print(f"❌ File not found: {INCIDENTS_PATH}")
-        return []
-    data = []
+        _incidents_cache = []
+        return _incidents_cache
+
+    data: list[dict[str, Any]] = []
     with open(INCIDENTS_PATH, "r", encoding="utf-8-sig") as f:
         for i, line in enumerate(f, start=1):
             line = line.strip()
             if not line:
                 continue
             try:
-                data.append(json.loads(line))
+                raw_entry = json.loads(line)
             except Exception as e:
                 print(f"⚠️ JSON parse error on line {i} in {INCIDENTS_PATH}: {e}")
                 break
+            if not isinstance(raw_entry, dict):
+                continue
+            entry = {
+                "id": int(raw_entry.get("id") or 0),
+                "date": _normalize_incident_text(raw_entry.get("date")),
+                "date_sort": _normalize_incident_text(raw_entry.get("date_sort")),
+                "submarine_name": _normalize_incident_text(raw_entry.get("submarine_name")),
+                "hull_number": _normalize_incident_text(raw_entry.get("hull_number")),
+                "incident_type": _normalize_incident_text(raw_entry.get("incident_type")),
+                "description": _normalize_incident_text(raw_entry.get("description")),
+                "casualties": _normalize_incident_text(raw_entry.get("casualties")),
+                "status": _normalize_incident_text(raw_entry.get("status")),
+                "era": _normalize_incident_text(raw_entry.get("era")),
+                "notes": _normalize_incident_text(raw_entry.get("notes")),
+            }
+            entry["date_sort"] = entry["date_sort"] or _normalize_incident_date_sort(entry["date"])
+            data.append(entry)
     print(f"✅ Loaded {len(data)} records from {os.path.basename(INCIDENTS_PATH)}")
+    data.sort(key=_incident_sort_key)
+    _incidents_cache = data
     return data
 
-# Load incidents corpus at startup
-INCIDENTS = load_incidents()
+
+def _save_incidents() -> None:
+    incidents = _load_incidents()
+    tmp_path = INCIDENTS_PATH + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as handle:
+        for entry in incidents:
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    os.replace(tmp_path, INCIDENTS_PATH)
+
+
+def _next_incident_id(incidents: list[dict[str, Any]]) -> int:
+    max_id = 0
+    for entry in incidents:
+        try:
+            max_id = max(max_id, int(entry.get("id") or 0))
+        except (TypeError, ValueError):
+            continue
+    return max_id + 1
+
+
+def _apply_incident_payload(target: dict[str, Any], payload: dict[str, Any]) -> None:
+    submarine_name = _normalize_incident_text(payload.get("submarine_name"))
+    if not submarine_name:
+        raise HTTPException(status_code=400, detail="submarine_name is required")
+
+    target["submarine_name"] = submarine_name
+    target["date"] = _normalize_incident_text(payload.get("date"))
+    target["date_sort"] = _normalize_incident_date_sort(target["date"])
+    target["hull_number"] = _normalize_incident_text(payload.get("hull_number"))
+    target["incident_type"] = _normalize_incident_text(payload.get("incident_type"))
+    target["description"] = _normalize_incident_text(payload.get("description"))
+    target["casualties"] = _normalize_incident_text(payload.get("casualties"))
+    target["status"] = _normalize_incident_text(payload.get("status"))
+    target["era"] = _normalize_incident_text(payload.get("era"))
+    target["notes"] = _normalize_incident_text(payload.get("notes"))
+
+
 # ------------------------------------------------------------
 # Incidents API endpoint
 # ------------------------------------------------------------
@@ -166,7 +491,7 @@ INCIDENTS = load_incidents()
 @app.get("/api/incidents")
 def get_incidents():
     """Return all submarine incidents."""
-    return {"incidents": INCIDENTS}
+    return {"incidents": list(_load_incidents())}
 
 # Groq key — used for Whisper transcription (whisper-large-v3-turbo, ~0.3s latency)
 _GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
@@ -208,7 +533,8 @@ TOUR = load_jsonl(TOUR_PATH)
 FAQ = load_jsonl(FAQ_PATH)
 SHORTS = load_jsonl(SHORTS_PATH)
 CATEGORIES = load_jsonl(CATEGORIES_PATH)
-print(f"Loaded: {len(TOUR)} tour, {len(FAQ)} faq, {len(SHORTS)} shorts chunks, {len(CATEGORIES)} categories")
+OPERATIONS_GUIDE = load_jsonl(OPERATIONS_GUIDE_PATH)
+print(f"Loaded: {len(TOUR)} tour, {len(FAQ)} faq, {len(SHORTS)} shorts chunks, {len(CATEGORIES)} categories, {len(OPERATIONS_GUIDE)} operations guide records")
 
 
 
@@ -274,6 +600,8 @@ def health():
     return {
         "status": "ok",
         "use_llm": USE_LLM,
+        "sample_content_mode": SAMPLE_CONTENT_MODE,
+        "auto_sample_fallback": AUTO_SAMPLE_FALLBACK,
         "transcribe_available": bool(_GROQ_API_KEY),
         "tour_chunks": len(TOUR),
         "faq_chunks": len(FAQ),
@@ -320,10 +648,13 @@ async def transcribe_audio(
             api_key=_GROQ_API_KEY,
             base_url="https://api.groq.com/openai/v1",
         )
+        # Domain prompt biases Whisper toward submarine/Pampanito vocabulary,
+        # reducing mishearings of specialist terms (e.g. "bunk" → "punk").
         result = await client.audio.transcriptions.create(
             model="whisper-large-v3-turbo",
             file=buf,
             language=whisper_lang,
+            prompt=_WHISPER_PROMPT,
         )
         transcript = (result.text or "").strip()
         print(f"[TRANSCRIBE] '{transcript[:80]}'")
@@ -385,6 +716,8 @@ def tokenize(text: str) -> List[str]:
 _COMPARTMENT_AMBIGUOUS_TOKENS: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"\bafter\s+battery\b", re.I), "battery"),
     (re.compile(r"\bforward\s+battery\b", re.I), "battery"),
+    # "hot" in "hot bunk/bunking" means the practice, not temperature
+    (re.compile(r"\bhot[\s-]bunk", re.I), "hot"),
 ]
 
 
@@ -491,7 +824,7 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     # which over-matches tour chunks about the sleeping *experience* (e.g. "I slept
     # in the aft torpedo room") when the visitor is asking about the physical bunks.
     "bunks":  ["bunk", "bed", "beds", "rack", "racks", "berthing"],
-    "bunk":   ["bunks", "bed", "beds", "rack", "racks", "berthing"],
+    "bunk":   ["bunks", "bunking", "bed", "beds", "rack", "racks", "berthing"],
     # "banks" is a common STT mishearing of "bunks" (also handled client-side)
     "banks":  ["bunks", "bunk", "bed", "beds", "rack", "racks", "berthing"],
     # crew quality / selection questions
@@ -1151,6 +1484,18 @@ def retrieve(
     def _has_both_marks(text: str) -> bool:
         return bool(_BOTH_MARKS_RE[0][0].search(text) and _BOTH_MARKS_RE[0][1].search(text))
 
+    def _get_chunk_title(ch: Dict[str, Any], text: str) -> str:
+        explicit_title = (ch.get("title") or "").strip()
+        if explicit_title:
+            return explicit_title
+        raw_paras = [p.strip() for p in re.split(r"\n\n+", text) if p.strip()]
+        if raw_paras and raw_paras[0].rstrip().endswith("?"):
+            return raw_paras[0]
+        return ""
+
+    normalized_question = re.sub(r"[^a-z0-9\s]", " ", (question_text or "").lower()).split()
+    normalized_question_text = " ".join(normalized_question)
+
     # helper
     def add_hits(chunks: List[Dict[str, Any]], source_id: str, weight: float, compartment_filter: bool):
         for ch in chunks:
@@ -1190,9 +1535,9 @@ def retrieve(
             # specific title like "What is a torpedo?" (coverage=1.0) beats
             # "What is in the after torpedo room?" (coverage=0.33) even when
             # both contain the only query token "torpedo".
-            raw_paras = [p.strip() for p in re.split(r"\n\n+", text) if p.strip()]
-            if raw_paras and raw_paras[0].rstrip().endswith("?"):
-                title_toks = set(tokenize(raw_paras[0]))
+            title_text = _get_chunk_title(ch, text)
+            if title_text:
+                title_toks = set(tokenize(title_text))
                 q_set = set(q_tokens)
                 if q_set and title_toks:
                     # Use synonym-expanded query tokens so e.g. "served"→"assigned"
@@ -1214,6 +1559,13 @@ def retrieve(
                     elif matched >= max(1, len(q_set) - 1):
                         # Near-exact (all but one): scale 2x by coverage
                         effective_weight = weight * 2.0 * coverage
+
+                    normalized_title_text = " ".join(
+                        re.sub(r"[^a-z0-9\s]", " ", title_text.lower()).split()
+                    )
+                    if normalized_question_text and normalized_question_text == normalized_title_text:
+                        # Exact FAQ wording should outrank broader topical chunks.
+                        effective_weight = max(effective_weight, weight * 8.0)
 
             # For comparison queries, strongly boost chunks that discuss both sides
             if intent.get("wants_mark_compare") and _has_both_marks(text):
@@ -1402,8 +1754,20 @@ def synthesize_extractive(
                 "chunk_id": ch.get("chunk_id"),
             })
 
-    # Secondary chunk: supplement if primary is thin
-    if len(used_sentences) < 3 and len(hits) > 1:
+    # Secondary chunk: supplement if primary is thin.
+    # Do not append a second chunk onto a FAQ answer body — for exact FAQ-style
+    # questions that produces mixed answers like the right FAQ followed by an
+    # unrelated generic explanation from another chunk.
+    # Also skip if this is a quantity question and the primary already contains
+    # a number — the answer is complete and supplementing adds off-topic content.
+    _primary_has_number = bool(re.search(
+        r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten"
+        r"|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen"
+        r"|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy"
+        r"|eighty|ninety|hundred|thousand|dozen|thirty-six|twenty-four)\b",
+        " ".join(used_sentences), re.I
+    ))
+    if faq_body is None and len(used_sentences) < 3 and len(hits) > 1 and not (intent.get("wants_quantity") and _primary_has_number):
         seen_norm = {re.sub(r"\s+", " ", s.strip().lower()) for s in used_sentences}
         for _, ch2, src2 in hits[1:]:
             sents2 = chunk_sentences(ch2)
@@ -1538,6 +1902,7 @@ def synthesize_extractive(
         "due to", "led to", "motivated", "motive", "objective", "strategy",
         "provoked", "prompted", "intent", "intended", "wanted to", "sought",
         "goal", "aim", "embargo", "retaliation", "threat", "feared",
+        "since", "so that", "designed to", "meant to", "required to",
     ]
     if intent.get("is_why_question"):
         answer_lower = answer_short.lower()
@@ -1684,6 +2049,10 @@ def synthesize_openai_stub(
 _GENERATED_PREFIXES = {"der", "pam", "fix"}
 _faq_write_lock = threading.Lock()
 _category_write_lock = threading.Lock()
+_glossary_write_lock = threading.Lock()
+_incidents_write_lock = threading.Lock()
+_operations_guide_write_lock = threading.Lock()
+_eternal_patrol_write_lock = threading.Lock()
 
 
 def _normalize_faq_html(text: str) -> str:
@@ -1752,6 +2121,350 @@ def _save_categories_corpus() -> None:
         for entry in sorted(CATEGORIES, key=lambda e: (int(e.get("sort_order") or 0), (e.get("title") or "").lower())):
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     os.replace(tmp, CATEGORIES_PATH)
+
+
+_glossary_cache: list[dict[str, Any]] | None = None
+
+
+def _glossary_sort_key(term: str) -> tuple[str, str]:
+    normalized = unicodedata.normalize("NFKD", term or "")
+    ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
+    return (ascii_value.casefold(), (term or "").casefold())
+
+
+def _load_glossary() -> list[dict[str, Any]]:
+    global _glossary_cache
+    if _glossary_cache is not None:
+        return _glossary_cache
+
+    entries: list[dict[str, Any]] = []
+    if os.path.exists(GLOSSARY_PATH):
+        with open(GLOSSARY_PATH, "r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                entries.append({
+                    "id": int(entry.get("id") or 0),
+                    "term": str(entry.get("term") or "").strip(),
+                    "definition": str(entry.get("definition") or "").strip(),
+                })
+
+    entries.sort(key=lambda entry: _glossary_sort_key(entry.get("term", "")))
+    _glossary_cache = entries
+    return entries
+
+
+def _save_glossary() -> None:
+    entries = _load_glossary()
+    tmp_path = GLOSSARY_PATH + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as handle:
+        for entry in entries:
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    os.replace(tmp_path, GLOSSARY_PATH)
+
+
+def _next_glossary_id(entries: list[dict[str, Any]]) -> int:
+    max_id = 0
+    for entry in entries:
+        try:
+            max_id = max(max_id, int(entry.get("id") or 0))
+        except (TypeError, ValueError):
+            continue
+    return max_id + 1
+
+
+def _assert_unique_glossary_term(entries: list[dict[str, Any]], term: str, ignore_id: int | None = None) -> None:
+    normalized = term.casefold()
+    for entry in entries:
+        try:
+            entry_id = int(entry.get("id") or 0)
+        except (TypeError, ValueError):
+            entry_id = 0
+        if ignore_id is not None and entry_id == ignore_id:
+            continue
+        if str(entry.get("term") or "").strip().casefold() == normalized:
+            raise HTTPException(status_code=409, detail="A glossary term with that name already exists")
+
+
+def _apply_glossary_payload(target: dict[str, Any], payload: dict[str, Any]) -> None:
+    term = (payload.get("term") or "").strip()
+    if not term:
+        raise HTTPException(status_code=400, detail="term is required")
+    target["term"] = term
+    target["definition"] = _normalize_faq_html(payload.get("definition") or "")
+
+
+def _operations_guide_sort_key(entry: dict[str, Any]) -> tuple[int, str]:
+    chunk_id = str(entry.get("chunk_id") or "")
+    match = re.search(r"(\d+)$", chunk_id)
+    order = int(match.group(1)) if match else 0
+    return (order, chunk_id)
+
+
+def _operations_text_blocks(text: str) -> list[dict[str, Any]]:
+    blocks: list[dict[str, Any]] = []
+    current_paragraph: list[str] = []
+    current_list: list[str] = []
+
+    def flush_paragraph() -> None:
+        nonlocal current_paragraph
+        if current_paragraph:
+            blocks.append({"type": "paragraph", "text": " ".join(line.strip() for line in current_paragraph if line.strip())})
+            current_paragraph = []
+
+    def flush_list() -> None:
+        nonlocal current_list
+        if current_list:
+            blocks.append({"type": "list", "items": current_list[:]})
+            current_list = []
+
+    for raw_line in str(text or "").replace("\r\n", "\n").split("\n"):
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if not stripped:
+            flush_paragraph()
+            flush_list()
+            continue
+        if stripped.startswith("- "):
+            flush_paragraph()
+            current_list.append(stripped[2:].strip())
+            continue
+        flush_list()
+        current_paragraph.append(stripped)
+
+    flush_paragraph()
+    flush_list()
+    return blocks
+
+
+def _operations_text_to_html(text: str) -> str:
+    parts: list[str] = []
+    for block in _operations_text_blocks(text):
+        if block["type"] == "paragraph":
+            parts.append(f"<p>{html.escape(block['text'])}</p>")
+        elif block["type"] == "list":
+            items = "".join(f"<li>{html.escape(item)}</li>" for item in block["items"])
+            parts.append(f"<ul>{items}</ul>")
+    return "".join(parts)
+
+
+def _operations_topic_tags(entry: dict[str, Any]) -> list[str]:
+    seed_text = " ".join([
+        str(entry.get("section") or "").replace("_", " "),
+        str(entry.get("title") or ""),
+    ])
+    tags: list[str] = []
+    seen: set[str] = set()
+    for token in re.findall(r"[a-z0-9]+", seed_text.lower()):
+        if len(token) < 3 or token in seen:
+            continue
+        seen.add(token)
+        tags.append(token)
+        if len(tags) >= 6:
+            break
+    if "ww2" not in seen:
+        tags.append("ww2")
+    return tags[:7]
+
+
+def _build_operations_guide_faq_schema_entries() -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for entry in sorted(OPERATIONS_GUIDE, key=_operations_guide_sort_key):
+        chunk_id = str(entry.get("chunk_id") or "ops_000")
+        title = str(entry.get("title") or "Operations Guide Entry").strip()
+        records.append({
+            "chunk_id": f"faq_{chunk_id}",
+            "doc_type": "dieselsubs_faq",
+            "source": "Submarine Operations Guide",
+            "title": title,
+            "slug": _make_slug(title),
+            "category": "Operations Guide",
+            "text": _operations_text_to_html(str(entry.get("text") or "")),
+            "topic_tags": _operations_topic_tags(entry),
+            "authority_level": "reference_faq",
+            "era": "ww2",
+            "platform": ["us_diesel_electric_submarines"],
+            "pampanito_specific": False,
+            "display_citation": str(entry.get("display_citation") or f"Operations Guide — {title}"),
+        })
+    return records
+
+
+def _build_operations_guide_single_html_record() -> dict[str, Any]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for entry in sorted(OPERATIONS_GUIDE, key=_operations_guide_sort_key):
+        groups.setdefault(str(entry.get("section") or "custom"), []).append(entry)
+
+    html_parts = [
+        '<div id="operations-view">',
+        '<h1>Submarine Operations</h1>',
+        '<p>Explore the fascinating world of submarine operations, tactics, and missions throughout history.</p>',
+    ]
+
+    for section_name, heading in [
+        ("overview", "About Submarine Operations"),
+        ("types_of_operations", "Types of Operations"),
+        ("tactical_approaches", "Tactical Approaches"),
+        ("related_faqs", "Related FAQs"),
+        ("statistics", "WWII Pacific Theater Statistics"),
+        ("additional_resources", "Additional Resources"),
+    ]:
+        entries = groups.pop(section_name, [])
+        if not entries:
+            continue
+        html_parts.append(f"<section><h2>{html.escape(heading)}</h2>")
+        for entry in entries:
+            title = str(entry.get("title") or "").strip()
+            if section_name != "overview" and title and title.lower() != heading.lower():
+                html_parts.append(f"<article><h3>{html.escape(title)}</h3>{_operations_text_to_html(str(entry.get('text') or ''))}</article>")
+            else:
+                html_parts.append(_operations_text_to_html(str(entry.get("text") or "")))
+        html_parts.append("</section>")
+
+    for section_name, entries in groups.items():
+        if not entries:
+            continue
+        html_parts.append(f"<section><h2>{html.escape(section_name.replace('_', ' ').title())}</h2>")
+        for entry in entries:
+            title = str(entry.get("title") or "").strip()
+            html_parts.append(f"<article><h3>{html.escape(title)}</h3>{_operations_text_to_html(str(entry.get('text') or ''))}</article>")
+        html_parts.append("</section>")
+
+    html_parts.append("</div>")
+    return {
+        "chunk_id": "ops_html_001",
+        "doc_type": "dieselsubs_operations_guide_html",
+        "source": "Submarine Operations Guide",
+        "title": "Submarine Operations",
+        "slug": "submarine-operations",
+        "category": "Operations Guide",
+        "text": "".join(html_parts),
+        "display_citation": "Operations Guide — Submarine Operations",
+        "source_url": "/web/faqs.html?view=operations",
+    }
+
+
+def _save_operations_derived_exports() -> None:
+    faq_schema_records = _build_operations_guide_faq_schema_entries()
+    faq_schema_tmp_path = OPERATIONS_GUIDE_FAQ_SCHEMA_PATH + ".tmp"
+    with open(faq_schema_tmp_path, "w", encoding="utf-8") as handle:
+        for entry in faq_schema_records:
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    os.replace(faq_schema_tmp_path, OPERATIONS_GUIDE_FAQ_SCHEMA_PATH)
+
+    html_record = _build_operations_guide_single_html_record()
+    html_tmp_path = OPERATIONS_GUIDE_SINGLE_HTML_PATH + ".tmp"
+    with open(html_tmp_path, "w", encoding="utf-8") as handle:
+        handle.write(json.dumps(html_record, ensure_ascii=False) + "\n")
+    os.replace(html_tmp_path, OPERATIONS_GUIDE_SINGLE_HTML_PATH)
+
+
+def _save_operations_guide() -> None:
+    tmp_path = OPERATIONS_GUIDE_PATH + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as handle:
+        for entry in sorted(OPERATIONS_GUIDE, key=_operations_guide_sort_key):
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    os.replace(tmp_path, OPERATIONS_GUIDE_PATH)
+    _save_operations_derived_exports()
+
+
+def _next_operations_guide_chunk_id(entries: list[dict[str, Any]]) -> str:
+    max_value = 0
+    for entry in entries:
+        match = re.search(r"(\d+)$", str(entry.get("chunk_id") or ""))
+        if match:
+            max_value = max(max_value, int(match.group(1)))
+    return f"ops_{max_value + 1:03d}"
+
+
+def _apply_operations_guide_payload(target: dict[str, Any], payload: dict[str, Any]) -> None:
+    title = str(payload.get("title") or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="title is required")
+
+    target["doc_type"] = "dieselsubs_operations_guide"
+    target["section"] = str(payload.get("section") or "").strip() or "custom"
+    target["title"] = title
+    target["text"] = str(payload.get("text") or "").replace("\r\n", "\n").strip()
+    target["display_citation"] = str(payload.get("display_citation") or "").strip() or f"Submarine Operations Guide — {title}"
+    target["source_url"] = str(payload.get("source_url") or "").strip() or "/web/faqs.html?view=operations"
+
+
+def _category_text(title: str, description: str) -> str:
+    description = (description or "").strip()
+    return f"{title}\n\n{description}" if description else title
+
+
+def _find_category_entry(title: str) -> Optional[dict[str, Any]]:
+    title = (title or "").strip()
+    for entry in CATEGORIES:
+        entry_title = (entry.get("title") or entry.get("name") or "").strip()
+        if entry_title == title:
+            return entry
+    return None
+
+
+def _next_category_id() -> int:
+    existing_ids = [int(entry.get("category_id")) for entry in CATEGORIES if str(entry.get("category_id", "")).isdigit()]
+    return max(existing_ids) + 1 if existing_ids else 1
+
+
+def _materialize_category_record(record: dict[str, Any], sort_order: int) -> dict[str, Any]:
+    title = (record.get("title") or "").strip()
+    if not title:
+        raise ValueError("Category title is required")
+
+    description = (record.get("description") or "").strip()
+    slug = record.get("slug") or _make_slug(title)
+    entry = _find_category_entry(title)
+    if entry is None:
+        category_id = record.get("category_id")
+        if not str(category_id or "").isdigit():
+            category_id = _next_category_id()
+        entry = {
+            "chunk_id": record.get("chunk_id") or f"faq_category_{category_id}",
+            "doc_type": "dieselsubs_faq_category",
+            "source": record.get("source") or "manual_editor",
+            "category_id": category_id,
+            "title": title,
+            "slug": slug,
+            "description": description,
+            "text": _category_text(title, description),
+            "sort_order": sort_order,
+            "era": record.get("era") or "ww2",
+            "platform": record.get("platform") or ["us_diesel_electric_submarines"],
+            "display_citation": record.get("display_citation") or f"SubmarineDocent FAQ Category — {title}",
+        }
+        CATEGORIES.append(entry)
+        return entry
+
+    entry["title"] = title
+    entry["slug"] = slug
+    entry["description"] = description
+    entry["text"] = _category_text(title, description)
+    entry["sort_order"] = sort_order
+    entry["display_citation"] = f"SubmarineDocent FAQ Category — {title}"
+    entry.setdefault("doc_type", "dieselsubs_faq_category")
+    entry.setdefault("source", "manual_editor")
+    entry.setdefault("era", "ww2")
+    entry.setdefault("platform", ["us_diesel_electric_submarines"])
+    if not str(entry.get("category_id", "")).isdigit():
+        entry["category_id"] = _next_category_id()
+    if not entry.get("chunk_id"):
+        entry["chunk_id"] = f"faq_category_{entry['category_id']}"
+    return entry
+
+
+def _normalize_category_sort_orders() -> None:
+    records = _get_category_records()
+    for index, record in enumerate(records):
+        _materialize_category_record(record, index * 10)
+    _save_categories_corpus()
 
 
 def _get_category_records() -> list[dict[str, Any]]:
@@ -1846,10 +2559,450 @@ def get_faq_categories():
     return _get_category_records()
 
 
+@app.post("/admin/faq-categories")
+async def create_faq_category(request: Request):
+    payload = await request.json()
+    title = (payload.get("title") or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Category title is required")
+
+    if any(record.get("title", "").strip().lower() == title.lower() for record in _get_category_records()):
+        raise HTTPException(status_code=409, detail="A category with that title already exists")
+
+    existing_orders = [int(entry.get("sort_order") or 0) for entry in CATEGORIES]
+    next_order = max(existing_orders) + 10 if existing_orders else len(_get_category_records()) * 10
+    _materialize_category_record({"title": title, "description": payload.get("description") or ""}, next_order)
+    _normalize_category_sort_orders()
+    return _get_category_records()
+
+
+@app.post("/admin/faq-categories/reorder")
+async def reorder_faq_category(request: Request):
+    payload = await request.json()
+    records = _get_category_records()
+    ordered_titles = payload.get("ordered_titles")
+
+    if isinstance(ordered_titles, list):
+        normalized_titles = [(title or "").strip() for title in ordered_titles]
+        existing_titles = [record.get("title") for record in records]
+        if sorted(normalized_titles) != sorted(existing_titles):
+            raise HTTPException(status_code=400, detail="ordered_titles must contain every category exactly once")
+        records_by_title = {record.get("title"): record for record in records}
+        records = [records_by_title[title] for title in normalized_titles]
+    else:
+        title = (payload.get("title") or "").strip()
+        direction = (payload.get("direction") or "").strip().lower()
+        if not title or direction not in {"up", "down"}:
+            raise HTTPException(status_code=400, detail="Provide ordered_titles or title and direction")
+
+        index = next((i for i, record in enumerate(records) if record.get("title") == title), None)
+        if index is None:
+            raise HTTPException(status_code=404, detail="Category not found")
+
+        target_index = index - 1 if direction == "up" else index + 1
+        if target_index < 0 or target_index >= len(records):
+            return records
+
+        records[index], records[target_index] = records[target_index], records[index]
+
+    for order, record in enumerate(records):
+        _materialize_category_record(record, order * 10)
+    _save_categories_corpus()
+    return _get_category_records()
+
+
+@app.put("/admin/faq-categories/rename")
+async def rename_faq_category(request: Request):
+    payload = await request.json()
+    old_title = (payload.get("old_title") or "").strip()
+    new_title = (payload.get("new_title") or "").strip()
+    if not old_title or not new_title:
+        raise HTTPException(status_code=400, detail="old_title and new_title are required")
+
+    if old_title == new_title:
+        return _get_category_records()
+
+    records = _get_category_records()
+    existing = next((record for record in records if record.get("title") == old_title), None)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    if any(record.get("title", "").strip().lower() == new_title.lower() and record.get("title") != old_title for record in records):
+        raise HTTPException(status_code=409, detail="A category with that title already exists")
+
+    updated_any_faq = False
+    for entry in FAQ:
+        if (entry.get("category") or "").strip() == old_title:
+            entry["category"] = new_title
+            updated_any_faq = True
+
+    entry = _find_category_entry(old_title)
+    if entry is None:
+        entry = _materialize_category_record(existing, int(existing.get("sort_order") or 0))
+
+    entry["title"] = new_title
+    entry["slug"] = _make_slug(new_title)
+    entry["description"] = existing.get("description") or entry.get("description") or ""
+    entry["text"] = _category_text(new_title, entry.get("description") or "")
+    entry["display_citation"] = f"SubmarineDocent FAQ Category — {new_title}"
+
+    if updated_any_faq:
+        _save_faq_corpus()
+    _normalize_category_sort_orders()
+    return _get_category_records()
+
+
+@app.delete("/admin/faq-categories")
+async def delete_faq_category(request: Request):
+    payload = await request.json()
+    title = (payload.get("title") or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Category title is required")
+
+    original_len = len(CATEGORIES)
+    CATEGORIES[:] = [entry for entry in CATEGORIES if (entry.get("title") or entry.get("name") or "").strip() != title]
+    found = len(CATEGORIES) < original_len
+
+    updated_any_faq = False
+    for entry in FAQ:
+        if (entry.get("category") or "").strip() == title:
+            entry["category"] = ""
+            updated_any_faq = True
+
+    if not found and not updated_any_faq:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    if updated_any_faq:
+        _save_faq_corpus()
+    _normalize_category_sort_orders()
+    return _get_category_records()
+
+
+@app.get("/api/glossary")
+def get_public_glossary():
+    entries = list(_load_glossary())
+    entries.sort(key=lambda entry: _glossary_sort_key(entry.get("term", "")))
+    return entries
+
+
+@app.get("/admin/glossary")
+def get_admin_glossary():
+    entries = list(_load_glossary())
+    entries.sort(key=lambda entry: _glossary_sort_key(entry.get("term", "")))
+    return entries
+
+
+@app.post("/admin/glossary")
+async def create_admin_glossary(request: Request):
+    payload = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    entries = _load_glossary()
+    new_entry = {
+        "id": _next_glossary_id(entries),
+        "term": "",
+        "definition": "",
+    }
+    _apply_glossary_payload(new_entry, payload)
+
+    with _glossary_write_lock:
+        _assert_unique_glossary_term(entries, new_entry["term"])
+        entries.append(new_entry)
+        entries.sort(key=lambda entry: _glossary_sort_key(entry.get("term", "")))
+        _save_glossary()
+
+    return {"status": "created", "entry": new_entry}
+
+
+@app.put("/admin/glossary/{entry_id}")
+async def update_admin_glossary(entry_id: int, request: Request):
+    payload = await request.json()
+    entries = _load_glossary()
+    target = next((entry for entry in entries if int(entry.get("id") or 0) == entry_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Glossary entry not found")
+
+    with _glossary_write_lock:
+        _apply_glossary_payload(target, payload)
+        _assert_unique_glossary_term(entries, target["term"], ignore_id=entry_id)
+        entries.sort(key=lambda entry: _glossary_sort_key(entry.get("term", "")))
+        _save_glossary()
+
+    return {"status": "updated", "entry": target}
+
+
+@app.delete("/admin/glossary/{entry_id}")
+def delete_admin_glossary(entry_id: int):
+    entries = _load_glossary()
+    target = next((entry for entry in entries if int(entry.get("id") or 0) == entry_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Glossary entry not found")
+
+    with _glossary_write_lock:
+        entries[:] = [entry for entry in entries if int(entry.get("id") or 0) != entry_id]
+        _save_glossary()
+
+    return {"status": "deleted", "entry_id": entry_id}
+
+
+@app.get("/admin/incidents")
+def get_admin_incidents():
+    incidents = list(_load_incidents())
+    incidents.sort(key=_incident_sort_key)
+    return incidents
+
+
+@app.post("/admin/incidents")
+async def create_admin_incident(request: Request):
+    payload = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    incidents = _load_incidents()
+    new_incident = {
+        "id": _next_incident_id(incidents),
+        "date": "",
+        "date_sort": "",
+        "submarine_name": "",
+        "hull_number": "",
+        "incident_type": "",
+        "description": "",
+        "casualties": "",
+        "status": "",
+        "era": "",
+        "notes": "",
+    }
+    _apply_incident_payload(new_incident, payload)
+
+    with _incidents_write_lock:
+        incidents.append(new_incident)
+        incidents.sort(key=_incident_sort_key)
+        _save_incidents()
+
+    return {"status": "created", "incident": new_incident}
+
+
+@app.put("/admin/incidents/{incident_id}")
+async def update_admin_incident(incident_id: int, request: Request):
+    payload = await request.json()
+    incidents = _load_incidents()
+    target = next((incident for incident in incidents if int(incident.get("id") or 0) == incident_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    with _incidents_write_lock:
+        _apply_incident_payload(target, payload)
+        incidents.sort(key=_incident_sort_key)
+        _save_incidents()
+
+    return {"status": "updated", "incident": target}
+
+
+@app.delete("/admin/incidents/{incident_id}")
+def delete_admin_incident(incident_id: int):
+    incidents = _load_incidents()
+    target = next((incident for incident in incidents if int(incident.get("id") or 0) == incident_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    with _incidents_write_lock:
+        incidents[:] = [incident for incident in incidents if int(incident.get("id") or 0) != incident_id]
+        _save_incidents()
+
+    return {"status": "deleted", "incident_id": incident_id}
+
+
+@app.get("/admin/operations-guide")
+def get_admin_operations_guide():
+    entries = list(OPERATIONS_GUIDE)
+    entries.sort(key=_operations_guide_sort_key)
+    return entries
+
+
+@app.post("/admin/operations-guide")
+async def create_admin_operations_guide_entry(request: Request):
+    payload = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    new_entry = {
+        "chunk_id": _next_operations_guide_chunk_id(OPERATIONS_GUIDE),
+        "doc_type": "dieselsubs_operations_guide",
+        "section": "custom",
+        "title": "",
+        "text": "",
+        "display_citation": "",
+        "source_url": "/web/faqs.html?view=operations",
+    }
+    _apply_operations_guide_payload(new_entry, payload)
+
+    with _operations_guide_write_lock:
+        OPERATIONS_GUIDE.append(new_entry)
+        OPERATIONS_GUIDE.sort(key=_operations_guide_sort_key)
+        _save_operations_guide()
+
+    return {"status": "created", "entry": new_entry}
+
+
+@app.put("/admin/operations-guide/{chunk_id}")
+async def update_admin_operations_guide_entry(chunk_id: str, request: Request):
+    payload = await request.json()
+    target = next((entry for entry in OPERATIONS_GUIDE if str(entry.get("chunk_id") or "") == chunk_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Operations guide entry not found")
+
+    with _operations_guide_write_lock:
+        _apply_operations_guide_payload(target, payload)
+        OPERATIONS_GUIDE.sort(key=_operations_guide_sort_key)
+        _save_operations_guide()
+
+    return {"status": "updated", "entry": target}
+
+
+@app.delete("/admin/operations-guide/{chunk_id}")
+def delete_admin_operations_guide_entry(chunk_id: str):
+    target = next((entry for entry in OPERATIONS_GUIDE if str(entry.get("chunk_id") or "") == chunk_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Operations guide entry not found")
+
+    with _operations_guide_write_lock:
+        OPERATIONS_GUIDE[:] = [entry for entry in OPERATIONS_GUIDE if str(entry.get("chunk_id") or "") != chunk_id]
+        _save_operations_guide()
+
+    return {"status": "deleted", "chunk_id": chunk_id}
+
+
 # ── Eternal Patrol ────────────────────────────────────────────────────────────
 
 _ETERNAL_PATROL_PATH = os.path.join(CORPORA_DIR, "eternal_patrol.jsonl")
 _eternal_patrol_cache: list | None = None
+
+
+def _boat_number_sort_key(value: str) -> tuple[int, str]:
+    raw = (value or "").strip().upper()
+    match = re.search(r"(\d+)", raw)
+    if match:
+        return (int(match.group(1)), raw)
+    return (10**9, raw)
+
+
+def _slugify_filename_part(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value or "")
+    ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", ascii_value).strip("_")
+    return slug or "boat"
+
+
+def _safe_image_extension(filename: str, content_type: str | None) -> str:
+    extension = os.path.splitext(filename or "")[1].lower()
+    allowed = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+    if extension in allowed:
+        return ".jpg" if extension == ".jpeg" else extension
+    by_content_type = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+        "image/gif": ".gif",
+    }
+    guessed = by_content_type.get((content_type or "").lower())
+    if guessed:
+        return guessed
+    raise HTTPException(status_code=400, detail="Unsupported image type")
+
+
+def _build_eternal_patrol_image_name(boat: dict[str, Any], field_name: str, extension: str) -> str:
+    designation = _slugify_filename_part(boat.get("designation") or boat.get("boat_number") or boat.get("name") or "boat")
+    suffix_map = {
+        "photo_boat": "boat",
+        "photo_captain": "captain",
+        "image1": "extra1",
+        "image2": "extra2",
+        "image3": "extra3",
+        "image4": "extra4",
+    }
+    suffix = suffix_map.get(field_name)
+    if not suffix:
+        raise HTTPException(status_code=400, detail="Unsupported image field")
+    return f"{designation}_{suffix}{extension}"
+
+
+def _next_eternal_patrol_id(boats: list[dict[str, Any]]) -> int:
+    max_id = 0
+    for boat in boats:
+        try:
+            max_id = max(max_id, int(boat.get("id") or 0))
+        except (TypeError, ValueError):
+            continue
+    return max_id + 1
+
+
+def _derive_eternal_patrol_era(boat: dict[str, Any]) -> str:
+    raw_sort = str(boat.get("date_lost_sort") or "").strip()
+    raw_date = str(boat.get("date_lost") or "").strip()
+    year_match = re.search(r"(\d{4})", raw_sort) or re.search(r"(\d{4})", raw_date)
+    if not year_match:
+        return str(boat.get("era") or "unknown").strip() or "unknown"
+
+    year = int(year_match.group(1))
+    if year < 1941:
+        return "pre-wwii"
+    if year <= 1945:
+        return "wwii"
+    return "post-wwii"
+
+
+def _apply_eternal_patrol_payload(target: dict[str, Any], payload: dict[str, Any]) -> None:
+    allowed_fields = {
+        "boat_number",
+        "name",
+        "designation",
+        "date_lost",
+        "date_lost_sort",
+        "fatalities_num",
+        "fatalities_text",
+        "last_captain",
+        "location",
+        "cause",
+        "construction",
+        "loss_narrative",
+        "photo_boat",
+        "photo_captain",
+        "image1",
+        "image1_subtitle",
+        "image2",
+        "image2_subtitle",
+        "image3",
+        "image3_subtitle",
+        "image4",
+        "image4_subtitle",
+    }
+
+    for field in allowed_fields:
+        if field not in payload:
+            continue
+        value = payload.get(field)
+        if field == "fatalities_num":
+            if value in (None, ""):
+                target[field] = None
+            else:
+                try:
+                    target[field] = int(value)
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail="fatalities_num must be an integer")
+        else:
+            target[field] = (value or "").strip() if isinstance(value, str) else value
+
+    target["era"] = _derive_eternal_patrol_era(target)
+
+
+def _save_eternal_patrol() -> None:
+    boats = _load_eternal_patrol()
+    tmp = _ETERNAL_PATROL_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        for entry in boats:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    os.replace(tmp, _ETERNAL_PATROL_PATH)
 
 def _load_eternal_patrol() -> list:
     global _eternal_patrol_cache
@@ -1862,7 +3015,9 @@ def _load_eternal_patrol() -> list:
                 line = line.strip()
                 if line:
                     try:
-                        boats.append(json.loads(line))
+                        boat = json.loads(line)
+                        boat["era"] = _derive_eternal_patrol_era(boat)
+                        boats.append(boat)
                     except json.JSONDecodeError:
                         pass
     boats.sort(key=lambda b: b.get("date_lost", ""))
@@ -1874,6 +3029,119 @@ def _load_eternal_patrol() -> list:
 def eternal_patrol():
     """Return all submarines on eternal patrol."""
     return _load_eternal_patrol()
+
+
+@app.get("/admin/eternal-patrol")
+def get_admin_eternal_patrol():
+    boats = list(_load_eternal_patrol())
+    boats.sort(key=lambda boat: _boat_number_sort_key(boat.get("boat_number", "")))
+    return boats
+
+
+@app.post("/admin/eternal-patrol")
+async def create_admin_eternal_patrol(request: Request):
+    payload = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    if not isinstance(payload, dict):
+        payload = {}
+    boats = _load_eternal_patrol()
+    new_boat = {
+        "id": _next_eternal_patrol_id(boats),
+        "boat_number": "",
+        "name": "",
+        "designation": "",
+        "date_lost": "",
+        "date_lost_sort": "",
+        "fatalities_num": None,
+        "fatalities_text": "",
+        "last_captain": "",
+        "location": "",
+        "cause": "",
+        "construction": "",
+        "loss_narrative": "",
+        "photo_boat": None,
+        "photo_captain": None,
+        "era": "unknown",
+        "image1": None,
+        "image1_subtitle": None,
+        "image2": None,
+        "image2_subtitle": None,
+        "image3": None,
+        "image3_subtitle": None,
+        "image4": None,
+        "image4_subtitle": None,
+    }
+    _apply_eternal_patrol_payload(new_boat, payload)
+
+    with _eternal_patrol_write_lock:
+        boats.append(new_boat)
+        _save_eternal_patrol()
+
+    return {"status": "created", "boat": new_boat}
+
+
+@app.put("/admin/eternal-patrol/{boat_id}")
+async def update_admin_eternal_patrol(boat_id: int, request: Request):
+    payload = await request.json()
+    boats = _load_eternal_patrol()
+    target = next((boat for boat in boats if int(boat.get("id") or 0) == boat_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Boat not found")
+
+    with _eternal_patrol_write_lock:
+        _apply_eternal_patrol_payload(target, payload)
+        _save_eternal_patrol()
+
+    return {"status": "updated", "boat": target}
+
+
+@app.delete("/admin/eternal-patrol/{boat_id}")
+def delete_admin_eternal_patrol(boat_id: int):
+    boats = _load_eternal_patrol()
+    target = next((boat for boat in boats if int(boat.get("id") or 0) == boat_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Boat not found")
+
+    with _eternal_patrol_write_lock:
+        boats[:] = [boat for boat in boats if int(boat.get("id") or 0) != boat_id]
+        _save_eternal_patrol()
+
+    return {"status": "deleted", "boat_id": boat_id}
+
+
+@app.post("/admin/eternal-patrol/{boat_id}/upload-image")
+async def upload_admin_eternal_patrol_image(
+    boat_id: int,
+    field_name: str = Form(...),
+    image: UploadFile = File(...),
+):
+    allowed_fields = {"photo_boat", "photo_captain", "image1", "image2", "image3", "image4"}
+    if field_name not in allowed_fields:
+        raise HTTPException(status_code=400, detail="Unsupported image field")
+    if not image.filename:
+        raise HTTPException(status_code=400, detail="Image filename is required")
+
+    boats = _load_eternal_patrol()
+    target = next((boat for boat in boats if int(boat.get("id") or 0) == boat_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Boat not found")
+
+    extension = _safe_image_extension(image.filename, image.content_type)
+    os.makedirs(ETERNAL_PATROL_IMAGE_DIR, exist_ok=True)
+    filename = _build_eternal_patrol_image_name(target, field_name, extension)
+    destination = os.path.join(ETERNAL_PATROL_IMAGE_DIR, filename)
+
+    try:
+        with open(destination, "wb") as output_file:
+            shutil.copyfileobj(image.file, output_file)
+    finally:
+        await image.close()
+
+    relative_path = f"images/extracted/{filename}"
+    with _eternal_patrol_write_lock:
+        target[field_name] = relative_path
+        _save_eternal_patrol()
+
+    return {"status": "uploaded", "field_name": field_name, "path": relative_path, "boat": target}
 
 
 @app.get("/api/faqs")
@@ -1910,6 +3178,57 @@ def public_faqs():
     ordered_categories = [entry["title"] for entry in _get_category_records() if entry.get("title") in groups]
     unordered_categories = sorted(cat for cat in groups.keys() if cat not in set(ordered_categories))
     return [{"category": cat, "faqs": groups[cat]} for cat in [*ordered_categories, *unordered_categories]]
+
+
+@app.get("/api/operations-guide")
+def public_operations_guide():
+    """Return the structured operations guide corpus used to build exports and derived experiences."""
+    return list(OPERATIONS_GUIDE)
+
+
+@app.get("/admin/operations-guide-html")
+def get_operations_guide_html():
+    """Return the current rendered HTML for the operations guide."""
+    if not os.path.exists(OPERATIONS_GUIDE_SINGLE_HTML_PATH):
+        return {"html": ""}
+    with open(OPERATIONS_GUIDE_SINGLE_HTML_PATH, "r", encoding="utf-8") as f:
+        line = f.read().strip()
+    if not line:
+        return {"html": ""}
+    try:
+        record = json.loads(line)
+        raw = record.get("text", "")
+        # Strip the outer wrapper div added by the builder
+        raw = re.sub(r'^<div[^>]*id=["\']operations-view["\'][^>]*>', '', raw).rstrip()
+        if raw.endswith("</div>"):
+            raw = raw[:-6]
+        return {"html": raw.strip()}
+    except Exception:
+        return {"html": ""}
+
+
+@app.put("/admin/operations-guide-html")
+async def update_operations_guide_html(request: Request):
+    """Save edited HTML directly to the single-record file."""
+    body = await request.json()
+    body_html = (body.get("html") or "").strip()
+    record = {
+        "chunk_id": "ops_html_001",
+        "doc_type": "dieselsubs_operations_guide_html",
+        "source": "Submarine Operations Guide",
+        "title": "Submarine Operations",
+        "slug": "submarine-operations",
+        "category": "Operations Guide",
+        "text": f'<div id="operations-view">{body_html}</div>',
+        "display_citation": "Operations Guide — Submarine Operations",
+        "source_url": "/web/faqs.html?view=operations",
+    }
+    tmp = OPERATIONS_GUIDE_SINGLE_HTML_PATH + ".tmp"
+    with _operations_guide_write_lock:
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        os.replace(tmp, OPERATIONS_GUIDE_SINGLE_HTML_PATH)
+    return {"status": "saved"}
 
 
 @app.post("/admin/faq")
@@ -2049,6 +3368,196 @@ async def import_sql(sql_file: UploadFile = File(...)):
 
 
 # ------------------------------------------------------------
+# Medal of Honor recipients
+# ------------------------------------------------------------
+
+_MOH_PATH = os.path.join(CORPORA_DIR, "moh_recipients.jsonl")
+_moh_cache: list | None = None
+_moh_write_lock = threading.Lock()
+
+
+def _load_moh() -> list:
+    global _moh_cache
+    if _moh_cache is not None:
+        return _moh_cache
+    entries = []
+    if os.path.exists(_MOH_PATH):
+        with open(_MOH_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        entries.append(json.loads(line))
+                    except Exception:
+                        pass
+    _moh_cache = entries
+    return entries
+
+
+def _save_moh() -> None:
+    entries = _load_moh()
+    tmp = _MOH_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        for entry in entries:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    os.replace(tmp, _MOH_PATH)
+
+
+def _next_moh_id(entries: list) -> int:
+    existing = [int(e.get("id") or 0) for e in entries]
+    return max(existing) + 1 if existing else 1
+
+
+@app.get("/api/moh-recipients")
+def get_moh_recipients():
+    return _load_moh()
+
+
+@app.post("/admin/moh-recipients")
+async def create_moh_recipient(request: Request):
+    body = await request.json()
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+    entries = _load_moh()
+    new_entry = {
+        "id": _next_moh_id(entries),
+        "name": name,
+        "rank_unit": (body.get("rank_unit") or "").strip(),
+        "date_awarded": (body.get("date_awarded") or "").strip(),
+        "posthumous": bool(body.get("posthumous")),
+        "citation_summary": (body.get("citation_summary") or "").strip(),
+    }
+    with _moh_write_lock:
+        entries.append(new_entry)
+        _save_moh()
+    return {"status": "created", "entry": new_entry}
+
+
+@app.put("/admin/moh-recipients/{entry_id}")
+async def update_moh_recipient(entry_id: int, request: Request):
+    entries = _load_moh()
+    target = next((e for e in entries if int(e.get("id") or 0) == entry_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Recipient not found")
+    body = await request.json()
+    with _moh_write_lock:
+        for field in ("name", "rank_unit", "date_awarded", "citation_summary"):
+            if field in body:
+                target[field] = (body[field] or "").strip()
+        if "posthumous" in body:
+            target["posthumous"] = bool(body["posthumous"])
+        _save_moh()
+    return {"status": "updated", "entry": target}
+
+
+@app.delete("/admin/moh-recipients/{entry_id}")
+def delete_moh_recipient(entry_id: int):
+    entries = _load_moh()
+    original_len = len(entries)
+    entries[:] = [e for e in entries if int(e.get("id") or 0) != entry_id]
+    if len(entries) == original_len:
+        raise HTTPException(status_code=404, detail="Recipient not found")
+    with _moh_write_lock:
+        _save_moh()
+    return {"status": "deleted", "entry_id": entry_id}
+
+
+# ------------------------------------------------------------
+# Museums
+# ------------------------------------------------------------
+
+_MUSEUMS_PATH = os.path.join(CORPORA_DIR, "museums.jsonl")
+_museums_cache: list | None = None
+_museums_write_lock = threading.Lock()
+
+
+def _load_museums() -> list:
+    global _museums_cache
+    if _museums_cache is not None:
+        return _museums_cache
+    museums = []
+    if os.path.exists(_MUSEUMS_PATH):
+        with open(_MUSEUMS_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        museums.append(json.loads(line))
+                    except Exception:
+                        pass
+    _museums_cache = museums
+    return museums
+
+
+def _save_museums() -> None:
+    museums = _load_museums()
+    tmp = _MUSEUMS_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        for entry in museums:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    os.replace(tmp, _MUSEUMS_PATH)
+
+
+def _next_museum_id(museums: list) -> int:
+    existing = [int(m.get("id") or 0) for m in museums]
+    return max(existing) + 1 if existing else 1
+
+
+@app.get("/api/museums")
+def get_museums():
+    return _load_museums()
+
+
+@app.post("/admin/museums")
+async def create_museum(request: Request):
+    body = await request.json()
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+    museums = _load_museums()
+    new_entry = {
+        "id": _next_museum_id(museums),
+        "name": name,
+        "designation": (body.get("designation") or "").strip(),
+        "location": (body.get("location") or "").strip(),
+        "url": (body.get("url") or "").strip(),
+        "description": (body.get("description") or "").strip(),
+    }
+    with _museums_write_lock:
+        museums.append(new_entry)
+        _save_museums()
+    return {"status": "created", "museum": new_entry}
+
+
+@app.put("/admin/museums/{museum_id}")
+async def update_museum(museum_id: int, request: Request):
+    museums = _load_museums()
+    target = next((m for m in museums if int(m.get("id") or 0) == museum_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Museum not found")
+    body = await request.json()
+    with _museums_write_lock:
+        for field in ("name", "designation", "location", "url", "description"):
+            if field in body:
+                target[field] = (body[field] or "").strip()
+        _save_museums()
+    return {"status": "updated", "museum": target}
+
+
+@app.delete("/admin/museums/{museum_id}")
+def delete_museum(museum_id: int):
+    museums = _load_museums()
+    original_len = len(museums)
+    museums[:] = [m for m in museums if int(m.get("id") or 0) != museum_id]
+    if len(museums) == original_len:
+        raise HTTPException(status_code=404, detail="Museum not found")
+    with _museums_write_lock:
+        _save_museums()
+    return {"status": "deleted", "museum_id": museum_id}
+
+
+# ------------------------------------------------------------
 # Feedback endpoint
 # ------------------------------------------------------------
 
@@ -2089,6 +3598,147 @@ def list_feedback():
                     pass
     entries.reverse()
     return entries
+
+
+# ------------------------------------------------------------
+# Admin: Whisper domain vocabulary prompt
+# ------------------------------------------------------------
+
+@app.get("/admin/whisper-prompt")
+def get_whisper_prompt():
+    return {"prompt": _WHISPER_PROMPT}
+
+
+@app.put("/admin/whisper-prompt")
+async def update_whisper_prompt(request: Request):
+    global _WHISPER_PROMPT
+    payload = await request.json()
+    prompt = (payload.get("prompt") or "").strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="prompt must not be empty")
+    with _whisper_prompt_lock:
+        with open(_WHISPER_PROMPT_PATH, "w", encoding="utf-8") as f:
+            f.write(prompt)
+        _WHISPER_PROMPT = prompt
+    return {"status": "updated"}
+
+
+# ------------------------------------------------------------
+# Admin: War Patrol HTML pages
+# ------------------------------------------------------------
+
+_PATROL_ORDINALS = ["First", "Second", "Third", "Fourth", "Fifth"]
+_patrol_write_lock = threading.Lock()
+_PATROL_BODY_START = "<!-- PATROL-BODY-START -->"
+_PATROL_BODY_END = "<!-- PATROL-BODY-END -->"
+
+
+def _patrol_page_path(n: int) -> str:
+    return os.path.join(WEB_DIR, f"pampanito-patrol-{n}.html")
+
+
+def _patrol_page_html(n: int, body_html: str) -> str:
+    ordinal = _PATROL_ORDINALS[n - 1]
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>USS Pampanito \u2014 {ordinal} Patrol</title>
+  <link rel="stylesheet" href="/web/site-header.css">
+  <style>
+    body {{
+      margin: 0;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+    }}
+    .patrol-content {{
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 40px 24px 56px;
+      line-height: 1.7;
+    }}
+    .patrol-content h1, .patrol-content h2, .patrol-content h3 {{
+      font-weight: 700;
+      line-height: 1.25;
+    }}
+    .patrol-content h1 {{ font-size: 28px; margin: 1.5em 0 0.5em; }}
+    .patrol-content h2 {{ font-size: 22px; margin: 1.4em 0 0.4em; }}
+    .patrol-content h3 {{ font-size: 18px; margin: 1.2em 0 0.4em; }}
+    .patrol-content p {{ margin: 0 0 1em; }}
+    .patrol-content ul, .patrol-content ol {{ padding-left: 1.5em; margin: 0 0 1em; }}
+    .patrol-content blockquote {{
+      border-left: 3px solid #30363d;
+      margin: 0 0 1em;
+      padding-left: 1em;
+      color: #8b949e;
+    }}
+    .patrol-content table {{
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1em 0;
+      font-size: 14px;
+    }}
+    .patrol-content th, .patrol-content td {{
+      border: 1px solid #30363d;
+      padding: 8px 12px;
+      text-align: left;
+    }}
+    .patrol-content th {{ background: #161b22; font-weight: 600; }}
+    .patrol-content a {{ color: #58a6ff; }}
+  </style>
+</head>
+<body>
+  <article class="patrol-content">
+{_PATROL_BODY_START}
+{body_html}
+{_PATROL_BODY_END}
+  </article>
+  <script src="/web/site-footer.js"></script>
+  <script src="/web/site-header.js"></script>
+  <script>
+    SiteFooter.render();
+    SiteHeader.render({{
+      title: '{ordinal} Patrol',
+    }});
+  </script>
+</body>
+</html>
+"""
+
+
+@app.get("/admin/patrol/{n}")
+def get_patrol_content(n: int):
+    if not 1 <= n <= 5:
+        raise HTTPException(status_code=404, detail="Patrol number must be 1-5")
+    path = _patrol_page_path(n)
+    if not os.path.exists(path):
+        return {"exists": False, "html": ""}
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+    start = content.find(_PATROL_BODY_START)
+    end = content.find(_PATROL_BODY_END)
+    if start == -1 or end == -1:
+        return {"exists": True, "html": content}
+    body = content[start + len(_PATROL_BODY_START):end].strip()
+    return {"exists": True, "html": body}
+
+
+@app.put("/admin/patrol/{n}")
+async def save_patrol_content(n: int, request: Request):
+    if not 1 <= n <= 5:
+        raise HTTPException(status_code=404, detail="Patrol number must be 1-5")
+    body = await request.json()
+    body_html = (body.get("html") or "").strip()
+    page = _patrol_page_html(n, body_html)
+    path = _patrol_page_path(n)
+    tmp = path + ".tmp"
+    with _patrol_write_lock:
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(page)
+        os.replace(tmp, path)
+    return {"status": "saved", "patrol": n}
 
 
 # ------------------------------------------------------------

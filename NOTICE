@@ -1,0 +1,16 @@
+# Notice
+
+This repository contains both software and project-specific content.
+
+Software source code is licensed under the terms in [LICENSE](LICENSE).
+
+Historical corpora, editorial text, images, audio, video, trademarks, and other project-specific or third-party source materials may be subject to separate rights and are not automatically granted for reuse, redistribution, or relicensing.
+
+For redistribution-safe demos and open-source publication workflows, use the sample dataset under `sample_data/corpora/` or provide your own content directory via `CONTENT_ROOT`.
+
+Before publishing or redistributing the full repository contents, confirm the provenance and redistribution rights for:
+
+- bundled corpora in `corpora/`
+- media assets in `web/`
+- museum-specific branding and trademarks
+- imported or derived third-party source material

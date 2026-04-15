@@ -47,6 +47,23 @@
       font-size: 12px;
     }
 
+    header a.back-link {
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+      color: #e6edf3;
+      font-size: 14px;
+      font-weight: 700;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      min-height: 42px;
+      padding: 0 14px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    header a.back-link:hover { border-color: #58a6ff; }
+
     #btn-help {
       margin-left: auto;
       background: #21262d;
@@ -660,10 +677,8 @@
   <div id="loading">Loading FAQ corpus&hellip;</div>
 
   <header>
-    <div>
-      <h1>FAQ Editor</h1>
-    </div>
-    <button id="btn-help">? Help</button>
+    <a class="back-link" href="/web/edit.html">&#8592; Editor Hub</a>
+    <button id="btn-help">Help</button>
   </header>
 
   <!-- Help modal -->

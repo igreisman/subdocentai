@@ -1,0 +1,38 @@
+INFO:     Started server process [99901]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+✅ Loaded 16 records from incidents.jsonl
+Loading corpora...
+Loading file: /Users/irving/Documents/submarinedocent/corpora/pampanito_tour_corpus.jsonl
+✅ Loaded 213 records from pampanito_tour_corpus.jsonl
+Loading file: /Users/irving/Documents/submarinedocent/corpora/dieselsubs_faq_corpus.jsonl
+✅ Loaded 455 records from dieselsubs_faq_corpus.jsonl
+Loading file: /Users/irving/Documents/submarinedocent/corpora/dieselsubs_shorts_corpus.jsonl
+✅ Loaded 31 records from dieselsubs_shorts_corpus.jsonl
+Loading file: /Users/irving/Documents/submarinedocent/corpora/dieselsubs_faq_categories.jsonl
+✅ Loaded 10 records from dieselsubs_faq_categories.jsonl
+Loaded: 213 tour, 455 faq, 31 shorts chunks, 10 categories
+INFO:     127.0.0.1:64916 - "GET /web/faqs.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65003 - "GET /web/faqs.html HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:65003 - "GET /api/faqs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65004 - "GET /api/faq-categories HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65006 - "GET /web/glossary-tooltips.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65006 - "GET /api/glossary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65299 - "PUT /admin/glossary/101 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65299 - "GET /admin/glossary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65307 - "GET /web/faqs.html HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:65308 - "GET /api/faq-categories HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65307 - "GET /api/faqs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65310 - "GET /web/glossary-tooltips.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:65307 - "GET /api/glossary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65315 - "GET /web/edit.html HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:65315 - "GET /web/edit_incidents.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65453 - "GET /web/edit_incidents.html HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:49169 - "GET /admin/incidents HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49206 - "GET /web/edit_incidents.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49206 - "GET /admin/incidents HTTP/1.1" 404 Not Found
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [99901]

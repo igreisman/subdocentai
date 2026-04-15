@@ -6,6 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Edit Categories</title>
   <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -17,6 +23,15 @@
       max-width: 860px;
       margin: 0 auto;
       padding: 40px 24px 56px;
+    }
+
+    .topbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
     }
 
     .toplink,
@@ -34,13 +49,35 @@
     .toplink {
       border: 1px solid #30363d;
       color: #e6edf3;
-      margin-bottom: 20px;
+    }
+
+    #btn-help {
+      margin-left: auto;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 13px;
+      min-height: 42px;
+      padding: 0 14px;
+      font-weight: 700;
+    }
+
+    #btn-help:hover {
+      background: #30363d;
+      color: #c9d1d9;
     }
 
     .btn {
       background: #58a6ff;
       color: #08111b;
-      margin-right: 10px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: #79b8ff;
     }
 
     .panel {
@@ -48,6 +85,54 @@
       border: 1px solid #30363d;
       border-radius: 18px;
       padding: 24px;
+    }
+
+    .panel+.panel {
+      margin-top: 18px;
+    }
+
+    #help-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 300;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #help-backdrop.open {
+      display: flex;
+    }
+
+    #help-modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 18px;
+      max-width: 720px;
+      width: min(100%, 720px);
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 28px 32px;
+      position: relative;
+    }
+
+    #help-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: none;
+      border: none;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 24px;
+      line-height: 1;
+      padding: 4px 8px;
+    }
+
+    #help-close:hover {
+      color: #e6edf3;
     }
 
     h1 {
@@ -60,26 +145,1082 @@
       line-height: 1.7;
     }
 
+    #help-modal p,
+    #help-modal li {
+      color: #8b949e;
+      line-height: 1.7;
+    }
+
+    .lede {
+      margin: 0 0 18px;
+      max-width: 58ch;
+    }
+
+    .hint-list {
+      margin: 14px 0 0;
+      padding-left: 18px;
+      color: #8b949e;
+      line-height: 1.7;
+    }
+
+    .hint-list li+li {
+      margin-top: 6px;
+    }
+
+    .summary {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .pill {
+      border: 1px solid #30363d;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      color: #c9d1d9;
+      background: #0d1117;
+    }
+
+    #status {
+      display: none;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 14px;
+      margin-bottom: 18px;
+    }
+
+    #status.show {
+      display: block;
+    }
+
+    #status.info {
+      background: #0f2744;
+      border: 1px solid #245487;
+      color: #cfe8ff;
+    }
+
+    #status.success {
+      background: #0f2d1f;
+      border: 1px solid #2a6b46;
+      color: #d3f4df;
+    }
+
+    #status.error {
+      background: #3a1518;
+      border: 1px solid #7d2d33;
+      color: #ffd7d9;
+    }
+
+    .add-form {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+    }
+
+    .text-input {
+      flex: 1 1 320px;
+      min-width: 220px;
+      min-height: 44px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: #e6edf3;
+      font-size: 15px;
+    }
+
+    .text-input:focus {
+      outline: none;
+      border-color: #58a6ff;
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+    }
+
+    .muted {
+      font-size: 13px;
+      color: #8b949e;
+      margin-top: 12px;
+    }
+
+    #categories-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .category-card {
+      border: 1px solid #30363d;
+      border-radius: 16px;
+      background: #0d1117;
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+      cursor: grab;
+      transition: border-color 0.15s, background 0.15s, transform 0.15s;
+    }
+
+    .category-card.dragging {
+      opacity: 0.55;
+      border-color: #58a6ff;
+      background: #111927;
+    }
+
+    .category-card.drag-target {
+      border-color: #58a6ff;
+      box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.16);
+    }
+
+    .faq-count {
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: #111927;
+      border: 1px solid #243142;
+      color: #9ecbff;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .category-controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .action-btn {
+      min-height: 40px;
+      padding: 0 12px;
+      border-radius: 10px;
+      border: 1px solid #30363d;
+      background: #21262d;
+      color: #e6edf3;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .action-btn:hover:not(:disabled) {
+      background: #30363d;
+    }
+
+    .action-btn:disabled,
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    .action-btn.danger {
+      background: #35161a;
+      border-color: #6c2f37;
+      color: #ffccd2;
+    }
+
+    .action-btn.danger:hover:not(:disabled) {
+      background: #482026;
+    }
+
+    .empty-state {
+      border: 1px dashed #30363d;
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      color: #8b949e;
+      background: #0d1117;
+    }
+
+    .loading {
+      color: #8b949e;
+      text-align: center;
+      padding: 18px 0;
+    }
+
+    @media (max-width: 720px) {
+      h1 {
+        font-size: 30px;
+      }
+
+      .category-controls {
+        grid-template-columns: 1fr;
+      }
+
+      .action-row {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 520px) {
+      main {
+        padding: 28px 16px 48px;
+      }
+
+      .panel {
+        padding: 18px;
+      }
+
+      .section-head {
+        align-items: stretch;
+      }
+    }
+
     code {
       color: #e3b341;
+    }
+
+    /* Add FAQs modal */
+    #add-faqs-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 400;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 24px;
+      overflow-y: auto;
+    }
+
+    #add-faqs-backdrop.open {
+      display: flex;
+    }
+
+    #add-faqs-modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 18px;
+      width: min(100%, 740px);
+      padding: 28px 32px 32px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    #add-faqs-modal h2 {
+      margin: 0 0 4px;
+      font-size: 24px;
+    }
+
+    #add-faqs-modal .modal-category-label {
+      font-size: 13px;
+      color: #8b949e;
+      margin-bottom: 22px;
+    }
+
+    #add-faqs-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: none;
+      border: none;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 24px;
+      line-height: 1;
+      padding: 4px 8px;
+    }
+
+    #add-faqs-close:hover { color: #e6edf3; }
+
+    .modal-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid #30363d;
+      margin-bottom: 22px;
+    }
+
+    .modal-tab {
+      padding: 10px 18px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      margin-bottom: -1px;
+    }
+
+    .modal-tab.active {
+      color: #58a6ff;
+      border-bottom-color: #58a6ff;
+    }
+
+    .modal-panel { display: none; }
+    .modal-panel.active { display: block; }
+
+    .field-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #c9d1d9;
+      margin-bottom: 6px;
+    }
+
+    .modal-input, .modal-textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: #e6edf3;
+      font-size: 14px;
+      font-family: inherit;
+      margin-bottom: 14px;
+    }
+
+    .modal-input:focus, .modal-textarea:focus {
+      outline: none;
+      border-color: #58a6ff;
+      box-shadow: 0 0 0 3px rgba(88,166,255,0.15);
+    }
+
+    .modal-textarea {
+      min-height: 120px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+
+    .modal-status {
+      font-size: 13px;
+      color: #8b949e;
+      flex: 1;
+    }
+
+    .modal-status.ok { color: #3fb950; }
+    .modal-status.err { color: #f85149; }
+
+    .upload-zone {
+      border: 2px dashed #30363d;
+      border-radius: 12px;
+      padding: 32px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      margin-bottom: 16px;
+    }
+
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: #58a6ff;
+      background: rgba(88,166,255,0.04);
+    }
+
+    .upload-zone p {
+      margin: 8px 0 0;
+      font-size: 13px;
+      color: #8b949e;
+    }
+
+    #bulk-preview {
+      display: none;
+      margin-bottom: 16px;
+    }
+
+    .bulk-faq-item {
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 10px;
+      background: #0d1117;
+    }
+
+    .bulk-faq-item .faq-q {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 6px;
+      color: #e6edf3;
+    }
+
+    .bulk-faq-item .faq-a {
+      font-size: 13px;
+      color: #8b949e;
+      line-height: 1.6;
+      max-height: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+    }
+
+    .bulk-meta {
+      font-size: 13px;
+      color: #8b949e;
+      margin-bottom: 14px;
+    }
+
+    .action-btn.add-faqs-btn {
+      background: #0f2744;
+      border-color: #245487;
+      color: #9ecbff;
+    }
+
+    .action-btn.add-faqs-btn:hover:not(:disabled) {
+      background: #1a3d6b;
     }
   </style>
 </head>
 
 <body>
   <main>
-    <a class="toplink" href="/web/edit.html">Back to Editor Hub</a>
+    <div class="topbar">
+      <a class="toplink" href="/web/edit.html">&#8592; Editor Hub</a>
+      <button id="btn-help" type="button">Help</button>
+    </div>
+
     <div class="panel">
-      <h1>Categories</h1>
-      <p>Category records are currently stored in <code>corpora/dieselsubs_faq_categories.jsonl</code> and served by
-        <code>/api/faq-categories</code>. Category assignment for individual FAQs is already managed through the FAQ
-        editor.</p>
-      <p>This landing page gives you a stable destination for category editing workflows while the dedicated category
-        editor is expanded.</p>
-      <a class="btn" href="/web/faq_editor.html">Open FAQ Editor</a>
-      <a class="btn" href="/web/faqs.html">Open FAQ Dashboard</a>
+      <div id="status" aria-live="polite"></div>
+      <div class="section-head">
+        <h2>All Categories</h2>
+        <button id="add-category-btn" class="btn" type="button">Add Category</button>
+      </div>
+      <div class="add-form">
+        <input id="new-category-title" class="text-input" type="text" placeholder="New category title"
+          autocomplete="off">
+      </div>
+      <div id="categories-list" class="loading">Loading categories…</div>
     </div>
   </main>
+
+  <div id="help-backdrop" aria-hidden="true">
+    <div id="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <button id="help-close" type="button" aria-label="Close help">&times;</button>
+      <h1 id="help-title">Categories</h1>
+      <p class="lede">Manage the full FAQ category list here. You can rename categories, move them up or down to
+        change display order, add new ones, delete categories, and add FAQs directly to any category.</p>
+      <ul class="hint-list">
+        <li>Drag categories up and down to change the order used on the public FAQ page.</li>
+        <li>Renaming a category also updates every FAQ currently assigned to it.</li>
+        <li>Deleting a category clears that category assignment from matching FAQs.</li>
+        <li><strong>Add FAQs</strong> opens a panel where you can add a single FAQ (type a question and answer) or bulk-import multiple FAQs from a <code>.docx</code> file. In the Word document, write each question in <strong>bold</strong> — the paragraphs that follow it (until the next bold line) become the answer.</li>
+      </ul>
+      <div class="summary">
+        <div class="pill"><span id="help-category-total">0</span> categories</div>
+        <div class="pill"><span id="help-faq-total">0</span> FAQs tracked</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add FAQs modal -->
+  <div id="add-faqs-backdrop" aria-hidden="true">
+    <div id="add-faqs-modal" role="dialog" aria-modal="true" aria-labelledby="add-faqs-title">
+      <button id="add-faqs-close" type="button" aria-label="Close">&times;</button>
+      <h2 id="add-faqs-title">Add FAQs</h2>
+      <div class="modal-category-label">Category: <strong id="modal-category-name"></strong></div>
+
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="single">Single FAQ</button>
+        <button class="modal-tab" data-tab="bulk">Bulk from .docx</button>
+      </div>
+
+      <!-- Single FAQ panel -->
+      <div class="modal-panel active" id="panel-single">
+        <label class="field-label" for="single-question">Question</label>
+        <input class="modal-input" id="single-question" type="text" placeholder="Enter the question…" autocomplete="off">
+        <label class="field-label" for="single-answer">Answer</label>
+        <textarea class="modal-textarea" id="single-answer" placeholder="Enter the answer…" style="min-height:150px"></textarea>
+        <div class="modal-footer">
+          <button class="btn" id="single-save-btn" type="button">Save FAQ</button>
+          <span class="modal-status" id="single-status"></span>
+        </div>
+      </div>
+
+      <!-- Bulk .docx panel -->
+      <div class="modal-panel" id="panel-bulk">
+        <div class="upload-zone" id="upload-zone" tabindex="0" role="button" aria-label="Upload .docx file">
+          <div style="font-size:32px">📄</div>
+          <strong>Click or drop a .docx file</strong>
+          <p>Bold text is treated as the question; the paragraphs that follow (until the next bold line) are the answer.</p>
+        </div>
+        <input type="file" id="docx-file-input" accept=".docx" style="display:none">
+        <div id="bulk-preview">
+          <div class="bulk-meta" id="bulk-meta"></div>
+          <div id="bulk-items"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" id="bulk-save-btn" type="button" style="display:none">Save All FAQs</button>
+          <span class="modal-status" id="bulk-status"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mammoth/mammoth.browser.min.js"></script>
+  <script>
+    const API = '';
+    let categoryRecords = [];
+    let faqRecords = [];
+    let busy = false;
+    let draggedTitle = null;
+
+    function setStatus(message, type = 'info') {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = `show ${type}`;
+    }
+
+    function clearStatus() {
+      const status = document.getElementById('status');
+      status.textContent = '';
+      status.className = '';
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function setBusy(nextBusy) {
+      busy = nextBusy;
+      document.querySelectorAll('button').forEach(button => {
+        button.disabled = nextBusy;
+      });
+      const addInput = document.getElementById('new-category-title');
+      addInput.disabled = nextBusy;
+      document.querySelectorAll('.category-title-input').forEach(input => {
+        input.disabled = nextBusy;
+      });
+    }
+
+    function getFaqCount(title) {
+      return faqRecords.filter(entry => (entry.category || '').trim() === title).length;
+    }
+
+    function renderCategories() {
+      const list = document.getElementById('categories-list');
+      document.getElementById('help-category-total').textContent = categoryRecords.length;
+      document.getElementById('help-faq-total').textContent = faqRecords.length;
+
+      if (!categoryRecords.length) {
+        list.className = '';
+        list.innerHTML = '<div class="empty-state">No categories yet. Add one above to get started.</div>';
+        return;
+      }
+
+      list.className = '';
+      list.innerHTML = categoryRecords.map((record, index) => {
+        const faqCount = getFaqCount(record.title);
+        return `
+          <article class="category-card" data-title="${escapeHtml(record.title)}" draggable="true">
+            <div class="category-controls">
+              <input class="text-input category-title-input" type="text" value="${escapeHtml(record.title)}" data-original-title="${escapeHtml(record.title)}" autocomplete="off">
+              <div class="action-row">
+                  <div class="faq-count">${faqCount} FAQ${faqCount === 1 ? '' : 's'}</div>
+                <button class="action-btn add-faqs-btn" type="button" data-title="${escapeHtml(record.title)}">Add FAQs</button>
+                <button class="action-btn danger delete-btn" type="button" data-title="${escapeHtml(record.title)}">Delete</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    async function loadData() {
+      const list = document.getElementById('categories-list');
+      list.className = 'loading';
+      list.textContent = 'Loading categories…';
+
+      const [categoryResponse, faqResponse] = await Promise.all([
+        fetch(`${API}/api/faq-categories`),
+        fetch(`${API}/admin/faqs`),
+      ]);
+
+      if (!categoryResponse.ok || !faqResponse.ok) {
+        throw new Error('Failed to load category editor data');
+      }
+
+      categoryRecords = await categoryResponse.json();
+      faqRecords = await faqResponse.json();
+      renderCategories();
+    }
+
+    async function sendJson(url, options = {}) {
+      const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options,
+      });
+
+      if (!response.ok) {
+        let detail = 'Request failed';
+        try {
+          const payload = await response.json();
+          detail = payload.detail || detail;
+        } catch {
+          // ignore malformed error payloads
+        }
+        throw new Error(detail);
+      }
+
+      return response.json();
+    }
+
+    async function addCategory() {
+      const input = document.getElementById('new-category-title');
+      const title = input.value.trim();
+      if (!title) {
+        setStatus('Enter a category title before adding it.', 'error');
+        input.focus();
+        return;
+      }
+
+      setBusy(true);
+      setStatus('Adding category…', 'info');
+      try {
+        await sendJson(`${API}/admin/faq-categories`, {
+          method: 'POST',
+          body: JSON.stringify({ title }),
+        });
+        input.value = '';
+        await loadData();
+        setStatus(`Added category “${title}”.`, 'success');
+      } catch (error) {
+        setStatus(error.message, 'error');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function reorderCategories(orderedTitles) {
+      setBusy(true);
+      setStatus('Saving category order…', 'info');
+      try {
+        await sendJson(`${API}/admin/faq-categories/reorder`, {
+          method: 'POST',
+          body: JSON.stringify({ ordered_titles: orderedTitles }),
+        });
+        await loadData();
+        clearStatus();
+      } catch (error) {
+        setStatus(error.message, 'error');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function renameCategory(originalTitle, nextTitle) {
+      if (!nextTitle) {
+        setStatus('Category names cannot be blank.', 'error');
+        await loadData();
+        return;
+      }
+      if (originalTitle === nextTitle) {
+        clearStatus();
+        return;
+      }
+
+      setBusy(true);
+      setStatus('Renaming category…', 'info');
+      try {
+        await sendJson(`${API}/admin/faq-categories/rename`, {
+          method: 'PUT',
+          body: JSON.stringify({ old_title: originalTitle, new_title: nextTitle }),
+        });
+        await loadData();
+        setStatus(`Renamed “${originalTitle}” to “${nextTitle}”.`, 'success');
+      } catch (error) {
+        setStatus(error.message, 'error');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function deleteCategory(title) {
+      const confirmed = window.confirm(`Delete “${title}”? FAQs using this category will be left uncategorized.`);
+      if (!confirmed) {
+        return;
+      }
+
+      setBusy(true);
+      setStatus('Deleting category…', 'info');
+      try {
+        await sendJson(`${API}/admin/faq-categories`, {
+          method: 'DELETE',
+          body: JSON.stringify({ title }),
+        });
+        await loadData();
+        setStatus(`Deleted “${title}”.`, 'success');
+      } catch (error) {
+        setStatus(error.message, 'error');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    document.getElementById('add-category-btn').addEventListener('click', addCategory);
+    document.getElementById('btn-help').addEventListener('click', () => {
+      document.getElementById('help-backdrop').classList.add('open');
+      document.getElementById('help-backdrop').setAttribute('aria-hidden', 'false');
+    });
+    document.getElementById('help-close').addEventListener('click', () => {
+      document.getElementById('help-backdrop').classList.remove('open');
+      document.getElementById('help-backdrop').setAttribute('aria-hidden', 'true');
+    });
+    document.getElementById('help-backdrop').addEventListener('click', event => {
+      if (event.target.id === 'help-backdrop') {
+        document.getElementById('help-backdrop').classList.remove('open');
+        document.getElementById('help-backdrop').setAttribute('aria-hidden', 'true');
+      }
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        document.getElementById('help-backdrop').classList.remove('open');
+        document.getElementById('help-backdrop').setAttribute('aria-hidden', 'true');
+      }
+    });
+    document.getElementById('new-category-title').addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        addCategory();
+      }
+    });
+
+    document.getElementById('categories-list').addEventListener('click', event => {
+      const button = event.target.closest('button');
+      if (!button || busy) {
+        return;
+      }
+
+      const title = button.dataset.title;
+      if (button.classList.contains('delete-btn')) {
+        deleteCategory(title);
+      } else if (button.classList.contains('add-faqs-btn')) {
+        openAddFaqsModal(title);
+      }
+    });
+
+    document.getElementById('categories-list').addEventListener('keydown', event => {
+      if (busy || !event.target.classList.contains('category-title-input')) {
+        return;
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.target.blur();
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.target.value = event.target.dataset.originalTitle;
+        event.target.blur();
+      }
+    });
+
+    document.getElementById('categories-list').addEventListener('blur', event => {
+      if (busy || !event.target.classList.contains('category-title-input')) {
+        return;
+      }
+      const input = event.target;
+      renameCategory(input.dataset.originalTitle, input.value.trim());
+    }, true);
+
+    document.getElementById('categories-list').addEventListener('dragstart', event => {
+      const card = event.target.closest('.category-card');
+      if (!card || busy) {
+        event.preventDefault();
+        return;
+      }
+      draggedTitle = card.dataset.title;
+      card.classList.add('dragging');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', draggedTitle);
+    });
+
+    document.getElementById('categories-list').addEventListener('dragend', event => {
+      const card = event.target.closest('.category-card');
+      if (card) {
+        card.classList.remove('dragging');
+      }
+      document.querySelectorAll('.category-card.drag-target').forEach(node => node.classList.remove('drag-target'));
+      draggedTitle = null;
+    });
+
+    document.getElementById('categories-list').addEventListener('dragover', event => {
+      const card = event.target.closest('.category-card');
+      if (!card || busy || card.dataset.title === draggedTitle) {
+        return;
+      }
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.category-card.drag-target').forEach(node => {
+        if (node !== card) {
+          node.classList.remove('drag-target');
+        }
+      });
+      card.classList.add('drag-target');
+    });
+
+    document.getElementById('categories-list').addEventListener('dragleave', event => {
+      const card = event.target.closest('.category-card');
+      if (card && !card.contains(event.relatedTarget)) {
+        card.classList.remove('drag-target');
+      }
+    });
+
+    document.getElementById('categories-list').addEventListener('drop', event => {
+      const targetCard = event.target.closest('.category-card');
+      if (!targetCard || busy || !draggedTitle || targetCard.dataset.title === draggedTitle) {
+        return;
+      }
+      event.preventDefault();
+
+      const cards = Array.from(document.querySelectorAll('.category-card'));
+      const orderedTitles = cards.map(card => card.dataset.title);
+      const fromIndex = orderedTitles.indexOf(draggedTitle);
+      const toIndex = orderedTitles.indexOf(targetCard.dataset.title);
+      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+        return;
+      }
+
+      const [moved] = orderedTitles.splice(fromIndex, 1);
+      orderedTitles.splice(toIndex, 0, moved);
+      targetCard.classList.remove('drag-target');
+      reorderCategories(orderedTitles);
+    });
+
+    // -------------------------------------------------------
+    // Add FAQs modal
+    // -------------------------------------------------------
+    let modalCategory = '';
+    let bulkFaqs = [];
+
+    function openAddFaqsModal(category) {
+      modalCategory = category;
+      document.getElementById('modal-category-name').textContent = category;
+      document.getElementById('single-question').value = '';
+      document.getElementById('single-answer').value = '';
+      document.getElementById('single-status').textContent = '';
+      document.getElementById('single-status').className = 'modal-status';
+      document.getElementById('bulk-status').textContent = '';
+      document.getElementById('bulk-status').className = 'modal-status';
+      document.getElementById('bulk-preview').style.display = 'none';
+      document.getElementById('bulk-save-btn').style.display = 'none';
+      document.getElementById('bulk-items').innerHTML = '';
+      bulkFaqs = [];
+      switchModalTab('single');
+      const backdrop = document.getElementById('add-faqs-backdrop');
+      backdrop.classList.add('open');
+      backdrop.setAttribute('aria-hidden', 'false');
+      document.getElementById('single-question').focus();
+    }
+
+    function closeAddFaqsModal() {
+      const backdrop = document.getElementById('add-faqs-backdrop');
+      backdrop.classList.remove('open');
+      backdrop.setAttribute('aria-hidden', 'true');
+    }
+
+    function switchModalTab(tab) {
+      document.querySelectorAll('.modal-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+      document.querySelectorAll('.modal-panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${tab}`));
+    }
+
+    document.querySelectorAll('.modal-tab').forEach(btn => {
+      btn.addEventListener('click', () => switchModalTab(btn.dataset.tab));
+    });
+
+    document.getElementById('add-faqs-close').addEventListener('click', closeAddFaqsModal);
+    document.getElementById('add-faqs-backdrop').addEventListener('click', e => {
+      if (e.target.id === 'add-faqs-backdrop') closeAddFaqsModal();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('add-faqs-backdrop').classList.contains('open')) {
+        closeAddFaqsModal();
+      }
+    });
+
+    // Single FAQ save
+    document.getElementById('single-save-btn').addEventListener('click', async () => {
+      const question = document.getElementById('single-question').value.trim();
+      const answer = document.getElementById('single-answer').value.trim();
+      const statusEl = document.getElementById('single-status');
+      if (!question || !answer) {
+        statusEl.textContent = 'Both question and answer are required.';
+        statusEl.className = 'modal-status err';
+        return;
+      }
+      statusEl.textContent = 'Saving…';
+      statusEl.className = 'modal-status';
+      try {
+        await sendJson(`${API}/admin/faq`, {
+          method: 'POST',
+          body: JSON.stringify({ title: question, text: answer, category: modalCategory }),
+        });
+        document.getElementById('single-question').value = '';
+        document.getElementById('single-answer').value = '';
+        statusEl.textContent = 'Saved!';
+        statusEl.className = 'modal-status ok';
+        await loadData();
+        setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'modal-status'; }, 3000);
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + err.message;
+        statusEl.className = 'modal-status err';
+      }
+    });
+
+    document.getElementById('single-question').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('single-answer').focus(); }
+    });
+
+    // Bulk .docx
+    function parseBulkFaqs(html) {
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      const faqs = [];
+      let currentQ = null;
+      let answerParts = [];
+
+      function flush() {
+        if (currentQ && answerParts.length) {
+          faqs.push({ question: currentQ, answer: answerParts.join('\n\n').trim() });
+        }
+        currentQ = null;
+        answerParts = [];
+      }
+
+      for (const node of div.childNodes) {
+        if (node.nodeType !== 1) continue;
+        const tag = node.tagName.toLowerCase();
+        // Check if the entire block is bold (mammoth wraps bold paragraphs in <strong>)
+        const text = node.textContent.trim();
+        if (!text) continue;
+        const firstChild = node.firstElementChild;
+        const isBold = (firstChild && (firstChild.tagName === 'STRONG' || firstChild.tagName === 'B') && firstChild.textContent.trim() === text)
+          || node.querySelector('strong, b')?.textContent.trim() === text;
+        if (isBold) {
+          flush();
+          currentQ = text;
+        } else if (currentQ) {
+          answerParts.push(node.outerHTML);
+        }
+      }
+      flush();
+      return faqs;
+    }
+
+    function renderBulkPreview(faqs) {
+      const previewEl = document.getElementById('bulk-preview');
+      const itemsEl = document.getElementById('bulk-items');
+      const metaEl = document.getElementById('bulk-meta');
+      const saveBtn = document.getElementById('bulk-save-btn');
+      if (!faqs.length) {
+        metaEl.textContent = 'No FAQs found. Make sure questions are in bold.';
+        itemsEl.innerHTML = '';
+        saveBtn.style.display = 'none';
+        previewEl.style.display = 'block';
+        return;
+      }
+      metaEl.textContent = `${faqs.length} FAQ${faqs.length === 1 ? '' : 's'} found — review below, then click Save All FAQs.`;
+      itemsEl.innerHTML = faqs.map((faq, i) => `
+        <div class="bulk-faq-item">
+          <div class="faq-q">${escapeHtml(faq.question)}</div>
+          <div class="faq-a">${faq.answer.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300)}</div>
+        </div>
+      `).join('');
+      saveBtn.style.display = '';
+      previewEl.style.display = 'block';
+    }
+
+    function handleDocxFile(file) {
+      if (!file) return;
+      const statusEl = document.getElementById('bulk-status');
+      statusEl.textContent = 'Converting…';
+      statusEl.className = 'modal-status';
+      const reader = new FileReader();
+      reader.onload = evt => {
+        mammoth.convertToHtml({ arrayBuffer: evt.target.result })
+          .then(result => {
+            bulkFaqs = parseBulkFaqs(result.value);
+            renderBulkPreview(bulkFaqs);
+            statusEl.textContent = '';
+          })
+          .catch(err => {
+            statusEl.textContent = 'Conversion failed: ' + err.message;
+            statusEl.className = 'modal-status err';
+          });
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    document.getElementById('upload-zone').addEventListener('click', () => document.getElementById('docx-file-input').click());
+    document.getElementById('upload-zone').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') document.getElementById('docx-file-input').click(); });
+    document.getElementById('docx-file-input').addEventListener('change', e => { handleDocxFile(e.target.files[0]); e.target.value = ''; });
+    document.getElementById('upload-zone').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.classList.add('dragover'); });
+    document.getElementById('upload-zone').addEventListener('dragleave', e => e.currentTarget.classList.remove('dragover'));
+    document.getElementById('upload-zone').addEventListener('drop', e => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('dragover');
+      handleDocxFile(e.dataTransfer.files[0]);
+    });
+
+    document.getElementById('bulk-save-btn').addEventListener('click', async () => {
+      if (!bulkFaqs.length) return;
+      const statusEl = document.getElementById('bulk-status');
+      const saveBtn = document.getElementById('bulk-save-btn');
+      saveBtn.disabled = true;
+      statusEl.textContent = `Saving 0 / ${bulkFaqs.length}…`;
+      statusEl.className = 'modal-status';
+      let saved = 0;
+      for (const faq of bulkFaqs) {
+        try {
+          await sendJson(`${API}/admin/faq`, {
+            method: 'POST',
+            body: JSON.stringify({ title: faq.question, text: faq.answer, category: modalCategory }),
+          });
+          saved++;
+          statusEl.textContent = `Saving ${saved} / ${bulkFaqs.length}…`;
+        } catch (err) {
+          statusEl.textContent = `Error on FAQ ${saved + 1}: ${err.message}`;
+          statusEl.className = 'modal-status err';
+          saveBtn.disabled = false;
+          return;
+        }
+      }
+      statusEl.textContent = `${saved} FAQ${saved === 1 ? '' : 's'} saved!`;
+      statusEl.className = 'modal-status ok';
+      bulkFaqs = [];
+      document.getElementById('bulk-preview').style.display = 'none';
+      saveBtn.style.display = 'none';
+      saveBtn.disabled = false;
+      await loadData();
+    });
+
+    loadData().catch(error => {
+      setStatus(error.message, 'error');
+      const list = document.getElementById('categories-list');
+      list.className = '';
+      list.innerHTML = '<div class="empty-state">Unable to load categories right now.</div>';
+    });
+  </script>
 </body>
 
 </html>

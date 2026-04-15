@@ -5,6 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Diesel-Electric Submarine FAQs</title>
+  <link rel="stylesheet" href="/web/site-header.css">
   <style>
     *,
     *::before,
@@ -19,72 +20,6 @@
       background: #f6f8fa;
       color: #24292e;
       min-height: 100vh;
-    }
-
-    /* ── Top nav ── */
-    #topnav {
-      background: #1a1f2e;
-      color: #e6edf3;
-      padding: 0 24px;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      font-size: 15px;
-      font-weight: 700;
-    }
-
-    /* ── Hero ── */
-    #hero {
-      background: linear-gradient(135deg, #1a3a6b 0%, #2a5298 100%);
-      color: #fff;
-      padding: 36px 24px 28px;
-      text-align: center;
-    }
-
-    #hero h1 {
-      font-size: 28px;
-      font-weight: 800;
-      margin-bottom: 10px;
-    }
-
-    #hero .subtitle {
-      font-size: 15px;
-      color: #b8d4f0;
-      max-width: 560px;
-      margin: 0 auto 20px;
-      line-height: 1.5;
-    }
-
-    #feedback-banner {
-      background: rgba(255, 255, 255, 0.12);
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: 8px;
-      padding: 12px 20px;
-      max-width: 620px;
-      margin: 0 auto;
-      font-size: 13px;
-      color: #d4e8ff;
-      line-height: 1.5;
-    }
-
-    #feedback-banner a {
-      color: #7ec8ff;
-      font-weight: 600;
-      text-decoration: underline;
-    }
-
-    .site-warning {
-      background: #fff3cd;
-      border-bottom: 1px solid #e3c86a;
-      color: #5f4700;
-      padding: 12px 24px;
-      text-align: center;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    .site-warning strong {
-      color: #493600;
     }
 
     /* ── Dashboard ── */
@@ -191,6 +126,10 @@
     }
 
     .cat-card {
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
       background: #e3e8ee;
       border: 1px solid #e1e4e8;
       border-radius: 10px;
@@ -212,16 +151,26 @@
     }
 
     .cat-card-icon {
-      font-size: 20px;
-      margin-bottom: 8px;
-      display: block;
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 0;
+      background: rgba(3, 102, 214, 0.08);
+    }
+
+    .cat-card-body {
+      min-width: 0;
     }
 
     .cat-card-title {
       font-size: 14px;
       font-weight: 700;
       color: #0366d6;
-      margin-bottom: 10px;
+      margin-bottom: 0;
       line-height: 1.4;
     }
 
@@ -266,19 +215,13 @@
     }
 
     .special-card-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-      min-height: 28px;
+      display: contents;
     }
 
     .special-card .cat-card-icon {
-      font-size: 20px;
-      margin-bottom: 0;
-      display: inline-flex;
       line-height: 1;
       flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.16);
     }
 
     .special-card .cat-card-title {
@@ -343,6 +286,12 @@
 
     .special-card-blue .cat-card-title {
       color: #fff;
+    }
+
+    @media (max-width: 520px) {
+      .cat-card {
+        grid-template-columns: 1fr;
+      }
     }
 
     /* ── Medal of Honor view ── */
@@ -705,30 +654,38 @@
     /* ── Category filter ── */
     #cat-nav {
       display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 24px;
-      background: #fff;
-      border-bottom: 1px solid #e1e4e8;
+      justify-content: flex-start;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 18px 24px 0;
     }
 
-    .cat-filter-label {
-      font-size: 13px;
-      font-weight: 600;
-      color: #586069;
-      white-space: nowrap;
+    .faq-filter-item {
+      width: fit-content;
+      margin-bottom: 0;
+    }
+
+    .faq-filter-item .faq-q {
+      cursor: default;
+      padding: 13px 16px;
+    }
+
+    .faq-filter-item .faq-q:hover {
+      background: #fff;
     }
 
     #cat-select {
-      min-width: 280px;
+      width: auto;
+      min-width: 0;
       max-width: 100%;
-      padding: 8px 36px 8px 12px;
-      border: 1px solid #d1d5da;
-      border-radius: 8px;
+      padding: 0 36px 0 0;
+      border: 0;
+      border-radius: 0;
       background: #fff;
       color: #24292e;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 14px;
+      font-weight: 600;
       line-height: 1.4;
       appearance: none;
       -webkit-appearance: none;
@@ -739,23 +696,23 @@
     }
 
     #cat-select:hover {
-      border-color: #b0b7c0;
+      color: #111827;
     }
 
     #cat-select:focus {
       outline: none;
-      border-color: #0366d6;
-      box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.12);
     }
 
     @media (max-width: 700px) {
       #cat-nav {
-        flex-direction: column;
-        align-items: stretch;
+        padding: 18px 24px 0;
+      }
+
+      .faq-filter-item {
+        width: 100%;
       }
 
       #cat-select {
-        min-width: 0;
         width: 100%;
       }
     }
@@ -764,7 +721,7 @@
     #content {
       max-width: 860px;
       margin: 0 auto;
-      padding: 24px 24px 60px;
+      padding: 6px 24px 60px;
     }
 
     .cat-section {
@@ -1176,28 +1133,12 @@
   </style>
 </head>
 
-<body>
-
-  <div class="site-warning"><strong>Work in progress:</strong> this site is still being developed, and some content and
-    historical data remain unverified.</div>
-
-  <nav id="topnav">Diesel-Electric Submarine FAQs</nav>
-
-  <div id="hero">
-    <h1>Diesel-Electric Submarine FAQs</h1>
-    <p class="subtitle">A comprehensive collection of frequently asked questions about diesel-electric submarines, with
-      special focus on World War II US submarines.</p>
-    <div id="feedback-banner">
-      💡 <strong>Help us improve!</strong> Can't find what you're looking for? Have corrections or suggestions?
-      <a href="/web/feedback.html">Share your feedback</a> to help us make this resource better.
-    </div>
-  </div>
+<body data-enable-glossary-tooltips="true">
 
   <!-- Dashboard (default landing) -->
   <div id="dashboard">
     <div id="dash-search-wrap">
       <input id="dash-search" type="search" placeholder="Search questions and answers&hellip;" autocomplete="off" />
-      <button id="btn-copy-dashboard" type="button" class="share-link-btn share-link-btn-light">Copy Link</button>
     </div>
     <h2>Browse by Category</h2>
     <div id="cat-grid">
@@ -1213,10 +1154,13 @@
       <button id="btn-copy-faq" type="button" class="share-link-btn share-link-btn-light">Copy Link</button>
     </div>
     <nav id="cat-nav" aria-label="FAQ category filter">
-      <label class="cat-filter-label" for="cat-select">Categories</label>
-      <select id="cat-select">
-        <option value="all">All categories</option>
-      </select>
+      <div class="faq-item faq-filter-item">
+        <div class="faq-q">
+          <select id="cat-select">
+            <option value="all">All categories</option>
+          </select>
+        </div>
+      </div>
     </nav>
     <div id="content">
       <div id="no-results">
@@ -1239,95 +1183,7 @@
       <p class="lead">The following U.S. Navy Submariners were awarded the Medal of Honor for extraordinary heroism and
         self-sacrifice in the line of duty. Their actions represent the highest traditions of naval service and courage
         under the most perilous conditions.</p>
-
-      <div class="moh-recipient">
-        <h3>Henry Breault</h3>
-        <p><strong>Rank/Unit:</strong> Torpedoman Second Class, USS O-5<br>
-          <strong>Date Awarded:</strong> June 27, 1921
-        </p>
-        <p><strong>Citation Summary:</strong><br>
-          While O-5 sank following a collision in the Panama Canal, Breault voluntarily returned into the flooding
-          submarine chamber to rescue a shipmate despite almost certain death. His selfless actions saved the life of
-          his shipmate at the cost of great personal risk.</p>
-      </div>
-
-      <div class="moh-recipient">
-        <h3>John Philip Cromwell</h3>
-        <p><strong>Rank/Unit:</strong> Captain (posthumous), Submarine Force, U.S. Navy (assigned to USS Sculpin
-          support)<br>
-          <strong>Date Awarded:</strong> October 31, 1943
-        </p>
-        <p><strong>Citation Summary:</strong><br>
-          During World War II, Captain Cromwell chose to remain aboard an enemy-controlled submarine rather than risk
-          divulging vital secret information. Refusing rescue when sea pressure dropped and capture was imminent, he
-          gave his life to protect crucial Allied intelligence.</p>
-      </div>
-
-      <div class="moh-recipient">
-        <h3>Samuel D. Dealey</h3>
-        <p><strong>Rank/Unit:</strong> Commander, USS Harder<br>
-          <strong>Date Awarded:</strong> March 6, 1945
-        </p>
-        <p><strong>Citation Summary:</strong><br>
-          Commander Dealey displayed extraordinary heroism commanding Harder against Japanese shipping. His aggressive
-          tactics resulted in multiple successful attacks, sinking or damaging numerous enemy vessels under hazardous
-          conditions, demonstrating fearless leadership.</p>
-      </div>
-
-      <div class="moh-recipient">
-        <h3>Eugene B. Fluckey</h3>
-        <p><strong>Rank/Unit:</strong> Rear Admiral (then Commander), USS Barb<br>
-          <strong>Date Awarded:</strong> January 14, 1946
-        </p>
-        <p><strong>Citation Summary:</strong><br>
-          For outstanding service in WWII, Fluckey's innovative and daring patrols in Barb inflicted heavy enemy losses,
-          including uniquely audacious operations close to enemy shores. His tactics exemplified exceptional courage and
-          skill.</p>
-      </div>
-
-      <div class="moh-recipient">
-        <h3>Howard W. Gilmore</h3>
-        <p><strong>Rank/Unit:</strong> Commander, USS Growler<br>
-          <strong>Date Awarded:</strong> February 16, 1943 (posthumous)
-        </p>
-        <p><strong>Citation Summary:</strong><br>
-          During a surface engagement with enemy forces, Commander Gilmore ordered &ldquo;Take her down!&rdquo; &mdash;
-          sacrificing himself to save his ship and crew. His decisive action at great personal cost exemplified supreme
-          devotion to duty.</p>
-      </div>
-
-      <div class="moh-recipient">
-        <h3>Richard H. O'Kane</h3>
-        <p><strong>Rank/Unit:</strong> Rear Admiral (then Lieutenant), USS Tang<br>
-          <strong>Date Awarded:</strong> December 7, 1945
-        </p>
-        <p><strong>Citation Summary:</strong><br>
-          Lieutenant O'Kane was honored for exceptional leadership and submarine warfare prowess. As Executive Officer
-          and later Commander aboard Tang, his tactical expertise contributed to Tang's distinguished record of sinking
-          enemy ships under intense danger.</p>
-      </div>
-
-      <div class="moh-recipient">
-        <h3>Lawson P. Ramage</h3>
-        <p><strong>Rank/Unit:</strong> Commander, USS Parche<br>
-          <strong>Date Awarded:</strong> May 11, 1944
-        </p>
-        <p><strong>Citation Summary:</strong><br>
-          In the South China Sea, Commander Ramage led Parche through perilous shallow waters to attack strongly
-          defended Japanese convoys. His bold action and repeated surface attacks displayed tenacious aggressiveness in
-          the face of heavy enemy fire.</p>
-      </div>
-
-      <div class="moh-recipient">
-        <h3>George L. Street III</h3>
-        <p><strong>Rank/Unit:</strong> Captain, USS Tirante<br>
-          <strong>Date Awarded:</strong> April 18, 1945
-        </p>
-        <p><strong>Citation Summary:</strong><br>
-          While commanding Tirante in hostile Japanese waters, Captain Street navigated extreme peril beneath minefields
-          and heavy defenses to strike effectively at the enemy. His courage and skill brought vital successes against
-          daunting odds.</p>
-      </div>
+      <div id="moh-recipients-list"></div>
     </div>
   </div>
 
@@ -1542,6 +1398,13 @@
           categorySortOrder = new Map(
             categories.map((category, index) => [category.title, Number(category.sort_order ?? index * 10)])
           );
+          // Add empty groups for categories that have no FAQs yet
+          const existingCats = new Set(allGroups.map(g => g.category));
+          categories.forEach(cat => {
+            if (cat.title && !existingCats.has(cat.title)) {
+              allGroups.push({ category: cat.title, faqs: [] });
+            }
+          });
           allGroups = sortGroupsByCategoryOrder(allGroups);
         }
         buildDashboard();
@@ -1602,7 +1465,9 @@
         const icon = CAT_ICONS[group.category] || '📄';
         card.innerHTML = `
           <span class="cat-card-icon">${icon}</span>
-          <div class="cat-card-title">${escHtml(group.category)} <span class="cat-count">(${group.faqs.length})</span></div>`;
+          <div class="cat-card-body">
+            <div class="cat-card-title">${escHtml(group.category)} <span class="cat-count">(${group.faqs.length})</span></div>
+          </div>`;
         const openCategory = () => {
           setCategory(group.category);
           showFaqView();
@@ -1633,7 +1498,9 @@
         card.innerHTML = `
           <div class="special-card-header">
             <span class="cat-card-icon">${s.icon}</span>
-            <div class="cat-card-title">${s.label}</div>
+            <div class="cat-card-body">
+              <div class="cat-card-title">${s.label}</div>
+            </div>
           </div>`;
         card.addEventListener('click', s.action);
         card.addEventListener('keydown', (event) => {
@@ -1654,7 +1521,9 @@
       opCard.innerHTML = `
         <div class="special-card-header">
           <span class="cat-card-icon">⚓</span>
-          <div class="cat-card-title">Operations Guide</div>
+          <div class="cat-card-body">
+            <div class="cat-card-title">Operations Guide</div>
+          </div>
         </div>`;
       opCard.addEventListener('click', showOperationsView);
       opCard.addEventListener('keydown', (event) => {
@@ -1665,13 +1534,36 @@
       });
       grid.appendChild(opCard);
 
-      function showOperationsView() {
+      // Museums card
+      const musCard = document.createElement('div');
+      musCard.className = 'special-card special-card-blue';
+      musCard.tabIndex = 0;
+      musCard.setAttribute('role', 'button');
+      musCard.setAttribute('aria-label', 'Museums');
+      musCard.innerHTML = `
+        <div class="special-card-header">
+          <span class="cat-card-icon">🏛</span>
+          <div class="cat-card-body">
+            <div class="cat-card-title">Museums</div>
+          </div>
+        </div>`;
+      musCard.addEventListener('click', () => { window.location.href = '/web/museums.html'; });
+      musCard.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          window.location.href = '/web/museums.html';
+        }
+      });
+      grid.appendChild(musCard);
+
+      async function showOperationsView() {
         document.getElementById('dashboard').style.display = 'none';
         document.getElementById('faq-view').style.display = 'none';
         document.getElementById('moh-view').style.display = 'none';
         document.getElementById('lost-subs-view').style.display = 'none';
         document.getElementById('incidents-view').style.display = 'none';
         document.getElementById('operations-view').style.display = 'block';
+        await initOperationsGuide();
       }
     }
   </script>
@@ -1681,212 +1573,39 @@
       <button id="btn-operations-back">&#8592; All categories</button>
       <button id="btn-copy-operations" type="button" class="share-link-btn share-link-btn-light">Copy Link</button>
     </div>
-    <h1 style="font-size:2.2em;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:12px;"><span
-        style="font-size:1.1em;">⚓</span> Submarine Operations</h1>
-    <p class="lead" style="font-size:1.15em;color:#444;margin-bottom:32px;">Explore the fascinating world of submarine
-      operations, tactics, and missions throughout history.</p>
-
-    <section style="margin-bottom:36px;">
-      <script>
-        // Ensure showDashboard is globally accessible for Operations Guide back button
-        function showDashboard() {
-          document.getElementById('dashboard').style.display = 'block';
-          document.getElementById('faq-view').style.display = 'none';
-          document.getElementById('moh-view').style.display = 'none';
-          document.getElementById('lost-subs-view').style.display = 'none';
-          document.getElementById('incidents-view').style.display = 'none';
-          document.getElementById('operations-view').style.display = 'none';
-        }
-        window.showDashboard = showDashboard;
-        document.getElementById('btn-operations-back').addEventListener('click', showDashboard);
-      </script>
-      <h2 style="font-size:1.3em;font-weight:700;margin-bottom:10px;">About Submarine Operations</h2>
-      <p>US submarines have played crucial roles in various conflicts throughout history, particularly during World War
-        II. Their operations ranged from reconnaissance and intelligence gathering to direct combat engagements and
-        support missions.</p>
-      <p>This page provides information about the various types of submarine operations, tactical approaches, and the
-        evolution of submarine warfare doctrine.</p>
-    </section>
-
-    <section style="margin-bottom:36px;">
-      <h2 style="font-size:1.2em;font-weight:700;margin-bottom:18px;">Types of Operations</h2>
-      <div style="display:flex;flex-wrap:wrap;gap:24px 2%;">
-        <div
-          style="flex:1 1 320px;min-width:280px;background:#e3f2fd;border-radius:8px;padding:18px 20px 12px 20px;margin-bottom:18px;">
-          <h3 style="color:#1976d2;font-size:1.1em;font-weight:700;margin-bottom:8px;">War Patrols</h3>
-          <p style="margin-bottom:8px;">Combat patrols were the primary mission of WWII submarines. Boats would patrol
-            assigned areas, hunting enemy shipping and naval vessels. Patrols typically lasted 30-60 days.</p>
-          <ul style="margin-left:18px;color:#333;font-size:0.98em;">
-            <li>Ship and tanker hunting</li>
-            <li>Naval engagement</li>
-            <li>Commerce disruption</li>
-            <li>Area denial</li>
-          </ul>
-        </div>
-        <div
-          style="flex:1 1 320px;min-width:280px;background:#e8f5e9;border-radius:8px;padding:18px 20px 12px 20px;margin-bottom:18px;">
-          <h3 style="color:#388e3c;font-size:1.1em;font-weight:700;margin-bottom:8px;">Reconnaissance</h3>
-          <p style="margin-bottom:8px;">Submarines were ideal for covert reconnaissance missions, gathering intelligence
-            on enemy positions, movements, and installations.</p>
-          <ul style="margin-left:18px;color:#333;font-size:0.98em;">
-            <li>Beach reconnaissance for amphibious landings</li>
-            <li>Photo reconnaissance</li>
-            <li>Harbor surveillance</li>
-            <li>Weather reporting</li>
-          </ul>
-        </div>
-        <div
-          style="flex:1 1 320px;min-width:280px;background:#e3f7fa;border-radius:8px;padding:18px 20px 12px 20px;margin-bottom:18px;">
-          <h3 style="color:#0288d1;font-size:1.1em;font-weight:700;margin-bottom:8px;">Lifeguard Duty</h3>
-          <p style="margin-bottom:8px;">During air raids, submarines stationed near enemy territory rescued downed
-            airmen from the water, saving hundreds of lives.</p>
-          <ul style="margin-left:18px;color:#333;font-size:0.98em;">
-            <li>Stationed near bombing targets</li>
-            <li>Aircrew rescue operations</li>
-            <li>Surface ship rescue</li>
-            <li>Over 500 airmen saved in WWII</li>
-          </ul>
-        </div>
-        <div
-          style="flex:1 1 320px;min-width:280px;background:#ffebee;border-radius:8px;padding:18px 20px 12px 20px;margin-bottom:18px;">
-          <h3 style="color:#d32f2f;font-size:1.1em;font-weight:700;margin-bottom:8px;">Supply & Transport</h3>
-          <p style="margin-bottom:8px;">Submarines transported supplies, personnel, and special forces to and from
-            isolated or enemy-held areas.</p>
-          <ul style="margin-left:18px;color:#333;font-size:0.98em;">
-            <li>Guerrilla support in Philippines</li>
-            <li>Special forces insertion</li>
-            <li>Ammunition and supplies transport</li>
-            <li>Evacuations of key personnel</li>
-          </ul>
-        </div>
-        <div
-          style="flex:1 1 320px;min-width:280px;background:#ffebee;border-radius:8px;padding:18px 20px 12px 20px;margin-bottom:18px;">
-          <h3 style="color:#d32f2f;font-size:1.1em;font-weight:700;margin-bottom:8px;">Mine Laying</h3>
-          <p style="margin-bottom:8px;">Some submarines were equipped to lay mines in enemy waters, creating hazards for
-            enemy shipping lanes and harbors.</p>
-          <ul style="margin-left:18px;color:#333;font-size:0.98em;">
-            <li>Harbor entrances</li>
-            <li>Shipping lanes</li>
-            <li>Strategic waterways</li>
-            <li>Covert deployment</li>
-          </ul>
-        </div>
-        <div
-          style="flex:1 1 320px;min-width:280px;background:#eceff1;border-radius:8px;padding:18px 20px 12px 20px;margin-bottom:18px;">
-          <h3 style="color:#616161;font-size:1.1em;font-weight:700;margin-bottom:8px;">Communication & Coordination</h3>
-          <p style="margin-bottom:8px;">Submarines served as radio relay stations and coordination platforms for
-            multi-boat operations and intelligence gathering.</p>
-          <ul style="margin-left:18px;color:#333;font-size:0.98em;">
-            <li>Wolf pack coordination</li>
-            <li>Radio relay</li>
-            <li>Intelligence transmission</li>
-            <li>Weather reporting</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <section style="margin-bottom:36px;">
-      <h2 style="font-size:1.2em;font-weight:700;margin-bottom:18px;">Tactical Approaches</h2>
-      <div style="display:flex;flex-wrap:wrap;gap:24px 2%;">
-        <div
-          style="flex:1 1 320px;min-width:280px;background:#f3e5f5;border-radius:8px;padding:18px 20px 12px 20px;margin-bottom:18px;">
-          <h3 style="color:#6a1b9a;font-size:1.1em;font-weight:700;margin-bottom:8px;">Submerged Attack</h3>
-          <p>The classic approach: submerged approach using periscope observations, calculating firing solutions, and
-            launching torpedoes while avoiding detection.</p>
-        </div>
-        <div
-          style="flex:1 1 320px;min-width:280px;background:#ede7f6;border-radius:8px;padding:18px 20px 12px 20px;margin-bottom:18px;">
-          <h3 style="color:#4527a0;font-size:1.1em;font-weight:700;margin-bottom:8px;">Night Surface Attack</h3>
-          <p>Particularly effective in the Pacific, submarines would surface at night to use their deck guns and higher
-            speed for attacks and repositioning.</p>
-        </div>
-        <div
-          style="flex:1 1 320px;min-width:280px;background:#e8f5e9;border-radius:8px;padding:18px 20px 12px 20px;margin-bottom:18px;">
-          <h3 style="color:#388e3c;font-size:1.1em;font-weight:700;margin-bottom:8px;">Wolf Pack Tactics</h3>
-          <p>Coordinated attacks by multiple submarines, sharing intelligence and attacking convoys from multiple angles
-            simultaneously.</p>
-        </div>
-        <div
-          style="flex:1 1 320px;min-width:280px;background:#fbe9e7;border-radius:8px;padding:18px 20px 12px 20px;margin-bottom:18px;">
-          <h3 style="color:#d84315;font-size:1.1em;font-weight:700;margin-bottom:8px;">Evasion & Escape</h3>
-          <p>Silent running, deep diving, use of thermal layers, and noise discipline to evade depth charge attacks and
-            enemy detection.</p>
-        </div>
-      </div>
-    </section>
-
-    <section style="margin-bottom:36px;">
-      <h2 style="font-size:1.2em;font-weight:700;margin-bottom:18px;">Related FAQs</h2>
-      <ul style="margin-left:18px;font-size:1.05em;">
-        <li><a href="#" onclick="setCategory('Operating US Subs in WW2');showFaqView();return false;">Operating US Subs
-            in WW2</a></li>
-        <li><a href="#"
-            onclick="setCategory('Attacks and Battles, Small and Large');showFaqView();return false;">Attacks and
-            Battles, Small and Large</a></li>
-        <li><a href="#" onclick="setCategory('Life Aboard WW2 US Subs');showFaqView();return false;">Life Aboard WW2 US
-            Subs</a></li>
-      </ul>
-    </section>
-
-    <section style="margin-bottom:36px;">
-      <h2 style="font-size:1.2em;font-weight:700;margin-bottom:18px;">WWII Pacific Theater Statistics</h2>
-      <div style="display:flex;flex-wrap:wrap;gap:18px 2%;margin-bottom:10px;">
-        <div
-          style="flex:1 1 180px;min-width:140px;background:#fff;border-radius:8px;padding:14px 12px;text-align:center;">
-          <div style="font-size:1.5em;color:#1976d2;font-weight:700;">1,560</div>
-          <div style="font-size:0.98em;color:#444;">Enemy Ships Sunk</div>
-        </div>
-        <div
-          style="flex:1 1 180px;min-width:140px;background:#fff;border-radius:8px;padding:14px 12px;text-align:center;">
-          <div style="font-size:1.5em;color:#388e3c;font-weight:700;">52</div>
-          <div style="font-size:0.98em;color:#444;">US Submarines Lost</div>
-        </div>
-        <div
-          style="flex:1 1 180px;min-width:140px;background:#fff;border-radius:8px;padding:14px 12px;text-align:center;">
-          <div style="font-size:1.5em;color:#0288d1;font-weight:700;">288</div>
-          <div style="font-size:0.98em;color:#444;">Active Submarines</div>
-        </div>
-        <div
-          style="flex:1 1 180px;min-width:140px;background:#fff;border-radius:8px;padding:14px 12px;text-align:center;">
-          <div style="font-size:1.5em;color:#fbc02d;font-weight:700;">1,682</div>
-          <div style="font-size:0.98em;color:#444;">War Patrols</div>
-        </div>
-      </div>
-      <p style="text-align:center;font-size:0.98em;color:#666;margin-top:8px;"><em>US submarines accounted for
-          approximately 55% of all Japanese shipping losses during WWII, while representing only 2% of the US Navy.</em>
-      </p>
-    </section>
-
-    <section id="additional-resources-section" style="margin:40px 0 0 0;">
-      <div
-        style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.08);padding:32px 36px 28px 36px;max-width:1100px;margin:0 auto;">
-        <div style="display:flex;align-items:center;gap:16px;margin-bottom:28px;">
-          <span style="font-size:2.1em;color:#222;">&#8599;</span>
-          <span style="font-size:2em;font-weight:800;color:#222;">Additional Resources</span>
-        </div>
-        <div style="display:flex;gap:32px;justify-content:center;align-items:stretch;">
-          <button onclick="window.location.href='eternal-patrol.html';return false;"
-            style="display:flex;flex-direction:row;align-items:center;gap:10px;background:#fff;border:2px solid #0099ee;color:#0099ee;font-size:1.05em;font-weight:700;padding:14px 24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04);transition:box-shadow 0.15s;cursor:pointer;">
-            <span style="font-size:1.2em;">&#128681;</span> Eternal Patrol
-          </button>
-          <button onclick="showIncidentsView();return false;"
-            style="display:flex;flex-direction:row;align-items:center;gap:10px;background:#fff;border:2px solid #ffc107;color:#ffc107;font-size:1.05em;font-weight:700;padding:14px 24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04);transition:box-shadow 0.15s;cursor:pointer;">
-            <span style="font-size:1.2em;">&#9888;</span> Incidents
-          </button>
-          <button onclick="setCategory('Memorial');showFaqView();return false;"
-            style="display:flex;flex-direction:row;align-items:center;gap:10px;background:#fff;border:2px solid #636c72;color:#636c72;font-size:1.05em;font-weight:700;padding:14px 24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04);transition:box-shadow 0.15s;cursor:pointer;">
-            <span style="font-size:1.2em;">&#128467;</span> Memorial
-          </button>
-        </div>
-      </div>
-    </section>
+    <div id="operations-loading" style="text-align:center;padding:40px;color:#6a737d;">Loading operations guide…</div>
+    <div id="operations-error" style="display:none;text-align:center;padding:24px;color:#c0392b;"></div>
+    <div id="operations-content" style="display:none;"></div>
   </div>
 
   </div> <!-- End main HTML body content -->
 
   <script>
-    // Ensure Operations Guide back button works
+    let _operationsLoaded = false;
+
+    async function initOperationsGuide() {
+      if (_operationsLoaded) return;
+      const loading = document.getElementById('operations-loading');
+      const error = document.getElementById('operations-error');
+      const content = document.getElementById('operations-content');
+      loading.style.display = 'block';
+      error.style.display = 'none';
+      content.style.display = 'none';
+      try {
+        const res = await fetch('/admin/operations-guide-html');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        content.innerHTML = data.html || '';
+        loading.style.display = 'none';
+        content.style.display = 'block';
+        _operationsLoaded = true;
+      } catch (err) {
+        loading.style.display = 'none';
+        error.style.display = 'block';
+        error.textContent = `Error loading operations guide: ${err.message}`;
+      }
+    }
+
     document.getElementById('btn-operations-back').addEventListener('click', showDashboard);
 
     function showIncidentsView() {
@@ -1894,6 +1613,7 @@
       document.getElementById('faq-view').style.display = 'none';
       document.getElementById('moh-view').style.display = 'none';
       document.getElementById('lost-subs-view').style.display = 'none';
+      document.getElementById('operations-view').style.display = 'none';
       document.getElementById('incidents-view').style.display = 'block';
       initIncidents();
     }
@@ -2128,10 +1848,44 @@
         select.appendChild(option);
       });
       select.value = activeCategory;
+      updateCategoryNavWidth();
+    }
+
+    function updateCategoryNavWidth() {
+      const select = document.getElementById('cat-select');
+      if (!select || window.innerWidth <= 700) {
+        if (select) {
+          select.style.width = '';
+        }
+        return;
+      }
+
+      const probe = document.createElement('span');
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      probe.style.whiteSpace = 'nowrap';
+      probe.style.fontSize = window.getComputedStyle(select).fontSize;
+      probe.style.fontWeight = window.getComputedStyle(select).fontWeight;
+      probe.style.fontFamily = window.getComputedStyle(select).fontFamily;
+      probe.style.letterSpacing = window.getComputedStyle(select).letterSpacing;
+      document.body.appendChild(probe);
+
+      let widest = 0;
+      Array.from(select.options).forEach(option => {
+        probe.textContent = option.textContent || '';
+        widest = Math.max(widest, Math.ceil(probe.getBoundingClientRect().width));
+      });
+
+      probe.remove();
+      select.style.width = `${widest + 36}px`;
     }
 
     function showFaqView() {
       document.getElementById('dashboard').style.display = 'none';
+      document.getElementById('moh-view').style.display = 'none';
+      document.getElementById('lost-subs-view').style.display = 'none';
+      document.getElementById('incidents-view').style.display = 'none';
+      document.getElementById('operations-view').style.display = 'none';
       document.getElementById('faq-view').style.display = 'block';
       render();
     }
@@ -2140,13 +1894,38 @@
       document.getElementById('dashboard').style.display = 'none';
       document.getElementById('faq-view').style.display = 'none';
       document.getElementById('lost-subs-view').style.display = 'none';
+      document.getElementById('incidents-view').style.display = 'none';
+      document.getElementById('operations-view').style.display = 'none';
       document.getElementById('moh-view').style.display = 'block';
+      loadMohRecipients();
+    }
+
+    let _mohLoaded = false;
+    function loadMohRecipients() {
+      if (_mohLoaded) return;
+      _mohLoaded = true;
+      fetch('/api/moh-recipients')
+        .then(r => r.json())
+        .then(entries => {
+          const el = document.getElementById('moh-recipients-list');
+          if (!entries.length) { el.innerHTML = ''; return; }
+          el.innerHTML = entries.map(e => `
+            <div class="moh-recipient">
+              <h3>${escHtml(e.name)}${e.posthumous ? ' <span style="font-size:13px;font-weight:400;color:#8b949e">(posthumous)</span>' : ''}</h3>
+              <p><strong>Rank/Unit:</strong> ${escHtml(e.rank_unit)}<br>
+                <strong>Date Awarded:</strong> ${escHtml(e.date_awarded)}</p>
+              <p><strong>Citation Summary:</strong><br>${escHtml(e.citation_summary)}</p>
+            </div>`).join('');
+        })
+        .catch(() => {});
     }
 
     function showLostSubsView() {
       document.getElementById('dashboard').style.display = 'none';
       document.getElementById('faq-view').style.display = 'none';
       document.getElementById('moh-view').style.display = 'none';
+      document.getElementById('incidents-view').style.display = 'none';
+      document.getElementById('operations-view').style.display = 'none';
       document.getElementById('lost-subs-view').style.display = 'block';
       initLostSubs();
     }
@@ -2155,6 +1934,8 @@
       document.getElementById('faq-view').style.display = 'none';
       document.getElementById('moh-view').style.display = 'none';
       document.getElementById('lost-subs-view').style.display = 'none';
+      document.getElementById('incidents-view').style.display = 'none';
+      document.getElementById('operations-view').style.display = 'none';
       document.getElementById('dashboard').style.display = 'block';
       activeCategory = 'all';
       searchQuery = '';
@@ -2399,6 +2180,13 @@
         <div class="ls-stat-card"><div class="ls-stat-num">${totalLost.toLocaleString()}</div><div class="ls-stat-label">Lives Lost</div></div>`;
     }
 
+    function renderLsStats(data) {
+      const totalLost = data.reduce((n, b) => n + (b.fatalities_num || 0), 0);
+      document.getElementById('ls-stats').innerHTML = `
+        <div class="ls-stat-card"><div class="ls-stat-num">${data.length}</div><div class="ls-stat-label">Total Submarines Lost</div></div>
+        <div class="ls-stat-card"><div class="ls-stat-num">${totalLost.toLocaleString()}</div><div class="ls-stat-label">Lives Lost</div></div>`;
+    }
+
     function renderLostSubs() {
       const q = lsSearchQuery.toLowerCase();
       let filtered = (lsBoats || []).filter(b => {
@@ -2413,6 +2201,7 @@
         if (!b.date_lost_sort) return -1;
         return a.date_lost_sort.localeCompare(b.date_lost_sort);
       });
+      renderLsStats(filtered);
       const grid = document.getElementById('ls-grid');
       const noRes = document.getElementById('ls-no-results');
       document.getElementById('ls-count-bar').textContent =
@@ -2456,7 +2245,7 @@
       renderLostSubs();
     });
 
-    ['btn-copy-dashboard', 'btn-copy-faq', 'btn-copy-moh', 'btn-copy-ls', 'btn-copy-incidents', 'btn-copy-operations']
+    ['btn-copy-faq', 'btn-copy-moh', 'btn-copy-ls', 'btn-copy-incidents', 'btn-copy-operations']
       .forEach(id => {
         const button = document.getElementById(id);
         if (!button) return;
@@ -2680,6 +2469,16 @@
     }
 
     init();
+  </script>
+  <script src="/web/glossary-tooltips.js"></script>
+  <script src="/web/site-footer.js"></script>
+  <script src="/web/site-header.js"></script>
+  <script>
+    SiteFooter.render({ onCopy: () => writeTextToClipboard(getVisitorShareUrl()) });
+    SiteHeader.render({
+      title:    'Diesel-Electric Submarine FAQs',
+      subtitle: 'A comprehensive collection of frequently asked questions about diesel-electric submarines, with special focus on World War II US submarines.',
+    });
   </script>
 </body>
 

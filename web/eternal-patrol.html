@@ -5,26 +5,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Submarines on Eternal Patrol</title>
+  <link rel="stylesheet" href="/web/site-header.css">
 
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #f6f8fa;
       color: #24292e;
-    }
-
-    .site-warning {
-      background: #fff3cd;
-      border-bottom: 1px solid #e3c86a;
-      color: #5f4700;
-      padding: 12px 24px;
-      text-align: center;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    .site-warning strong {
-      color: #493600;
     }
 
     .container {
@@ -164,53 +151,12 @@
       font-size: 1.1em;
     }
 
-    .top-actions {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 18px;
-      flex-wrap: wrap;
-    }
-
-    .copy-link-btn {
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: 1px solid #d1d5da;
-      background: #fff;
-      color: #586069;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s, color 0.15s;
-    }
-
-    .copy-link-btn:hover {
-      background: #f3f6fa;
-      border-color: #b8c2cc;
-    }
-
-    .copy-link-btn.is-copied {
-      background: #1f7a3e;
-      border-color: #1f7a3e;
-      color: #fff;
-    }
   </style>
 </head>
 
-<body>
-  <div class="site-warning"><strong>Work in progress:</strong> this site is still being developed, and some content and
-    historical data remain unverified.</div>
+<body data-enable-glossary-tooltips="true">
+
   <div class="container">
-    <div class="top-actions">
-      <a href="memorial.html" class="boat-link">&larr; Back to Memorial</a>
-      <button id="copy-page-link" type="button" class="copy-link-btn">Copy Link</button>
-    </div>
-    <div class="row mb-4">
-      <div class="col-12">
-        <h1 style="font-size:2.2em;font-weight:800;color:#0366d6;">⚓ Submarines on Eternal Patrol</h1>
-      </div>
-    </div>
     <div class="card">
       <div class="card-header">About the Tolling of the Boats</div>
       <div class="card-body">
@@ -309,33 +255,6 @@
     </table>
     <div class="alert">No submarines found matching your criteria.</div>
     <script>
-      function flashCopiedButton(button) {
-        const originalText = button.dataset.originalText || button.textContent;
-        button.dataset.originalText = originalText;
-        button.textContent = 'Copied';
-        button.classList.add('is-copied');
-        window.setTimeout(() => {
-          button.textContent = originalText;
-          button.classList.remove('is-copied');
-        }, 1400);
-      }
-
-      async function copyPageLink() {
-        const url = new URL(window.location.href);
-        const era = document.getElementById('era').value;
-        const search = document.getElementById('search').value.trim();
-        url.searchParams.delete('era');
-        url.searchParams.delete('q');
-        if (era && era !== 'all') {
-          url.searchParams.set('era', era);
-        }
-        if (search) {
-          url.searchParams.set('q', search);
-        }
-        await navigator.clipboard.writeText(url.toString());
-        flashCopiedButton(document.getElementById('copy-page-link'));
-      }
-
       async function fetchSubmarines() {
         // Try API endpoint first, fallback to static file
         let response;
@@ -362,6 +281,12 @@
           return sum;
         }, 0);
         return { totalBoats, totalLives };
+      }
+
+      function renderStats(data) {
+        const stats = computeStats(data);
+        document.getElementById('stat-boats').textContent = stats.totalBoats;
+        document.getElementById('stat-lives').textContent = stats.totalLives.toLocaleString();
       }
 
       function filterData(data, era, search) {
@@ -417,6 +342,30 @@
         // Remove any existing modal
         const oldModal = document.getElementById('boat-modal');
         if (oldModal) oldModal.remove();
+        const imgPath = (src) => {
+          if (!src) return '';
+          if (src.startsWith('/web/') || src.startsWith('http://') || src.startsWith('https://')) {
+            return src;
+          }
+          if (src.startsWith('images/')) {
+            return `/web/${src}`;
+          }
+          return src;
+        };
+        let galleryHtml = '';
+        for (let i = 1; i <= 4; i += 1) {
+          const image = boat[`image${i}`];
+          if (!image) {
+            continue;
+          }
+          const subtitle = boat[`image${i}_subtitle`] || '';
+          galleryHtml += `
+            <div style="display:grid;gap:8px;">
+              <img src="${imgPath(image)}" alt="Gallery image ${i}" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;background:#f6f8fa;">
+              ${subtitle ? `<div style="font-size:0.95em;color:#555;line-height:1.5;">${subtitle.replace(/\n/g, '<br>')}</div>` : ''}
+            </div>
+          `;
+        }
         const modal = document.createElement('div');
         modal.id = 'boat-modal';
         modal.style.position = 'fixed';
@@ -453,13 +402,19 @@
                 <div style="font-weight:600;margin-bottom:6px;">Loss Narrative</div>
                 <div style="color:#333;font-size:1em;">${boat.loss_narrative.replace(/\n/g, '<br>')}</div>
               </div>
+              ${galleryHtml ? `
+              <div style="margin-bottom:18px;">
+                <div style="font-weight:600;margin-bottom:10px;">Gallery</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">${galleryHtml}</div>
+              </div>
+              ` : ''}
               <div style="margin-bottom:18px;">
                 <div style="font-weight:600;margin-bottom:6px;">Submarine Photo</div>
-                <img src="${boat.photo_boat}" alt="Submarine Photo" style="max-width:220px;max-height:140px;border-radius:6px;background:#f6f8fa;">
+                <img src="${imgPath(boat.photo_boat)}" alt="Submarine Photo" style="max-width:220px;max-height:140px;border-radius:6px;background:#f6f8fa;">
               </div>
               <div>
                 <div style="font-weight:600;margin-bottom:6px;">Captain Photo</div>
-                <img src="${boat.photo_captain}" alt="Captain Photo" style="max-width:120px;max-height:140px;border-radius:6px;background:#f6f8fa;">
+                <img src="${imgPath(boat.photo_captain)}" alt="Captain Photo" style="max-width:120px;max-height:140px;border-radius:6px;background:#f6f8fa;">
               </div>
             </div>
           `;
@@ -468,9 +423,6 @@
 
       async function main() {
         const data = await fetchSubmarines();
-        const stats = computeStats(data);
-        document.getElementById('stat-boats').textContent = stats.totalBoats;
-        document.getElementById('stat-lives').textContent = stats.totalLives;
         const params = new URLSearchParams(window.location.search);
         if (params.get('era')) {
           document.getElementById('era').value = params.get('era');
@@ -483,19 +435,39 @@
           const era = document.getElementById('era').value;
           const search = document.getElementById('search').value.trim().toLowerCase();
           const filtered = filterData(data, era, search);
+          renderStats(filtered);
           renderTable(filtered);
         }
 
         document.getElementById('era').addEventListener('change', update);
         document.getElementById('search').addEventListener('input', update);
-        document.getElementById('copy-page-link').addEventListener('click', () => {
-          copyPageLink().catch(() => { });
-        });
         update();
       }
       main();
     </script>
   </div>
+  <script src="/web/glossary-tooltips.js"></script>
+  <script src="/web/site-footer.js"></script>
+  <script src="/web/site-header.js"></script>
+  <script>
+    SiteFooter.render({
+      onCopy: () => {
+        const url = new URL(window.location.href);
+        const era = document.getElementById('era').value;
+        const search = document.getElementById('search').value.trim();
+        url.searchParams.delete('era');
+        url.searchParams.delete('q');
+        if (era && era !== 'all') url.searchParams.set('era', era);
+        if (search) url.searchParams.set('q', search);
+        return navigator.clipboard.writeText(url.toString());
+      },
+    });
+    SiteHeader.render({
+      title:    'Submarines on Eternal Patrol',
+      subtitle: 'Honoring the brave men and vessels lost in service to their nation — those who never returned from the deep.',
+      feedback: 'Have a correction or additional information?',
+    });
+  </script>
 </body>
 
 </html>

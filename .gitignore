@@ -3,7 +3,10 @@
 __pycache__/
 *.pyc
 .venv/
+build/
 certs/
 serve_https.py
 .env.local
 feedback.jsonl
+bin/anthropic key
+web/videos/*.mp4
