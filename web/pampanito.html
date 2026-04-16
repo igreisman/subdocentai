@@ -844,6 +844,12 @@
     </div>
   </dialog>
 
+  <script>
+    // Override the video base by setting window.PAMPANITO_VIDEO_BASE before this
+    // script runs, or by hosting a /web/video-config.js that assigns it.
+    // Defaults to /web/videos for local dev.
+  </script>
+  <script src="/web/video-config.js" onerror="void 0"></script>
   <script src="/web/pampanito-tour-cues.js?v=20260319b"></script>
 
   <script>
@@ -1125,12 +1131,14 @@
       return window.matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop';
     }
 
+    const VIDEO_BASE = (window.PAMPANITO_VIDEO_BASE || '/web/videos').replace(/\/$/, '');
+
     function getVariantSrc(playbackMedia, variant) {
       if (!playbackMedia) return '';
       const srcKey = `${variant}Src`;
       const fileKey = `${variant}File`;
       if (playbackMedia[srcKey]) return playbackMedia[srcKey];
-      if (playbackMedia[fileKey]) return `/web/videos/${playbackMedia[fileKey]}`;
+      if (playbackMedia[fileKey]) return `${VIDEO_BASE}/${playbackMedia[fileKey]}`;
       return '';
     }
 
@@ -1142,15 +1150,15 @@
       const candidates = [];
       for (const variant of orderedVariants) {
         for (const ext of VIDEO_EXTENSIONS) {
-          candidates.push(`/web/videos/${compartment}-${variant}.${ext}`);
-          candidates.push(`/web/videos/${compartment}/${variant}.${ext}`);
-          candidates.push(`/web/videos/${compartment}/${compartment}-${variant}.${ext}`);
+          candidates.push(`${VIDEO_BASE}/${compartment}-${variant}.${ext}`);
+          candidates.push(`${VIDEO_BASE}/${compartment}/${variant}.${ext}`);
+          candidates.push(`${VIDEO_BASE}/${compartment}/${compartment}-${variant}.${ext}`);
         }
       }
       for (const ext of VIDEO_EXTENSIONS) {
-        candidates.push(`/web/videos/${compartment}.${ext}`);
-        candidates.push(`/web/videos/${compartment}/${compartment}.${ext}`);
-        candidates.push(`/web/videos/${compartment}/tour.${ext}`);
+        candidates.push(`${VIDEO_BASE}/${compartment}.${ext}`);
+        candidates.push(`${VIDEO_BASE}/${compartment}/${compartment}.${ext}`);
+        candidates.push(`${VIDEO_BASE}/${compartment}/tour.${ext}`);
       }
       return candidates.filter((candidate, index, list) => list.indexOf(candidate) === index);
     }
@@ -1175,7 +1183,7 @@
       if (preferredSrc) candidates.push(preferredSrc);
       if (alternateSrc) candidates.push(alternateSrc);
       if (playbackMedia.src) candidates.push(playbackMedia.src);
-      if (playbackMedia.file) candidates.push(`/web/videos/${playbackMedia.file}`);
+      if (playbackMedia.file) candidates.push(`${VIDEO_BASE}/${playbackMedia.file}`);
 
       return (candidates.length ? candidates : getAutoVideoCandidates(track, preferredVariant))
         .filter((candidate, index, list) => list.indexOf(candidate) === index)

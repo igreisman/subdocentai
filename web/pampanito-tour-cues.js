@@ -32,7 +32,7 @@ window.PAMPANITO_TOUR_MEDIA = {
   trackPlaybackMedia: {
     after_deck: {
       type: 'video',
-      src: '/web/videos/after_deck.mp4',
+      file: 'after_deck.mp4',
       title: 'After Deck Video Tour',
       caption: 'Aft deck video tour.'
     },

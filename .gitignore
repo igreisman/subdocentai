@@ -10,3 +10,4 @@ serve_https.py
 feedback.jsonl
 bin/anthropic key
 web/videos/*.mp4
+web/video-config.local.js
