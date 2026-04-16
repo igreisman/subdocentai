@@ -300,6 +300,26 @@
       background: #000;
     }
 
+    #videoLoadingOverlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: rgba(6, 10, 18, 0.85);
+      z-index: 2;
+    }
+    #videoLoadingOverlay.visible { display: grid; }
+    #videoLoadingOverlay::after {
+      content: '';
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #7eb8ff;
+      border-radius: 50%;
+      animation: vl-spin 0.8s linear infinite;
+    }
+    @keyframes vl-spin { to { transform: rotate(360deg); } }
+
     #tourVisualPanel.is-empty {
       display: none;
     }
@@ -761,6 +781,7 @@
       <div id="tourVisualFrame">
         <img id="tourVisualImage" alt="USS Pampanito audio tour visual" />
         <video id="tourVideo" preload="auto" playsinline></video>
+        <div id="videoLoadingOverlay"></div>
       </div>
       <div id="tourVisualMeta">
         <div id="tourVisualTitle"></div>
@@ -1328,10 +1349,13 @@
     }
 
     function loadTrack(idx) {
+      const wasPlaying = isPlaying;
       currentIdx = idx;
       const t = TRACKS[idx];
       player.pause();
       tourVideo.pause();
+      isPlaying = false;
+      playPauseBtn.textContent = '▶';
       player.removeAttribute('src');
       tourVideo.removeAttribute('src');
       hideTourVisualPanel();
@@ -1344,6 +1368,9 @@
       activeTourVisualKey = '';
       if (trackUsesVideo(t)) {
         showVideoVisual(playbackMedia, t);
+        if (wasPlaying) {
+          pendingTrackResume = true;
+        }
       } else {
         tourVideo.style.display = 'none';
         tourVisualImage.style.display = 'none';
@@ -1351,6 +1378,9 @@
         player.src = getTrackAudioUrl(t.file);
         player.load();
         setTourVisual(getTrackBaseVisual(t));
+        if (wasPlaying) {
+          pendingTrackResume = true;
+        }
       }
       updatePlaylistHighlight();
     }
@@ -1395,6 +1425,25 @@
       pendingTrackResume = false;
       if (shouldResume) play();
     }
+
+    const videoLoadingOverlay = document.getElementById('videoLoadingOverlay');
+
+    tourVideo.addEventListener('loadstart', () => {
+      videoLoadingOverlay.classList.add('visible');
+      playPauseBtn.style.visibility = 'hidden';
+    });
+    tourVideo.addEventListener('waiting', () => {
+      videoLoadingOverlay.classList.add('visible');
+      playPauseBtn.style.visibility = 'hidden';
+    });
+    tourVideo.addEventListener('canplay', () => {
+      videoLoadingOverlay.classList.remove('visible');
+      playPauseBtn.style.visibility = '';
+    });
+    tourVideo.addEventListener('error', () => {
+      videoLoadingOverlay.classList.remove('visible');
+      playPauseBtn.style.visibility = '';
+    });
 
     tourVideo.addEventListener('loadeddata', () => {
       if (pendingVideoFrameSeek) {
