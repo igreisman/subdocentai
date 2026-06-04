@@ -563,12 +563,7 @@
       font-size: 13px;
       color: #8b949e;
       line-height: 1.6;
-      max-height: 80px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
+      white-space: pre-wrap;
     }
 
     .bulk-meta {
@@ -1143,7 +1138,16 @@
       itemsEl.innerHTML = faqs.map((faq, i) => `
         <div class="bulk-faq-item">
           <div class="faq-q">${escapeHtml(faq.question)}</div>
-          <div class="faq-a">${faq.answer.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300)}</div>
+          <div class="faq-a">${escapeHtml(
+            faq.answer
+              .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
+              .replace(/<br\s*\/?>/gi, '\n')
+              .replace(/<[^>]+>/g, '')
+              .replace(/[ \t]+/g, ' ')
+              .replace(/\n{3,}/g, '\n\n')
+              .replace(/[ \t]*\n[ \t]*/g, '\n')
+              .trim()
+          )}</div>
         </div>
       `).join('');
       saveBtn.style.display = '';
