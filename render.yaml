@@ -31,6 +31,10 @@ services:
         sync: false # required to enable admin and feedback-list routes
       - key: ADMIN_PASSWORD
         sync: false # required to enable admin and feedback-list routes
+      - key: MUSEUM_ADMIN_USERNAME
+        sync: false # optional: grants access only to museum pages editor
+      - key: MUSEUM_ADMIN_PASSWORD
+        sync: false # optional: grants access only to museum pages editor
       - key: PREVIEW_USERNAME
         sync: false # optional: enable preview auth for the tour page
       - key: PREVIEW_PASSWORD

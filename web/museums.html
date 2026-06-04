@@ -56,6 +56,135 @@
       color: #c9d1d9;
       line-height: 1.6;
     }
+
+    .museum-pages {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid #21262d;
+      display: grid;
+      gap: 10px;
+    }
+
+    .museum-pages .museum-pages {
+      margin-top: 10px;
+      padding-top: 10px;
+      padding-left: 14px;
+      border-top: none;
+      border-left: 2px solid #21262d;
+    }
+
+    .museum-page-link {
+      display: block;
+      padding: 14px 16px;
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 10px;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .museum-page-link:hover {
+      border-color: #58a6ff;
+      transform: translateY(-1px);
+    }
+
+    .museum-page-link .page-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .faq-badge {
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #0f2744;
+      border: 1px solid #245487;
+      color: #cfe8ff;
+    }
+
+    .museum-page-link .page-desc {
+      font-size: 13px;
+      color: #8b949e;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .detail-breadcrumb {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #8b949e;
+    }
+    .detail-breadcrumb a {
+      color: #58a6ff;
+      text-decoration: none;
+      padding: 4px 6px;
+      border-radius: 6px;
+    }
+    .detail-breadcrumb a:hover { background: #161b22; }
+    .detail-breadcrumb .sep { color: #484f58; }
+    .detail-breadcrumb .current { color: #e6edf3; padding: 4px 6px; }
+
+    .detail-content {
+      font-size: 15px;
+      color: #c9d1d9;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      margin-bottom: 20px;
+    }
+
+    .detail-content-frame {
+      width: 100%;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      background: #fff;
+      margin-bottom: 20px;
+      min-height: 300px;
+    }
+
+    .detail-attachments {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .attachment-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #58a6ff;
+      text-decoration: none;
+      background: #161b22;
+      width: fit-content;
+      max-width: 100%;
+      transition: border-color 0.15s;
+    }
+    .attachment-link:hover { border-color: #58a6ff; }
+    .attachment-link .ext {
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #8b949e;
+      background: #0d1117;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .detail-title { margin: 0 0 6px; font-size: 24px; }
+    .detail-desc { color: #8b949e; font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
   </style>
 </head>
 
@@ -73,33 +202,175 @@
       feedback: 'Know of a submarine museum we should add? Have a correction?',
     });
 
-    function escHtml(s) {
-      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const main = document.getElementById('main');
+
+    let allMuseums = [];
+    let pagesByMuseumId = {};
+
+    function getPageId() {
+      return new URLSearchParams(location.search).get('page');
     }
+
+    function navigate(pageId) {
+      const url = pageId ? `?page=${pageId}` : location.pathname;
+      history.pushState(null, '', url);
+      renderView();
+    }
+
+    function findPage(pageId) {
+      const id = parseInt(pageId, 10);
+      for (const pages of Object.values(pagesByMuseumId)) {
+        const p = pages.find(pg => pg.id === id);
+        if (p) return p;
+      }
+      return null;
+    }
+
+    function findMuseum(museumId) {
+      return allMuseums.find(m => m.id === museumId) || null;
+    }
+
+    function ancestry(page) {
+      const chain = [];
+      let cur = page;
+      while (cur) {
+        chain.unshift(cur);
+        cur = cur.parent_page_id ? findPage(cur.parent_page_id) : null;
+      }
+      return chain;
+    }
+
+    function renderTopPages(pages, museumId) {
+      const roots = pages.filter(p => !p.parent_page_id);
+      if (!roots.length) return '';
+      return `<div class="museum-pages">${roots.map(p => `
+        <a class="museum-page-link" href="?page=${p.id}" data-page="${p.id}">
+          <div class="page-title">
+            <span>${esc(p.title)}</span>
+            ${p.is_faq ? '<span class="faq-badge">FAQs</span>' : ''}
+          </div>
+          ${p.description ? `<p class="page-desc">${esc(p.description)}</p>` : ''}
+        </a>
+      `).join('')}</div>`;
+    }
+
+    function isHtml(text) {
+      const t = text.trimStart();
+      return /^<!doctype\s+html/i.test(t) || /^<html[\s>]/i.test(t) || /<\/(p|div|h[1-6]|body|table|ul|ol)>/i.test(t);
+    }
+
+    function renderContent(content) {
+      if (isHtml(content)) {
+        return `<iframe class="detail-content-frame" sandbox="allow-same-origin" srcdoc="${esc(content)}" onload="this.style.height=this.contentDocument.documentElement.scrollHeight+'px'"></iframe>`;
+      }
+      return `<div class="detail-content">${esc(content)}</div>`;
+    }
+
+    function renderAttachments(attachments) {
+      if (!attachments || !attachments.length) return '';
+      return `<div class="detail-attachments">${attachments.map(a => {
+        const ext = (a.filename || '').split('.').pop() || '';
+        return `<a class="attachment-link" href="${esc(a.url)}" target="_blank" rel="noopener">
+          <span class="ext">${esc(ext.toUpperCase())}</span>
+          <span>${esc(a.filename)}</span>
+        </a>`;
+      }).join('')}</div>`;
+    }
+
+    function renderMuseumList() {
+      if (!allMuseums.length) {
+        main.innerHTML = '<p style="color:#8b949e;padding:24px 0">No museums listed yet.</p>';
+        return;
+      }
+      main.innerHTML = allMuseums.map(m => {
+        const pages = pagesByMuseumId[m.id] || [];
+        return `<div class="museum-card">
+          <div class="museum-body">
+            <h2>${esc(m.name)}</h2>
+            ${m.designation ? `<div class="designation">${esc(m.designation)}</div>` : ''}
+            ${m.location    ? `<div class="designation">${esc(m.location)}</div>` : ''}
+            ${m.description ? `<p>${esc(m.description)}</p>` : ''}
+            ${renderTopPages(pages, m.id)}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderPageDetail(pageId) {
+      const page = findPage(pageId);
+      if (!page) { renderMuseumList(); return; }
+      const museum = findMuseum(page.museum_id);
+      const chain = ancestry(page);
+      const pages = pagesByMuseumId[page.museum_id] || [];
+      const children = pages.filter(p => (p.parent_page_id || null) === page.id);
+
+      const crumbs = [`<a href="?" data-page="">Museums</a>`];
+      if (museum) {
+        crumbs.push('<span class="sep">›</span>');
+        crumbs.push(`<a href="?" data-page="">${esc(museum.name)}</a>`);
+      }
+      chain.forEach((p, i) => {
+        crumbs.push('<span class="sep">›</span>');
+        if (i === chain.length - 1) {
+          crumbs.push(`<span class="current">${esc(p.title)}</span>`);
+        } else {
+          crumbs.push(`<a href="?page=${p.id}" data-page="${p.id}">${esc(p.title)}</a>`);
+        }
+      });
+
+      const childHtml = children.length ? `
+        <div class="museum-pages">${children.map(c => `
+          <a class="museum-page-link" href="?page=${c.id}" data-page="${c.id}">
+            <div class="page-title">
+              <span>${esc(c.title)}</span>
+              ${c.is_faq ? '<span class="faq-badge">FAQs</span>' : ''}
+            </div>
+            ${c.description ? `<p class="page-desc">${esc(c.description)}</p>` : ''}
+          </a>
+        `).join('')}</div>` : '';
+
+      main.innerHTML = `
+        <nav class="detail-breadcrumb">${crumbs.join('')}</nav>
+        <h1 class="detail-title">${esc(page.title)}</h1>
+        ${page.description ? `<p class="detail-desc">${esc(page.description)}</p>` : ''}
+        ${page.content ? renderContent(page.content) : ''}
+        ${renderAttachments(page.attachments)}
+        ${childHtml}
+      `;
+    }
+
+    function renderView() {
+      const pageId = getPageId();
+      if (pageId) {
+        renderPageDetail(pageId);
+      } else {
+        renderMuseumList();
+      }
+    }
+
+    main.addEventListener('click', (e) => {
+      const link = e.target.closest('[data-page]');
+      if (!link) return;
+      e.preventDefault();
+      const pid = link.dataset.page;
+      navigate(pid || null);
+    });
+
+    window.addEventListener('popstate', renderView);
 
     fetch('/api/museums')
       .then(r => r.json())
-      .then(museums => {
-        const main = document.getElementById('main');
-        if (!museums.length) {
-          main.innerHTML = '<p style="color:#8b949e;padding:24px 0">No museums listed yet.</p>';
-          return;
-        }
-        main.innerHTML = museums.map(m => {
-          const tag = m.url ? 'a' : 'div';
-          const href = m.url ? ` href="${escHtml(m.url)}"` : '';
-          return `<${tag} class="museum-card"${href}>
-            <div class="museum-body">
-              <h2>${escHtml(m.name)}</h2>
-              ${m.designation ? `<div class="designation">${escHtml(m.designation)}</div>` : ''}
-              ${m.location    ? `<div class="designation">${escHtml(m.location)}</div>` : ''}
-              ${m.description ? `<p>${escHtml(m.description)}</p>` : ''}
-            </div>
-          </${tag}>`;
-        }).join('');
+      .then(async (museums) => {
+        allMuseums = museums;
+        const allPages = await Promise.all(
+          museums.map(m => fetch(`/api/museums/${m.id}/pages`).then(r => r.ok ? r.json() : []).catch(() => []))
+        );
+        museums.forEach((m, i) => { pagesByMuseumId[m.id] = allPages[i]; });
+        renderView();
       })
-      .catch(e => {
-        document.getElementById('main').innerHTML = '<p style="color:#8b949e;padding:24px 0">Unable to load museums.</p>';
+      .catch(() => {
+        main.innerHTML = '<p style="color:#8b949e;padding:24px 0">Unable to load museums.</p>';
       });
   </script>
 </body>

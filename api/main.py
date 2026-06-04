@@ -112,6 +112,8 @@ DEFAULT_ROOT_REDIRECT = os.getenv("DEFAULT_ROOT_REDIRECT", "/web/welcome.html").
 RETURNING_VISITOR_REDIRECT = os.getenv("RETURNING_VISITOR_REDIRECT", "/web/faqs.html").strip() or "/web/faqs.html"
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
+MUSEUM_ADMIN_USERNAME = os.getenv("MUSEUM_ADMIN_USERNAME", "").strip()
+MUSEUM_ADMIN_PASSWORD = os.getenv("MUSEUM_ADMIN_PASSWORD", "").strip()
 PREVIEW_USERNAME = os.getenv("PREVIEW_USERNAME", "").strip()
 PREVIEW_PASSWORD = os.getenv("PREVIEW_PASSWORD", "").strip()
 ADMIN_PAGE_PATHS = {
@@ -146,6 +148,14 @@ def _is_admin_path(path: str) -> bool:
         or path == "/feedback/list"
         or path in ADMIN_PAGE_PATHS
         or (path.startswith("/web/edit_") and path.endswith(".html"))
+    )
+
+
+def _is_museum_admin_path(path: str) -> bool:
+    return (
+        path.startswith("/admin/museum_pages")
+        or path == "/web/edit_museum_pages.html"
+        or path == "/edit_museum_pages.html"
     )
 
 
@@ -188,7 +198,24 @@ async def redirect_legacy_domain(request: Request, call_next):
 @app.middleware("http")
 async def protect_sensitive_routes(request: Request, call_next):
     path = request.url.path
-    if _is_admin_path(path):
+    if _is_museum_admin_path(path):
+        super_ok = (
+            ADMIN_USERNAME and ADMIN_PASSWORD
+            and _check_basic_auth(request, ADMIN_USERNAME, ADMIN_PASSWORD)
+        )
+        museum_ok = (
+            MUSEUM_ADMIN_USERNAME and MUSEUM_ADMIN_PASSWORD
+            and _check_basic_auth(request, MUSEUM_ADMIN_USERNAME, MUSEUM_ADMIN_PASSWORD)
+        )
+        if not super_ok and not museum_ok:
+            if not (ADMIN_USERNAME and ADMIN_PASSWORD) and not (MUSEUM_ADMIN_USERNAME and MUSEUM_ADMIN_PASSWORD):
+                return _basic_auth_challenge(
+                    "SubmarineDocent Museum Admin",
+                    "Museum admin access is disabled. Set MUSEUM_ADMIN_USERNAME and MUSEUM_ADMIN_PASSWORD to enable it.",
+                    status_code=503,
+                )
+            return _basic_auth_challenge("SubmarineDocent Museum Admin", "Authentication required.")
+    elif _is_admin_path(path):
         if not ADMIN_USERNAME or not ADMIN_PASSWORD:
             return _basic_auth_challenge(
                 "SubmarineDocent Admin",
@@ -3555,6 +3582,257 @@ def delete_museum(museum_id: int):
     with _museums_write_lock:
         _save_museums()
     return {"status": "deleted", "museum_id": museum_id}
+
+
+# ------------------------------------------------------------
+# Museum sub-pages (managed by museum admin)
+# ------------------------------------------------------------
+
+_MUSEUM_PAGES_PATH = os.path.join(CORPORA_DIR, "museum_pages.jsonl")
+_MUSEUM_UPLOADS_DIR = os.path.join(CORPORA_DIR, "museum_uploads")
+_MUSEUM_UPLOAD_ALLOWED_EXTS = {
+    ".html", ".htm",
+    ".doc", ".docx",
+    ".xls", ".xlsx",
+    ".ppt", ".pptx",
+    ".pdf", ".txt", ".md", ".rtf", ".odt",
+}
+_MUSEUM_UPLOAD_MAX_BYTES = 25 * 1024 * 1024  # 25 MB per file
+_museum_pages_cache: list | None = None
+_museum_pages_write_lock = threading.Lock()
+
+os.makedirs(_MUSEUM_UPLOADS_DIR, exist_ok=True)
+app.mount(
+    "/museum_uploads",
+    StaticFiles(directory=_MUSEUM_UPLOADS_DIR),
+    name="museum_uploads",
+)
+
+
+def _load_museum_pages() -> list:
+    global _museum_pages_cache
+    if _museum_pages_cache is not None:
+        return _museum_pages_cache
+    pages = []
+    if os.path.exists(_MUSEUM_PAGES_PATH):
+        with open(_MUSEUM_PAGES_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        pages.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    _museum_pages_cache = pages
+    return pages
+
+
+def _save_museum_pages() -> None:
+    pages = _load_museum_pages()
+    os.makedirs(os.path.dirname(_MUSEUM_PAGES_PATH), exist_ok=True)
+    with open(_MUSEUM_PAGES_PATH, "w", encoding="utf-8") as f:
+        for entry in pages:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _next_museum_page_id(pages: list) -> int:
+    existing = [int(p.get("id") or 0) for p in pages]
+    return (max(existing) + 1) if existing else 1
+
+
+def _museum_exists(museum_id: int) -> bool:
+    return any(int(m.get("id") or 0) == museum_id for m in _load_museums())
+
+
+@app.get("/api/museums/{museum_id}/pages")
+def get_museum_pages(museum_id: int):
+    if not _museum_exists(museum_id):
+        raise HTTPException(status_code=404, detail="Museum not found")
+    return [p for p in _load_museum_pages() if int(p.get("museum_id") or 0) == museum_id]
+
+
+def _coerce_parent_id(value, museum_id: int, pages: list, self_id: int | None = None) -> int | None:
+    if value in (None, "", 0, "0"):
+        return None
+    try:
+        parent_id = int(value)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="parent_page_id must be an integer or null")
+    parent = next((p for p in pages if int(p.get("id") or 0) == parent_id), None)
+    if parent is None:
+        raise HTTPException(status_code=404, detail="Parent page not found")
+    if int(parent.get("museum_id") or 0) != museum_id:
+        raise HTTPException(status_code=400, detail="Parent page belongs to a different museum")
+    if self_id is not None:
+        ancestor = parent
+        while ancestor is not None:
+            if int(ancestor.get("id") or 0) == self_id:
+                raise HTTPException(status_code=400, detail="Cannot set parent to self or a descendant")
+            pid = ancestor.get("parent_page_id")
+            ancestor = next((p for p in pages if int(p.get("id") or 0) == (pid or 0)), None) if pid else None
+    return parent_id
+
+
+@app.post("/admin/museum_pages")
+async def create_museum_page(request: Request):
+    body = await request.json()
+    try:
+        museum_id = int(body.get("museum_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="museum_id is required")
+    if not _museum_exists(museum_id):
+        raise HTTPException(status_code=404, detail="Museum not found")
+    title = (body.get("title") or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="title is required")
+    pages = _load_museum_pages()
+    parent_page_id = _coerce_parent_id(body.get("parent_page_id"), museum_id, pages)
+    new_entry = {
+        "id": _next_museum_page_id(pages),
+        "museum_id": museum_id,
+        "parent_page_id": parent_page_id,
+        "title": title,
+        "description": (body.get("description") or "").strip(),
+        "is_faq": bool(body.get("is_faq")),
+        "content": (body.get("content") or "").strip(),
+        "attachments": [],
+    }
+    with _museum_pages_write_lock:
+        pages.append(new_entry)
+        _save_museum_pages()
+    return {"status": "created", "page": new_entry}
+
+
+@app.put("/admin/museum_pages/{page_id}")
+async def update_museum_page(page_id: int, request: Request):
+    pages = _load_museum_pages()
+    target = next((p for p in pages if int(p.get("id") or 0) == page_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Page not found")
+    body = await request.json()
+    with _museum_pages_write_lock:
+        if "title" in body:
+            target["title"] = (body["title"] or "").strip()
+        if "description" in body:
+            target["description"] = (body["description"] or "").strip()
+        if "is_faq" in body:
+            target["is_faq"] = bool(body["is_faq"])
+        if "content" in body:
+            target["content"] = (body["content"] or "").strip()
+        if "parent_page_id" in body:
+            target["parent_page_id"] = _coerce_parent_id(
+                body["parent_page_id"], int(target["museum_id"]), pages, self_id=page_id
+            )
+        _save_museum_pages()
+    return {"status": "updated", "page": target}
+
+
+@app.delete("/admin/museum_pages/{page_id}")
+def delete_museum_page(page_id: int):
+    pages = _load_museum_pages()
+    to_delete = {page_id}
+    changed = True
+    while changed:
+        changed = False
+        for p in pages:
+            pid = int(p.get("id") or 0)
+            parent = p.get("parent_page_id")
+            if parent and int(parent) in to_delete and pid not in to_delete:
+                to_delete.add(pid)
+                changed = True
+    original_len = len(pages)
+    pages[:] = [p for p in pages if int(p.get("id") or 0) not in to_delete]
+    if len(pages) == original_len:
+        raise HTTPException(status_code=404, detail="Page not found")
+    with _museum_pages_write_lock:
+        _save_museum_pages()
+    for pid in to_delete:
+        shutil.rmtree(os.path.join(_MUSEUM_UPLOADS_DIR, str(pid)), ignore_errors=True)
+    return {"status": "deleted", "page_ids": sorted(to_delete)}
+
+
+def _sanitize_upload_name(name: str) -> str:
+    stem, ext = os.path.splitext(os.path.basename(name or ""))
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", stem).strip("._") or "file"
+    return (stem + ext.lower())[:120]
+
+
+def _next_attachment_id(attachments: list) -> int:
+    existing = [int(a.get("id") or 0) for a in attachments]
+    return (max(existing) + 1) if existing else 1
+
+
+@app.post("/admin/museum_pages/{page_id}/uploads")
+async def upload_museum_page_attachment(page_id: int, file: UploadFile = File(...)):
+    pages = _load_museum_pages()
+    target = next((p for p in pages if int(p.get("id") or 0) == page_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    orig_name = _sanitize_upload_name(file.filename or "")
+    ext = os.path.splitext(orig_name)[1].lower()
+    if ext not in _MUSEUM_UPLOAD_ALLOWED_EXTS:
+        raise HTTPException(status_code=400, detail=f"File type {ext or '(none)'} is not allowed")
+
+    page_dir = os.path.join(_MUSEUM_UPLOADS_DIR, str(page_id))
+    os.makedirs(page_dir, exist_ok=True)
+
+    attachments = list(target.get("attachments") or [])
+    attachment_id = _next_attachment_id(attachments)
+    stored_name = f"{attachment_id}_{orig_name}"
+    dest_path = os.path.join(page_dir, stored_name)
+
+    total = 0
+    try:
+        with open(dest_path, "wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > _MUSEUM_UPLOAD_MAX_BYTES:
+                    out.close()
+                    os.remove(dest_path)
+                    raise HTTPException(status_code=413, detail="File exceeds 25 MB limit")
+                out.write(chunk)
+    finally:
+        await file.close()
+
+    entry = {
+        "id": attachment_id,
+        "filename": orig_name,
+        "stored_name": stored_name,
+        "content_type": file.content_type or "application/octet-stream",
+        "size": total,
+        "url": f"/museum_uploads/{page_id}/{stored_name}",
+    }
+    with _museum_pages_write_lock:
+        attachments.append(entry)
+        target["attachments"] = attachments
+        _save_museum_pages()
+    return {"status": "uploaded", "attachment": entry}
+
+
+@app.delete("/admin/museum_pages/{page_id}/uploads/{attachment_id}")
+def delete_museum_page_attachment(page_id: int, attachment_id: int):
+    pages = _load_museum_pages()
+    target = next((p for p in pages if int(p.get("id") or 0) == page_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Page not found")
+    attachments = list(target.get("attachments") or [])
+    match = next((a for a in attachments if int(a.get("id") or 0) == attachment_id), None)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    stored = match.get("stored_name")
+    if stored:
+        try:
+            os.remove(os.path.join(_MUSEUM_UPLOADS_DIR, str(page_id), stored))
+        except FileNotFoundError:
+            pass
+    with _museum_pages_write_lock:
+        target["attachments"] = [a for a in attachments if int(a.get("id") or 0) != attachment_id]
+        _save_museum_pages()
+    return {"status": "deleted", "attachment_id": attachment_id}
 
 
 # ------------------------------------------------------------
