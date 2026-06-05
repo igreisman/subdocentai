@@ -209,8 +209,15 @@
     </div>
 
     <p class="lead">
-      This text is sent to Whisper as a domain hint before transcribing visitor speech.
-      It biases the speech recognizer toward submarine-specific terms, reducing mishearings
+      <strong>Whisper</strong> is the AI speech-to-text model (from OpenAI) that converts a
+      visitor's spoken question into written text so the docent can answer it. Like any speech
+      recognizer, it can mishear unfamiliar words — especially submarine jargon it rarely
+      encounters.
+    </p>
+
+    <p class="lead">
+      The text below is sent to Whisper as a domain hint before transcribing visitor speech.
+      It biases the recognizer toward submarine-specific terms, reducing mishearings
       like <em>"punk"</em> for <em>"bunk"</em>.
       Add any term you notice being misrecognized. Phrases work better than single words.
       Keep the total under ~200 words. <span id="count"></span>
