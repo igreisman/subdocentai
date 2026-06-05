@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Edit Categories</title>
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
   <style>
     *,
     *::before,
@@ -274,6 +275,10 @@
       transition: border-color 0.15s, background 0.15s, transform 0.15s;
     }
 
+    .category-card:active { cursor: grabbing; }
+    .category-card .action-btn { cursor: pointer; }
+
+
     .category-card.dragging {
       opacity: 0.55;
       border-color: #58a6ff;
@@ -301,6 +306,24 @@
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 12px;
       align-items: center;
+    }
+
+    .category-name {
+      font-size: 17px;
+      font-weight: 700;
+      color: #e6edf3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .action-btn.edit-btn {
+      border-color: #1f6feb;
+      color: #9ecbff;
+    }
+
+    .action-btn.edit-btn:hover:not(:disabled) {
+      background: #132034;
     }
 
     .action-row {
@@ -518,6 +541,141 @@
     .modal-status.ok { color: #3fb950; }
     .modal-status.err { color: #f85149; }
 
+    /* Edit Category modal */
+    #edit-category-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 400;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 24px;
+      overflow-y: auto;
+    }
+
+    #edit-category-backdrop.open { display: flex; }
+
+    #edit-category-modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 18px;
+      width: min(100%, 740px);
+      padding: 28px 32px 32px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    #edit-category-modal h2 { margin: 0 0 18px; font-size: 24px; }
+
+    #edit-category-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: none;
+      border: none;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 24px;
+      line-height: 1;
+      padding: 4px 8px;
+    }
+
+    #edit-category-close:hover { color: #e6edf3; }
+
+    .edit-name-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .edit-name-row .modal-input { flex: 1; }
+
+    .edit-faqs-heading {
+      margin: 26px 0 6px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #edit-category-faqs {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .edit-faq-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      background: #0d1117;
+      padding: 10px 14px;
+      cursor: grab;
+    }
+
+    .edit-faq-row:active { cursor: grabbing; }
+    .edit-faq-row .action-btn { cursor: pointer; }
+    .edit-faq-row.dragging { opacity: 0.55; border-color: #58a6ff; }
+    .edit-faq-row.drag-target { border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.16); }
+
+    .edit-faq-title {
+      font-size: 14px;
+      color: #e6edf3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .edit-faq-editor {
+      border: 1px solid #1f6feb;
+      border-radius: 12px;
+      background: #0d1117;
+      padding: 14px 16px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .edit-faq-editor .field-label { margin-top: 8px; }
+    .edit-faq-editor .field-label:first-child { margin-top: 0; }
+    .edit-faq-editor .modal-footer { margin-top: 10px; }
+
+    /* Quill dark-mode overrides (scoped to the FAQ editor) */
+    .edit-faq-editor .ql-toolbar.ql-snow {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-bottom: none;
+      border-radius: 10px 10px 0 0;
+    }
+    .edit-faq-editor .ql-toolbar.ql-snow .ql-stroke { stroke: #c9d1d9; }
+    .edit-faq-editor .ql-toolbar.ql-snow .ql-fill { fill: #c9d1d9; }
+    .edit-faq-editor .ql-toolbar.ql-snow .ql-picker { color: #c9d1d9; }
+    .edit-faq-editor .ql-toolbar.ql-snow .ql-picker-options { background: #21262d; border-color: #30363d; }
+    .edit-faq-editor .ql-container.ql-snow {
+      border: 1px solid #30363d;
+      border-radius: 0 0 10px 10px;
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: inherit;
+      font-size: 14px;
+    }
+    .edit-faq-editor .ql-editor { min-height: 180px; line-height: 1.6; }
+    .edit-faq-editor .ql-editor p { color: #c9d1d9; }
+    .edit-faq-editor .ql-editor a { color: #58a6ff; }
+    .edit-faq-editor .ql-editor.ql-blank::before { color: #6e7681; font-style: normal; }
+
+    .edit-faqs-empty {
+      border: 1px dashed #30363d;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      color: #8b949e;
+      font-size: 13px;
+    }
+
     .upload-zone {
       border: 2px dashed #30363d;
       border-radius: 12px;
@@ -609,12 +767,19 @@
     <div id="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
       <button id="help-close" type="button" aria-label="Close help">&times;</button>
       <h1 id="help-title">Categories</h1>
-      <p class="lede">Manage the full FAQ category list here. You can rename categories, move them up or down to
-        change display order, add new ones, delete categories, and add FAQs directly to any category.</p>
+      <p class="lede">Manage the full FAQ category list here. You can reorder categories, rename them, edit and
+        reorder the FAQs inside each one, add new categories, delete categories, and add FAQs.</p>
       <ul class="hint-list">
-        <li>Drag categories up and down to change the order used on the public FAQ page.</li>
-        <li>Renaming a category also updates every FAQ currently assigned to it.</li>
-        <li>Deleting a category clears that category assignment from matching FAQs.</li>
+        <li><strong>Reorder categories:</strong> drag a category card — by its title or anywhere on the row — to change the order used on the public FAQ page. (The Edit, Add FAQs, and Delete buttons don't start a drag.)</li>
+        <li><strong>Edit</strong> opens a panel for that category where you can rename it and manage its FAQs:
+          <ul class="hint-list">
+            <li>Change the <strong>Category name</strong> and click <strong>Save</strong>. Renaming also updates every FAQ assigned to it.</li>
+            <li><strong>Reorder FAQs</strong> by dragging a FAQ by its name; the new order saves automatically.</li>
+            <li>Click <strong>Edit</strong> on a FAQ to change its question and answer with the rich-text editor, then click <strong>Save</strong> — that one button saves both the category name and the open FAQ.</li>
+          </ul>
+        </li>
+        <li><strong>Add Category</strong> adds a new, empty category at the bottom of the list.</li>
+        <li><strong>Delete</strong> removes a category and clears that category assignment from its FAQs (the FAQs themselves are kept).</li>
         <li><strong>Add FAQs</strong> opens a panel where you can add a single FAQ (type a question and answer) or bulk-import multiple FAQs from a <code>.docx</code> file. In the Word document, write each question in <strong>bold</strong> — the paragraphs that follow it (until the next bold line) become the answer.</li>
       </ul>
       <div class="summary">
@@ -668,7 +833,28 @@
     </div>
   </div>
 
+  <!-- Edit Category modal -->
+  <div id="edit-category-backdrop" aria-hidden="true">
+    <div id="edit-category-modal" role="dialog" aria-modal="true" aria-labelledby="edit-category-title">
+      <button id="edit-category-close" type="button" aria-label="Close">&times;</button>
+      <h2 id="edit-category-title">Edit Category</h2>
+
+      <label class="field-label" for="edit-category-name">Category name</label>
+      <div class="edit-name-row">
+        <input class="modal-input" id="edit-category-name" type="text" autocomplete="off">
+        <button class="btn" id="edit-category-name-save" type="button">Save</button>
+      </div>
+      <span class="modal-status" id="edit-category-name-status"></span>
+
+      <h3 class="edit-faqs-heading">FAQs in this category <span id="edit-category-faq-count" class="faq-count"></span></h3>
+      <p class="hint">Drag a FAQ to reorder. The new order is saved automatically and used on the public FAQ page.</p>
+      <div id="edit-category-faqs"></div>
+      <span class="modal-status" id="edit-category-reorder-status"></span>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/mammoth/mammoth.browser.min.js"></script>
+  <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
   <script>
     const API = '';
     let categoryRecords = [];
@@ -704,9 +890,6 @@
       });
       const addInput = document.getElementById('new-category-title');
       addInput.disabled = nextBusy;
-      document.querySelectorAll('.category-title-input').forEach(input => {
-        input.disabled = nextBusy;
-      });
     }
 
     function getFaqCount(title) {
@@ -730,9 +913,10 @@
         return `
           <article class="category-card" data-title="${escapeHtml(record.title)}" draggable="true">
             <div class="category-controls">
-              <input class="text-input category-title-input" type="text" value="${escapeHtml(record.title)}" data-original-title="${escapeHtml(record.title)}" autocomplete="off">
+              <div class="category-name">${escapeHtml(record.title)}</div>
               <div class="action-row">
                   <div class="faq-count">${faqCount} FAQ${faqCount === 1 ? '' : 's'}</div>
+                <button class="action-btn edit-btn" type="button" data-title="${escapeHtml(record.title)}">Edit</button>
                 <button class="action-btn add-faqs-btn" type="button" data-title="${escapeHtml(record.title)}">Add FAQs</button>
                 <button class="action-btn danger delete-btn" type="button" data-title="${escapeHtml(record.title)}">Delete</button>
               </div>
@@ -824,33 +1008,6 @@
       }
     }
 
-    async function renameCategory(originalTitle, nextTitle) {
-      if (!nextTitle) {
-        setStatus('Category names cannot be blank.', 'error');
-        await loadData();
-        return;
-      }
-      if (originalTitle === nextTitle) {
-        clearStatus();
-        return;
-      }
-
-      setBusy(true);
-      setStatus('Renaming category…', 'info');
-      try {
-        await sendJson(`${API}/admin/faq-categories/rename`, {
-          method: 'PUT',
-          body: JSON.stringify({ old_title: originalTitle, new_title: nextTitle }),
-        });
-        await loadData();
-        setStatus(`Renamed “${originalTitle}” to “${nextTitle}”.`, 'success');
-      } catch (error) {
-        setStatus(error.message, 'error');
-      } finally {
-        setBusy(false);
-      }
-    }
-
     async function deleteCategory(title) {
       const confirmed = window.confirm(`Delete “${title}”? FAQs using this category will be left uncategorized.`);
       if (!confirmed) {
@@ -912,33 +1069,18 @@
         deleteCategory(title);
       } else if (button.classList.contains('add-faqs-btn')) {
         openAddFaqsModal(title);
+      } else if (button.classList.contains('edit-btn')) {
+        openEditCategoryModal(title);
       }
     });
-
-    document.getElementById('categories-list').addEventListener('keydown', event => {
-      if (busy || !event.target.classList.contains('category-title-input')) {
-        return;
-      }
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        event.target.blur();
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.target.value = event.target.dataset.originalTitle;
-        event.target.blur();
-      }
-    });
-
-    document.getElementById('categories-list').addEventListener('blur', event => {
-      if (busy || !event.target.classList.contains('category-title-input')) {
-        return;
-      }
-      const input = event.target;
-      renameCategory(input.dataset.originalTitle, input.value.trim());
-    }, true);
 
     document.getElementById('categories-list').addEventListener('dragstart', event => {
+      // The whole card (title included) is a drag handle for reordering, but
+      // not the action buttons — clicking those should act, not start a drag.
+      if (event.target.closest('button')) {
+        event.preventDefault();
+        return;
+      }
       const card = event.target.closest('.category-card');
       if (!card || busy) {
         event.preventDefault();
@@ -1041,6 +1183,288 @@
 
     document.querySelectorAll('.modal-tab').forEach(btn => {
       btn.addEventListener('click', () => switchModalTab(btn.dataset.tab));
+    });
+
+    // ----- Edit Category modal -----
+    let editCategoryTitle = null;
+    let editDraggedId = null;
+    let editingFaqId = null;
+    let faqQuill = null;
+
+    function setEditStatus(id, message, type) {
+      const el = document.getElementById(id);
+      el.textContent = message;
+      el.className = 'modal-status' + (type ? ' ' + type : '');
+    }
+
+    function faqsForCategory(title) {
+      const key = (title || '').trim();
+      const orderValue = entry => {
+        const raw = entry.display_order;
+        return raw === null || raw === undefined || raw === '' || Number.isNaN(Number(raw))
+          ? Number.POSITIVE_INFINITY
+          : Number(raw);
+      };
+      return faqRecords
+        .filter(entry => (entry.category || '').trim() === key)
+        .slice()
+        .sort((a, b) => {
+          const diff = orderValue(a) - orderValue(b);
+          return diff !== 0 ? diff : (a.title || '').localeCompare(b.title || '');
+        });
+    }
+
+    function renderEditCategoryFaqs() {
+      const container = document.getElementById('edit-category-faqs');
+      const faqs = faqsForCategory(editCategoryTitle);
+      document.getElementById('edit-category-faq-count').textContent =
+        `${faqs.length} FAQ${faqs.length === 1 ? '' : 's'}`;
+      if (!faqs.length) {
+        container.innerHTML = '<div class="edit-faqs-empty">No FAQs in this category yet. Use “Add FAQs” to create some.</div>';
+        return;
+      }
+      container.innerHTML = faqs.map(faq => {
+        const id = escapeHtml(faq.chunk_id);
+        if (faq.chunk_id === editingFaqId) {
+          return `
+            <div class="edit-faq-editor" data-id="${id}">
+              <label class="field-label">Question</label>
+              <input class="modal-input faq-edit-question" type="text" value="${escapeHtml(faq.title || '')}">
+              <label class="field-label">Answer</label>
+              <div class="faq-edit-quill"></div>
+            </div>
+          `;
+        }
+        return `
+          <div class="edit-faq-row" data-id="${id}" draggable="true">
+            <div class="edit-faq-title">${escapeHtml(faq.title || '(untitled)')}</div>
+            <button class="action-btn edit-btn faq-edit-open" type="button" data-id="${id}">Edit</button>
+          </div>
+        `;
+      }).join('');
+
+      // Mount a Quill WYSIWYG editor on the answer when a FAQ is being edited.
+      faqQuill = null;
+      if (editingFaqId) {
+        const editor = container.querySelector(`.edit-faq-editor[data-id="${CSS.escape(editingFaqId)}"]`);
+        const faq = faqs.find(item => item.chunk_id === editingFaqId);
+        if (editor && faq) {
+          faqQuill = new Quill(editor.querySelector('.faq-edit-quill'), {
+            theme: 'snow',
+            placeholder: 'Enter the answer…',
+            modules: {
+              toolbar: [
+                [{ header: [2, 3, false] }],
+                ['bold', 'italic', 'underline'],
+                [{ list: 'ordered' }, { list: 'bullet' }],
+                ['link'],
+                ['clean'],
+              ],
+            },
+          });
+          faqQuill.root.innerHTML = faq.text || '';
+        }
+      }
+    }
+
+    function openEditCategoryModal(title) {
+      editCategoryTitle = title;
+      editingFaqId = null;
+      document.getElementById('edit-category-name').value = title;
+      setEditStatus('edit-category-name-status', '', '');
+      setEditStatus('edit-category-reorder-status', '', '');
+      renderEditCategoryFaqs();
+      const backdrop = document.getElementById('edit-category-backdrop');
+      backdrop.classList.add('open');
+      backdrop.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeEditCategoryModal() {
+      const backdrop = document.getElementById('edit-category-backdrop');
+      backdrop.classList.remove('open');
+      backdrop.setAttribute('aria-hidden', 'true');
+      editCategoryTitle = null;
+      editingFaqId = null;
+    }
+
+    // Single "Save" — persists the category name and, if a FAQ is open for
+    // editing, that FAQ's question and answer, in one click.
+    async function saveEditCategory() {
+      const nameInput = document.getElementById('edit-category-name');
+      const nextTitle = nameInput.value.trim();
+      if (!nextTitle) {
+        setEditStatus('edit-category-name-status', 'Category name cannot be blank.', 'err');
+        return;
+      }
+
+      // Capture the open FAQ editor's values before any reload/re-render.
+      let faqEdit = null;
+      if (editingFaqId && faqQuill) {
+        const editorEl = editFaqsEl.querySelector(`.edit-faq-editor[data-id="${CSS.escape(editingFaqId)}"]`);
+        if (editorEl) {
+          faqEdit = {
+            chunkId: editingFaqId,
+            question: editorEl.querySelector('.faq-edit-question').value.trim(),
+            answerHtml: faqQuill.root.innerHTML,
+            answerText: faqQuill.getText().trim(),
+          };
+        }
+      }
+      if (faqEdit && (!faqEdit.question || !faqEdit.answerText)) {
+        setEditStatus('edit-category-name-status', 'FAQ question and answer are both required.', 'err');
+        return;
+      }
+
+      const saveBtn = document.getElementById('edit-category-name-save');
+      saveBtn.disabled = true;
+      setEditStatus('edit-category-name-status', 'Saving…', '');
+      try {
+        if (faqEdit) {
+          await sendJson(`${API}/admin/faq/${encodeURIComponent(faqEdit.chunkId)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ title: faqEdit.question, text: faqEdit.answerHtml }),
+          });
+          const entry = faqRecords.find(faq => faq.chunk_id === faqEdit.chunkId);
+          if (entry) {
+            entry.title = faqEdit.question;
+            entry.text = faqEdit.answerHtml;
+          }
+        }
+        if (nextTitle !== editCategoryTitle) {
+          await sendJson(`${API}/admin/faq-categories/rename`, {
+            method: 'PUT',
+            body: JSON.stringify({ old_title: editCategoryTitle, new_title: nextTitle }),
+          });
+          editCategoryTitle = nextTitle;
+        }
+        await loadData();
+        editingFaqId = null;
+        renderEditCategoryFaqs();
+        setEditStatus('edit-category-name-status', 'Saved.', 'ok');
+      } catch (error) {
+        setEditStatus('edit-category-name-status', error.message, 'err');
+      } finally {
+        saveBtn.disabled = false;
+      }
+    }
+
+    async function saveFaqOrder() {
+      const container = document.getElementById('edit-category-faqs');
+      const orderedIds = Array.from(container.querySelectorAll('.edit-faq-row')).map(row => row.dataset.id);
+      setEditStatus('edit-category-reorder-status', 'Saving order…', '');
+      try {
+        await sendJson(`${API}/admin/faqs/reorder`, {
+          method: 'POST',
+          body: JSON.stringify({ category: editCategoryTitle, ordered_ids: orderedIds }),
+        });
+        // Reflect the new order locally so reopening the modal shows it.
+        orderedIds.forEach((id, index) => {
+          const entry = faqRecords.find(faq => faq.chunk_id === id);
+          if (entry) entry.display_order = index * 10;
+        });
+        setEditStatus('edit-category-reorder-status', 'Order saved.', 'ok');
+      } catch (error) {
+        setEditStatus('edit-category-reorder-status', error.message, 'err');
+      }
+    }
+
+    // Drag-to-reorder FAQ rows — handle-gated, same pattern as the category cards.
+    const editFaqsEl = document.getElementById('edit-category-faqs');
+
+    // Open the inline FAQ editor; saving is handled by the single "Save" button.
+    editFaqsEl.addEventListener('click', event => {
+      const openBtn = event.target.closest('.faq-edit-open');
+      if (openBtn) {
+        editingFaqId = openBtn.dataset.id;
+        renderEditCategoryFaqs();
+        const field = editFaqsEl.querySelector(`.edit-faq-editor[data-id="${CSS.escape(editingFaqId)}"] .faq-edit-question`);
+        if (field) {
+          field.focus();
+        }
+      }
+    });
+
+    editFaqsEl.addEventListener('dragstart', event => {
+      // The whole row (title included) drags to reorder, but not the Edit button.
+      if (event.target.closest('button')) {
+        event.preventDefault();
+        return;
+      }
+      const row = event.target.closest('.edit-faq-row');
+      if (!row) {
+        event.preventDefault();
+        return;
+      }
+      editDraggedId = row.dataset.id;
+      row.classList.add('dragging');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', editDraggedId);
+    });
+
+    editFaqsEl.addEventListener('dragend', () => {
+      editFaqsEl.querySelectorAll('.edit-faq-row').forEach(row => row.classList.remove('dragging'));
+      editFaqsEl.querySelectorAll('.edit-faq-row.drag-target').forEach(row => row.classList.remove('drag-target'));
+      editDraggedId = null;
+    });
+
+    editFaqsEl.addEventListener('dragover', event => {
+      const row = event.target.closest('.edit-faq-row');
+      if (!row || row.dataset.id === editDraggedId) {
+        return;
+      }
+      event.preventDefault();
+      editFaqsEl.querySelectorAll('.edit-faq-row.drag-target').forEach(node => {
+        if (node !== row) {
+          node.classList.remove('drag-target');
+        }
+      });
+      row.classList.add('drag-target');
+    });
+
+    editFaqsEl.addEventListener('dragleave', event => {
+      const row = event.target.closest('.edit-faq-row');
+      if (row) {
+        row.classList.remove('drag-target');
+      }
+    });
+
+    editFaqsEl.addEventListener('drop', event => {
+      event.preventDefault();
+      const targetRow = event.target.closest('.edit-faq-row');
+      if (!targetRow || !editDraggedId || targetRow.dataset.id === editDraggedId) {
+        return;
+      }
+      const draggedRow = editFaqsEl.querySelector(`.edit-faq-row[data-id="${CSS.escape(editDraggedId)}"]`);
+      if (!draggedRow) {
+        return;
+      }
+      const rows = Array.from(editFaqsEl.querySelectorAll('.edit-faq-row'));
+      if (rows.indexOf(draggedRow) < rows.indexOf(targetRow)) {
+        targetRow.after(draggedRow);
+      } else {
+        targetRow.before(draggedRow);
+      }
+      targetRow.classList.remove('drag-target');
+      saveFaqOrder();
+    });
+
+    document.getElementById('edit-category-close').addEventListener('click', closeEditCategoryModal);
+    document.getElementById('edit-category-backdrop').addEventListener('click', event => {
+      if (event.target.id === 'edit-category-backdrop') {
+        closeEditCategoryModal();
+      }
+    });
+    document.getElementById('edit-category-name-save').addEventListener('click', saveEditCategory);
+    document.getElementById('edit-category-name').addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        saveEditCategory();
+      }
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && document.getElementById('edit-category-backdrop').classList.contains('open')) {
+        closeEditCategoryModal();
+      }
     });
 
     document.getElementById('add-faqs-close').addEventListener('click', closeAddFaqsModal);

@@ -3319,6 +3319,31 @@ async def update_faq(chunk_id: str, request: Request):
     return {"status": "saved", "chunk_id": chunk_id}
 
 
+@app.post("/admin/faqs/reorder")
+async def reorder_faqs(request: Request):
+    """Persist the display order of FAQs within a category.
+
+    Body: {"category": str, "ordered_ids": [chunk_id, ...]}. Assigns
+    display_order in steps of 10 following the given order; FAQs not listed
+    are left untouched.
+    """
+    payload = await request.json()
+    ordered_ids = payload.get("ordered_ids")
+    if not isinstance(ordered_ids, list):
+        raise HTTPException(status_code=400, detail="ordered_ids must be a list")
+    with _faq_write_lock:
+        entries_by_id = {e.get("chunk_id"): e for e in FAQ}
+        order = 0
+        for chunk_id in ordered_ids:
+            entry = entries_by_id.get(chunk_id)
+            if entry is None:
+                continue
+            entry["display_order"] = order
+            order += 10
+        _save_faq_corpus()
+    return {"status": "saved"}
+
+
 @app.post("/admin/faq/{chunk_id}/accept")
 def accept_faq(chunk_id: str):
     """Promote a generated FAQ entry to an accepted faq_NNN entry."""
