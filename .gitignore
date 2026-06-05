@@ -11,3 +11,6 @@ feedback.jsonl
 bin/anthropic key
 web/videos/*.mp4
 web/video-config.local.js
+
+# Personal Claude Code settings (may contain secrets)
+.claude/settings.local.json
