@@ -73,6 +73,20 @@
       border-left: 2px solid #21262d;
     }
 
+    .museum-name-link {
+      color: #58a6ff;
+      text-decoration: none;
+    }
+    .museum-name-link:hover {
+      text-decoration: underline;
+    }
+    .museum-name-link .ext-arrow {
+      font-size: 0.65em;
+      vertical-align: middle;
+      margin-left: 4px;
+      opacity: 0.85;
+    }
+
     .museum-page-link {
       display: block;
       padding: 14px 16px;
@@ -287,7 +301,9 @@
         const pages = pagesByMuseumId[m.id] || [];
         return `<div class="museum-card">
           <div class="museum-body">
-            <h2>${esc(m.name)}</h2>
+            <h2>${m.website
+              ? `<a class="museum-name-link" href="${esc(m.website)}" target="_blank" rel="noopener">${esc(m.name)}<span class="ext-arrow">↗</span></a>`
+              : esc(m.name)}</h2>
             ${m.designation ? `<div class="designation">${esc(m.designation)}</div>` : ''}
             ${m.location    ? `<div class="designation">${esc(m.location)}</div>` : ''}
             ${m.description ? `<p>${esc(m.description)}</p>` : ''}
