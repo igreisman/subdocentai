@@ -3869,19 +3869,29 @@ FEEDBACK_PATH = os.path.join(BASE_DIR, "feedback.jsonl")
 @app.post("/feedback")
 def receive_feedback(payload: dict):
     import datetime
+    source = (payload.get("source") or "tour").strip()
     entry = {
         "ts": datetime.datetime.utcnow().isoformat() + "Z",
+        "source": source,                         # "tour" | "contact"
         "question": (payload.get("question") or "").strip(),
         "answer": (payload.get("answer") or "").strip(),
         "rating": payload.get("rating"),          # "up" | "down" | null
         "comment": (payload.get("comment") or "").strip(),
     }
+    if source == "contact":
+        # Free-form visitor message from the public contact form.
+        entry["name"] = (payload.get("name") or "").strip()
+        entry["email"] = (payload.get("email") or "").strip()
+        entry["message"] = (payload.get("message") or "").strip()
     try:
         with open(FEEDBACK_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception as e:
         print(f"[feedback] write error: {e}")
-    print(f"[feedback] {entry['rating']} — {entry['question'][:80]}")
+    if source == "contact":
+        print(f"[feedback] contact from {entry.get('email') or 'anon'} — {entry['message'][:80]}")
+    else:
+        print(f"[feedback] {entry['rating']} — {entry['question'][:80]}")
     return {"status": "ok"}
 
 

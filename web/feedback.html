@@ -238,6 +238,7 @@
       <button class="filt" data-filter="up">👍 Helpful</button>
       <button class="filt" data-filter="down">👎 Not helpful</button>
       <button class="filt" data-filter="comment">With comments</button>
+      <button class="filt" data-filter="contact">✉️ Messages</button>
     </div>
     <span id="summary"></span>
   </div>
@@ -328,6 +329,7 @@
         if (activeFilter === 'up') return e.rating === 'up';
         if (activeFilter === 'down') return e.rating === 'down';
         if (activeFilter === 'comment') return e.comment && e.comment.trim();
+        if (activeFilter === 'contact') return e.source === 'contact';
         return true;
       });
 
@@ -345,6 +347,22 @@
       filtered.forEach((entry, idx) => {
         const card = document.createElement('div');
         card.className = 'card';
+
+        if (entry.source === 'contact') {
+          // Free-form visitor message from the public contact form.
+          const who = [entry.name, entry.email].filter(Boolean).map(esc).join(' · ');
+          card.innerHTML = `
+            <div class="card-header">
+              <span class="rating">✉️</span>
+              <span class="ts">${esc(formatTs(entry.ts))}</span>
+            </div>
+            <div class="question">${who || '<em>Anonymous</em>'}</div>
+            <div class="comment">💬 ${esc(entry.message || entry.comment)}</div>
+          `;
+          list.appendChild(card);
+          return;
+        }
+
         const ratingIcon = entry.rating === 'up' ? '👍' : entry.rating === 'down' ? '👎' : '—';
         const answerId = `ans-${idx}`;
         card.innerHTML = `
