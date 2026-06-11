@@ -5,7 +5,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Edit Categories</title>
-  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
   <style>
     *,
     *::before,
@@ -643,38 +642,15 @@
     .edit-faq-editor .field-label:first-child { margin-top: 0; }
     .edit-faq-editor .modal-footer { margin-top: 10px; }
 
-    /* Quill dark-mode overrides (scoped to the FAQ editor) */
-    .edit-faq-editor .ql-toolbar.ql-snow {
-      background: #21262d;
-      border: 1px solid #30363d;
-      border-bottom: none;
-      border-radius: 10px 10px 0 0;
-    }
-    .edit-faq-editor .ql-toolbar.ql-snow .ql-stroke { stroke: #c9d1d9; }
-    .edit-faq-editor .ql-toolbar.ql-snow .ql-fill { fill: #c9d1d9; }
-    .edit-faq-editor .ql-toolbar.ql-snow .ql-picker { color: #c9d1d9; }
-    .edit-faq-editor .ql-toolbar.ql-snow .ql-picker-options { background: #21262d; border-color: #30363d; }
-    .edit-faq-editor .ql-container.ql-snow {
-      border: 1px solid #30363d;
-      border-radius: 0 0 10px 10px;
-      background: #0d1117;
-      color: #e6edf3;
-      font-family: inherit;
-      font-size: 14px;
-    }
-    .edit-faq-editor .ql-editor { min-height: 180px; line-height: 1.6; }
-    .edit-faq-editor .ql-editor p { color: #c9d1d9; }
-    .edit-faq-editor .ql-editor a { color: #58a6ff; }
-    .edit-faq-editor .ql-editor.ql-blank::before { color: #6e7681; font-style: normal; }
-
-    /* Single-FAQ answer — contenteditable rich editor (preserves tables) */
-    #single-answer-host {
+    /* Contenteditable rich answer editor (preserves tables that Quill would
+       flatten). Shared by the Add-FAQ single answer and the per-FAQ editor. */
+    .rich-host {
       border: 1px solid #30363d;
       border-radius: 10px;
       background: #0d1117;
       overflow: hidden;
     }
-    #single-answer-host.dragover {
+    .rich-host.dragover {
       border-color: #58a6ff;
       box-shadow: 0 0 0 1px #58a6ff inset;
     }
@@ -869,7 +845,7 @@
         <label class="field-label" for="single-question">Question</label>
         <input class="modal-input" id="single-question" type="text" placeholder="Enter the question…" autocomplete="off">
         <label class="field-label">Answer</label>
-        <div id="single-answer-host">
+        <div id="single-answer-host" class="rich-host">
           <div class="rich-toolbar">
             <button type="button" class="rich-btn" data-cmd="bold"><strong>B</strong></button>
             <button type="button" class="rich-btn" data-cmd="italic"><em>I</em></button>
@@ -930,7 +906,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/mammoth/mammoth.browser.min.js"></script>
-  <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
   <script>
     const API = '';
     let categoryRecords = [];
@@ -1265,7 +1240,6 @@
     let editCategoryTitle = null;
     let editDraggedId = null;
     let editingFaqId = null;
-    let faqQuill = null;
 
     function setEditStatus(id, message, type) {
       const el = document.getElementById(id);
@@ -1307,7 +1281,10 @@
               <label class="field-label">Question</label>
               <input class="modal-input faq-edit-question" type="text" value="${escapeHtml(faq.title || '')}">
               <label class="field-label">Answer</label>
-              <div class="faq-edit-quill"></div>
+              <div class="rich-host faq-edit-host">
+                ${RICH_TOOLBAR_HTML}
+                <div class="rich-area faq-edit-area" contenteditable="true" data-placeholder="Enter the answer…"></div>
+              </div>
             </div>
           `;
         }
@@ -1319,26 +1296,16 @@
         `;
       }).join('');
 
-      // Mount a Quill WYSIWYG editor on the answer when a FAQ is being edited.
-      faqQuill = null;
+      // Mount the contenteditable rich editor on the answer when editing a FAQ.
       if (editingFaqId) {
         const editor = container.querySelector(`.edit-faq-editor[data-id="${CSS.escape(editingFaqId)}"]`);
         const faq = faqs.find(item => item.chunk_id === editingFaqId);
         if (editor && faq) {
-          faqQuill = new Quill(editor.querySelector('.faq-edit-quill'), {
-            theme: 'snow',
-            placeholder: 'Enter the answer…',
-            modules: {
-              toolbar: [
-                [{ header: [2, 3, false] }],
-                ['bold', 'italic', 'underline'],
-                [{ list: 'ordered' }, { list: 'bullet' }],
-                ['link'],
-                ['clean'],
-              ],
-            },
-          });
-          faqQuill.root.innerHTML = faq.text || '';
+          const host = editor.querySelector('.faq-edit-host');
+          const area = editor.querySelector('.faq-edit-area');
+          area.innerHTML = faq.text || '';
+          wireRichToolbar(host);
+          enableDocxDrop(host, area, document.getElementById('edit-category-name-status'));
         }
       }
     }
@@ -1375,14 +1342,15 @@
 
       // Capture the open FAQ editor's values before any reload/re-render.
       let faqEdit = null;
-      if (editingFaqId && faqQuill) {
+      if (editingFaqId) {
         const editorEl = editFaqsEl.querySelector(`.edit-faq-editor[data-id="${CSS.escape(editingFaqId)}"]`);
-        if (editorEl) {
+        const area = editorEl && editorEl.querySelector('.faq-edit-area');
+        if (editorEl && area) {
           faqEdit = {
             chunkId: editingFaqId,
             question: editorEl.querySelector('.faq-edit-question').value.trim(),
-            answerHtml: faqQuill.root.innerHTML,
-            answerText: faqQuill.getText().trim(),
+            answerHtml: area.innerHTML.trim(),
+            answerText: area.textContent.trim(),
           };
         }
       }
@@ -1553,31 +1521,46 @@
       }
     });
 
-    // Single FAQ — contenteditable rich answer editor (preserves tables/HTML
-    // that Quill would otherwise flatten into paragraphs).
-    const singleAnswerEditor = document.getElementById('single-answer-editor');
+    // ----- Shared contenteditable rich-editor helpers -----
+    // Reusable markup for the toolbar inside a `.rich-host`.
+    const RICH_TOOLBAR_HTML = `
+      <div class="rich-toolbar">
+        <button type="button" class="rich-btn" data-cmd="bold"><strong>B</strong></button>
+        <button type="button" class="rich-btn" data-cmd="italic"><em>I</em></button>
+        <button type="button" class="rich-btn" data-cmd="underline"><u>U</u></button>
+        <button type="button" class="rich-btn" data-block="h3">H3</button>
+        <button type="button" class="rich-btn" data-cmd="insertUnorderedList">• List</button>
+        <button type="button" class="rich-btn" data-cmd="insertOrderedList">1. List</button>
+        <button type="button" class="rich-btn" data-action="link">Link</button>
+        <button type="button" class="rich-btn" data-action="clear">Clear</button>
+      </div>`;
 
-    document.querySelectorAll('#single-answer-host .rich-btn').forEach(btn => {
-      btn.addEventListener('mousedown', e => e.preventDefault());  // keep editor selection
-      btn.addEventListener('click', () => {
-        singleAnswerEditor.focus();
-        if (btn.dataset.cmd) {
-          document.execCommand(btn.dataset.cmd, false, null);
-        } else if (btn.dataset.block) {
-          document.execCommand('formatBlock', false, btn.dataset.block);
-        } else if (btn.dataset.action === 'link') {
-          const url = prompt('Link URL:');
-          if (url) document.execCommand('createLink', false, url.trim());
-        } else if (btn.dataset.action === 'clear') {
-          document.execCommand('removeFormat', false, null);
-        }
+    // Wire a `.rich-host`'s toolbar buttons to execCommand on its `.rich-area`.
+    function wireRichToolbar(host) {
+      const area = host.querySelector('.rich-area');
+      host.querySelectorAll('.rich-btn').forEach(btn => {
+        btn.addEventListener('mousedown', e => e.preventDefault());  // keep editor selection
+        btn.addEventListener('click', () => {
+          area.focus();
+          if (btn.dataset.cmd) {
+            document.execCommand(btn.dataset.cmd, false, null);
+          } else if (btn.dataset.block) {
+            document.execCommand('formatBlock', false, btn.dataset.block);
+          } else if (btn.dataset.action === 'link') {
+            const url = prompt('Link URL:');
+            if (url) document.execCommand('createLink', false, url.trim());
+          } else if (btn.dataset.action === 'clear') {
+            document.execCommand('removeFormat', false, null);
+          }
+        });
       });
-    });
+    }
 
-    // Drop a .docx onto the answer to import its converted content inline.
-    (function enableDocxDropOnSingleAnswer() {
-      const host = document.getElementById('single-answer-host');
-      const statusEl = document.getElementById('single-status');
+    // Let a `.rich-host` accept a dropped .docx, converting it to inline HTML.
+    function enableDocxDrop(host, area, statusEl) {
+      const setStatus = (msg, cls) => {
+        if (statusEl) { statusEl.textContent = msg; statusEl.className = 'modal-status' + (cls ? ' ' + cls : ''); }
+      };
       host.addEventListener('dragover', e => {
         if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
           e.preventDefault();
@@ -1592,29 +1575,29 @@
         e.preventDefault();
         host.classList.remove('dragover');
         if (!/\.docx$/i.test(file.name)) {
-          statusEl.textContent = 'Only .docx files can be dropped here.';
-          statusEl.className = 'modal-status err';
+          setStatus('Only .docx files can be dropped here.', 'err');
           return;
         }
-        statusEl.textContent = `Importing ${file.name}…`;
-        statusEl.className = 'modal-status';
+        setStatus(`Importing ${file.name}…`, '');
         const reader = new FileReader();
         reader.onload = evt => {
           mammoth.convertToHtml({ arrayBuffer: evt.target.result })
             .then(result => {
-              singleAnswerEditor.focus();
+              area.focus();
               document.execCommand('insertHTML', false, result.value || '');
-              statusEl.textContent = `Imported content from ${file.name}.`;
-              statusEl.className = 'modal-status ok';
+              setStatus(`Imported content from ${file.name}.`, 'ok');
             })
-            .catch(err => {
-              statusEl.textContent = 'Conversion failed: ' + err.message;
-              statusEl.className = 'modal-status err';
-            });
+            .catch(err => setStatus('Conversion failed: ' + err.message, 'err'));
         };
         reader.readAsArrayBuffer(file);
       });
-    })();
+    }
+
+    // Single FAQ — contenteditable rich answer editor (preserves tables/HTML).
+    const singleAnswerEditor = document.getElementById('single-answer-editor');
+    const singleAnswerHost = document.getElementById('single-answer-host');
+    wireRichToolbar(singleAnswerHost);
+    enableDocxDrop(singleAnswerHost, singleAnswerEditor, document.getElementById('single-status'));
 
     // Single FAQ save
     document.getElementById('single-save-btn').addEventListener('click', async () => {
