@@ -503,6 +503,13 @@
       outline: none;
     }
 
+    #edit-html-editor.drag-over,
+    #edit-html-source.drag-over {
+      outline: 2px dashed #58a6ff;
+      outline-offset: -2px;
+      background: #11203a;
+    }
+
     #edit-html-editor:empty::before {
       content: attr(data-placeholder);
       color: #6e7681;
@@ -517,6 +524,31 @@
 
     #edit-html-editor>*:first-child {
       margin-top: 0;
+    }
+
+    #edit-html-editor table {
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 13px;
+    }
+
+    #edit-html-editor th,
+    #edit-html-editor td {
+      border: 1px solid #30363d;
+      padding: 2px 10px;
+      vertical-align: middle;
+      line-height: 1.4;
+      text-align: left;
+    }
+
+    #edit-html-editor td p,
+    #edit-html-editor th p {
+      margin: 0;
+    }
+
+    #edit-html-editor th {
+      background: #161b22;
+      font-weight: 600;
     }
 
     #edit-html-editor ul,
@@ -950,7 +982,7 @@
       </div>
       <div>
         <div class="field-label">Answer HTML</div>
-        <div class="field-help">Use the toolbar for rich editing or switch to source mode to edit raw HTML directly.</div>
+        <div class="field-help">Use the toolbar for rich editing or switch to source mode to edit raw HTML directly. <strong>Upload</strong> (or drag a file onto the answer box) embeds an image, pulls Word (.docx) content inline, or links other documents (PDF, Office, text) — max 25&nbsp;MB.</div>
         <div class="editor-shell" id="answer-editor-shell">
           <div class="editor-toolbar">
             <button type="button" class="editor-btn" data-cmd="bold"><strong>B</strong></button>
@@ -964,10 +996,13 @@
             <button type="button" class="editor-btn" data-cmd="formatBlock" data-value="blockquote">Quote</button>
             <span class="editor-divider"></span>
             <button type="button" class="editor-btn" data-action="link">Link</button>
+            <button type="button" class="editor-btn" data-action="upload">Upload</button>
             <button type="button" class="editor-btn" data-action="source" id="btn-source-toggle">Source</button>
           </div>
           <div id="edit-html-editor" contenteditable="true" data-placeholder="Write the full answer here…"></div>
           <textarea id="edit-html-source" placeholder="Write the raw HTML here…"></textarea>
+          <input type="file" id="faq-upload-input" style="display:none"
+            accept="image/*,.pdf,.txt,.md,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt">
         </div>
       </div>
       <div class="action-bar">
@@ -1021,6 +1056,30 @@
       });
       panel.querySelectorAll('.editor-btn[data-action]').forEach(btn => {
         btn.addEventListener('click', () => handleEditorAction(btn.dataset.action));
+      });
+      const uploadInput = panel.querySelector('#faq-upload-input');
+      if (uploadInput) {
+        uploadInput.addEventListener('change', () => handleFaqUpload(uploadInput));
+      }
+      // Drag-and-drop a file onto the answer editor (or source box) to upload it.
+      panel.querySelectorAll('#edit-html-editor, #edit-html-source').forEach(zone => {
+        zone.addEventListener('dragover', e => {
+          if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            zone.classList.add('drag-over');
+          }
+        });
+        zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+        zone.addEventListener('drop', async e => {
+          const files = e.dataTransfer && e.dataTransfer.files;
+          if (!files || !files.length) return;
+          e.preventDefault();           // stop the browser from opening/saving the file
+          zone.classList.remove('drag-over');
+          for (const file of files) {
+            await uploadFaqFile(file);
+          }
+        });
       });
       document.getElementById('btn-save').addEventListener('click', saveEntry);
       document.getElementById('btn-discard').addEventListener('click', () => {
@@ -1190,6 +1249,54 @@
         document.execCommand('createLink', false, url.trim());
         syncSourceFromEditor();
         dirty = true;
+        return;
+      }
+      if (action === 'upload') {
+        const input = document.getElementById('faq-upload-input');
+        if (input) input.click();
+      }
+    }
+
+    function escAttr(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function handleFaqUpload(input) {
+      const file = input.files && input.files[0];
+      input.value = '';  // allow re-uploading the same file later
+      uploadFaqFile(file);
+    }
+
+    async function uploadFaqFile(file) {
+      if (!file) return;
+      if (!focusHtmlEditor()) return;
+      setActionStatus(`Uploading ${file.name}…`, '');
+      try {
+        const body = new FormData();
+        body.append('file', file);
+        const res = await fetch(`${API}/admin/faq-uploads`, { method: 'POST', body });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        const url = escAttr(data.url);
+        const name = escAttr(data.filename || file.name);
+        let snippet;
+        if (data.is_docx && data.html) {
+          snippet = data.html;            // Word content converted to inline HTML
+        } else if (data.is_image) {
+          snippet = `<img src="${url}" alt="${name}" style="max-width:100%;height:auto;">`;
+        } else {
+          snippet = `<a href="${url}" target="_blank" rel="noopener">${name}</a>`;
+        }
+        focusHtmlEditor();
+        document.execCommand('insertHTML', false, snippet);
+        syncSourceFromEditor();
+        dirty = true;
+        const how = (data.is_docx && data.html) ? 'Inserted content from'
+          : data.is_image ? 'Inserted image' : 'Linked';
+        setActionStatus(`${how} ${data.filename || file.name}`, 'ok');
+      } catch (e) {
+        setActionStatus(`Upload failed: ${e.message}`, 'err');
       }
     }
 

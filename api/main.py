@@ -14,6 +14,7 @@ import smtplib
 import threading
 import shutil
 import unicodedata
+import uuid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -3632,6 +3633,75 @@ app.mount(
     StaticFiles(directory=_MUSEUM_UPLOADS_DIR),
     name="museum_uploads",
 )
+
+# ── FAQ answer attachments (images + documents embedded in FAQ answers) ──────
+_FAQ_UPLOADS_DIR = os.path.join(CORPORA_DIR, "faq_uploads")
+_FAQ_UPLOAD_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+_FAQ_UPLOAD_ALLOWED_EXTS = _FAQ_UPLOAD_IMAGE_EXTS | {
+    ".pdf", ".txt", ".md", ".rtf",
+    ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt",
+}
+_FAQ_UPLOAD_MAX_BYTES = 25 * 1024 * 1024  # 25 MB per file
+
+os.makedirs(_FAQ_UPLOADS_DIR, exist_ok=True)
+app.mount(
+    "/faq_uploads",
+    StaticFiles(directory=_FAQ_UPLOADS_DIR),
+    name="faq_uploads",
+)
+
+
+@app.post("/admin/faq-uploads")
+async def upload_faq_attachment(file: UploadFile = File(...)):
+    """Store a file referenced from a FAQ answer and return its public URL."""
+    orig_name = _sanitize_upload_name(file.filename or "")
+    ext = os.path.splitext(orig_name)[1].lower()
+    if ext not in _FAQ_UPLOAD_ALLOWED_EXTS:
+        raise HTTPException(status_code=400, detail=f"File type {ext or '(none)'} is not allowed")
+
+    stored_name = f"{uuid.uuid4().hex[:8]}_{orig_name}"
+    dest_path = os.path.join(_FAQ_UPLOADS_DIR, stored_name)
+
+    total = 0
+    try:
+        with open(dest_path, "wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > _FAQ_UPLOAD_MAX_BYTES:
+                    out.close()
+                    os.remove(dest_path)
+                    raise HTTPException(status_code=413, detail="File exceeds 25 MB limit")
+                out.write(chunk)
+    finally:
+        await file.close()
+
+    result = {
+        "status": "uploaded",
+        "filename": orig_name,
+        "url": f"/faq_uploads/{stored_name}",
+        "content_type": file.content_type or "application/octet-stream",
+        "size": total,
+        "is_image": ext in _FAQ_UPLOAD_IMAGE_EXTS,
+    }
+
+    # Word documents: convert to inline HTML so the content lands in the answer
+    # body. Falls back to a download link if conversion fails or mammoth is absent.
+    if ext == ".docx":
+        try:
+            import mammoth
+            with open(dest_path, "rb") as docx_in:
+                conversion = mammoth.convert_to_html(docx_in)
+            html_out = (conversion.value or "").strip()
+            if html_out:
+                result["is_docx"] = True
+                result["html"] = html_out
+        except Exception as e:
+            print(f"[faq-upload] docx conversion failed for {orig_name}: {e}")
+
+    return result
 
 
 def _load_museum_pages() -> list:

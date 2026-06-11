@@ -8,6 +8,7 @@ certs/
 serve_https.py
 .env.local
 feedback.jsonl
+corpora/faq_uploads/
 bin/anthropic key
 web/videos/*.mp4
 web/video-config.local.js
