@@ -347,41 +347,59 @@ ETERNAL_PATROL_IMAGE_DIR = os.path.join(WEB_DIR, "images", "extracted")
 
 TOUR_PATH = os.path.join(CORPORA_DIR, "pampanito_tour_corpus.jsonl")
 SHORTS_PATH = os.path.join(CORPORA_DIR, "dieselsubs_shorts_corpus.jsonl")
-GLOSSARY_PATH = os.path.join(CORPORA_DIR, "dieselsubs_glossary.jsonl")
-OPERATIONS_GUIDE_PATH = os.path.join(CORPORA_DIR, "dieselsubs_operations_guide.jsonl")
-OPERATIONS_GUIDE_FAQ_SCHEMA_PATH = os.path.join(CORPORA_DIR, "dieselsubs_operations_guide_faq_schema.jsonl")
-OPERATIONS_GUIDE_SINGLE_HTML_PATH = os.path.join(CORPORA_DIR, "dieselsubs_operations_guide_single_record_html.jsonl")
-_BUNDLED_CATEGORIES_PATH = os.path.join(CORPORA_DIR, "dieselsubs_faq_categories.jsonl")
-
-# FAQ corpus — use Render persistent disk (/data) if mounted, else local corpora/
-_BUNDLED_FAQ_PATH = os.path.join(CORPORA_DIR, "dieselsubs_faq_corpus.jsonl")
+# Editable corpora — on Render these live on the persistent disk (/data) so
+# that edits made on the live site survive redeploys. The bundled copy under
+# corpora/ seeds the disk on first boot and is the fallback for local/dev runs
+# (or when CORPORA_DIR is overridden, e.g. sample-content mode).
 _RENDER_DATA_DIR = "/data"
 _using_nondefault_corpora = os.path.abspath(CORPORA_DIR) != os.path.abspath(DEFAULT_CORPORA_DIR)
-if not _using_nondefault_corpora and os.path.isdir(_RENDER_DATA_DIR):
-    FAQ_PATH = os.path.join(_RENDER_DATA_DIR, "dieselsubs_faq_corpus.jsonl")
-    if not os.path.exists(FAQ_PATH) and os.path.exists(_BUNDLED_FAQ_PATH):
-        import shutil
-        shutil.copy2(_BUNDLED_FAQ_PATH, FAQ_PATH)
-        print(f"✅ Seeded persistent disk FAQ corpus from bundled copy")
-else:
-    FAQ_PATH = _BUNDLED_FAQ_PATH
+_persistent_disk_available = (not _using_nondefault_corpora) and os.path.isdir(_RENDER_DATA_DIR)
 
-if not _using_nondefault_corpora and os.path.isdir(_RENDER_DATA_DIR):
-    CATEGORIES_PATH = os.path.join(_RENDER_DATA_DIR, "dieselsubs_faq_categories.jsonl")
-    if not os.path.exists(CATEGORIES_PATH) and os.path.exists(_BUNDLED_CATEGORIES_PATH):
+
+def _editable_corpus_path(filename: str) -> str:
+    """Return the read/write path for an editable corpus file.
+
+    Prefers the Render persistent disk when available, seeding it from the
+    bundled corpora copy the first time. Falls back to the bundled path for
+    local development or sample-content mode, so on-site edits are never lost
+    to a redeploy in production.
+    """
+    bundled = os.path.join(CORPORA_DIR, filename)
+    if not _persistent_disk_available:
+        return bundled
+    disk_path = os.path.join(_RENDER_DATA_DIR, filename)
+    if not os.path.exists(disk_path) and os.path.exists(bundled):
         import shutil
-        shutil.copy2(_BUNDLED_CATEGORIES_PATH, CATEGORIES_PATH)
-        print(f"✅ Seeded persistent disk FAQ categories from bundled copy")
-else:
-    CATEGORIES_PATH = _BUNDLED_CATEGORIES_PATH
+        shutil.copy2(bundled, disk_path)
+        print(f"✅ Seeded persistent disk copy of {filename} from bundled corpora")
+    return disk_path
+
+
+def _editable_corpus_dir(dirname: str) -> str:
+    """Return the directory for editable user uploads (images/docs).
+
+    Like _editable_corpus_path, but for a directory of uploads rather than a
+    single seeded file: on Render it lives on the persistent disk so uploaded
+    files survive redeploys. The caller creates it via os.makedirs.
+    """
+    base = _RENDER_DATA_DIR if _persistent_disk_available else CORPORA_DIR
+    return os.path.join(base, dirname)
+
+
+GLOSSARY_PATH = _editable_corpus_path("dieselsubs_glossary.jsonl")
+OPERATIONS_GUIDE_PATH = _editable_corpus_path("dieselsubs_operations_guide.jsonl")
+OPERATIONS_GUIDE_FAQ_SCHEMA_PATH = _editable_corpus_path("dieselsubs_operations_guide_faq_schema.jsonl")
+OPERATIONS_GUIDE_SINGLE_HTML_PATH = _editable_corpus_path("dieselsubs_operations_guide_single_record_html.jsonl")
+FAQ_PATH = _editable_corpus_path("dieselsubs_faq_corpus.jsonl")
+CATEGORIES_PATH = _editable_corpus_path("dieselsubs_faq_categories.jsonl")
 
 
 # Path for incidents corpus
-INCIDENTS_PATH = os.path.join(CORPORA_DIR, "incidents.jsonl")
+INCIDENTS_PATH = _editable_corpus_path("incidents.jsonl")
 
 # Whisper domain vocabulary prompt — persisted to a text file so it can be
 # edited via the admin UI without touching source code.
-_WHISPER_PROMPT_PATH = os.path.join(CORPORA_DIR, "whisper_prompt.txt")
+_WHISPER_PROMPT_PATH = _editable_corpus_path("whisper_prompt.txt")
 _WHISPER_PROMPT_DEFAULT = (
     "USS Pampanito, submarine, torpedo, periscope, conning tower, "
     "hot bunk, hot bunking, hot racking, watertight door, ballast tank, "
@@ -3520,7 +3538,7 @@ def delete_moh_recipient(entry_id: int):
 # Museums
 # ------------------------------------------------------------
 
-_MUSEUMS_PATH = os.path.join(CORPORA_DIR, "museums.jsonl")
+_MUSEUMS_PATH = _editable_corpus_path("museums.jsonl")
 _museums_cache: list | None = None
 _museums_write_lock = threading.Lock()
 
@@ -3614,8 +3632,8 @@ def delete_museum(museum_id: int):
 # Museum sub-pages (managed by museum admin)
 # ------------------------------------------------------------
 
-_MUSEUM_PAGES_PATH = os.path.join(CORPORA_DIR, "museum_pages.jsonl")
-_MUSEUM_UPLOADS_DIR = os.path.join(CORPORA_DIR, "museum_uploads")
+_MUSEUM_PAGES_PATH = _editable_corpus_path("museum_pages.jsonl")
+_MUSEUM_UPLOADS_DIR = _editable_corpus_dir("museum_uploads")
 _MUSEUM_UPLOAD_ALLOWED_EXTS = {
     ".html", ".htm",
     ".doc", ".docx",
@@ -3635,7 +3653,7 @@ app.mount(
 )
 
 # ── FAQ answer attachments (images + documents embedded in FAQ answers) ──────
-_FAQ_UPLOADS_DIR = os.path.join(CORPORA_DIR, "faq_uploads")
+_FAQ_UPLOADS_DIR = _editable_corpus_dir("faq_uploads")
 _FAQ_UPLOAD_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 _FAQ_UPLOAD_ALLOWED_EXTS = _FAQ_UPLOAD_IMAGE_EXTS | {
     ".pdf", ".txt", ".md", ".rtf",
