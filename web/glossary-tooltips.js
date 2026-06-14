@@ -36,7 +36,7 @@
 
       .${TOOLTIP_CLASS} {
         position: fixed;
-        z-index: 9999;
+        z-index: 2147483647;
         max-width: min(340px, calc(100vw - 24px));
         padding: 14px 16px;
         border-radius: 14px;
