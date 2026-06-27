@@ -3207,9 +3207,15 @@ def public_faqs():
         if not e.get("chunk_id", "").startswith("faq_"):
             continue
         title = e.get("title", "")
-        text = _normalize_faq_html(e.get("text", ""))
-        parts = text.split("\n\n", 1)
-        answer = parts[1].strip() if len(parts) > 1 else text
+        # The stored ``text`` field holds the answer HTML only; the question is
+        # kept separately in ``title``. Earlier code split ``text`` on the first
+        # blank line and served only the part after it, on the assumption that
+        # ``text`` was formatted "question\n\nanswer". Rich-editor / Word-pasted
+        # answers legitimately contain blank lines, so that split silently
+        # discarded the beginning of those answers for visitors (while the editor,
+        # which reads the raw field, still showed them in full). Serve the whole
+        # normalized answer.
+        answer = _normalize_faq_html(e.get("text", ""))
         cat = e.get("category") or "General"
         groups[cat].append(
             {
@@ -3397,9 +3403,14 @@ def accept_faq(chunk_id: str):
 
 @app.delete("/admin/faq/{chunk_id}")
 def delete_faq(chunk_id: str):
-    """Permanently remove a generated FAQ entry from the corpus."""
-    if chunk_id.split("_")[0] not in _GENERATED_PREFIXES:
-        raise HTTPException(status_code=400, detail="Only der_, pam_, fix_ entries can be deleted")
+    """Permanently remove a FAQ entry from the corpus.
+
+    Allows deleting both generated (der_/pam_/fix_) entries and the curated
+    faq_ entries shown in the per-category editor, whose "Delete entry" button
+    targets this endpoint.
+    """
+    if chunk_id.split("_")[0] not in (_GENERATED_PREFIXES | {"faq"}):
+        raise HTTPException(status_code=400, detail="Only der_, pam_, fix_, faq_ entries can be deleted")
     with _faq_write_lock:
         idx = next((i for i, e in enumerate(FAQ) if e.get("chunk_id") == chunk_id), None)
         if idx is None:
