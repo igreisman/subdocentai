@@ -15,3 +15,6 @@ web/video-config.local.js
 
 # Personal Claude Code settings (may contain secrets)
 .claude/settings.local.json
+
+# Local-only scratch corpora (CONTENT_ROOT for local dev; never commit)
+corpora_local/
