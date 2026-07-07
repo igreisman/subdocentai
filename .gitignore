@@ -18,3 +18,6 @@ web/video-config.local.js
 
 # Local-only scratch corpora (CONTENT_ROOT for local dev; never commit)
 corpora_local/
+
+# Generated NotebookLM corpus exports (kept local)
+notebooklm_export/
