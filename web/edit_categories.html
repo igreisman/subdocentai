@@ -1292,6 +1292,7 @@
           <div class="edit-faq-row" data-id="${id}" draggable="true">
             <div class="edit-faq-title">${escapeHtml(faq.title || '(untitled)')}</div>
             <button class="action-btn edit-btn faq-edit-open" type="button" data-id="${id}">Edit</button>
+            <button class="action-btn danger faq-delete" type="button" data-id="${id}" data-title="${escapeHtml(faq.title || '(untitled)')}">Delete</button>
           </div>
         `;
       }).join('');
@@ -1412,11 +1413,30 @@
       }
     }
 
+    async function deleteFaqFromCategory(chunkId, title) {
+      if (!window.confirm(`Delete the FAQ “${title}”?\n\nThis permanently removes it from the category and cannot be undone.`)) return;
+      setEditStatus('edit-category-reorder-status', 'Deleting…', '');
+      try {
+        await sendJson(`${API}/admin/faq/${encodeURIComponent(chunkId)}`, { method: 'DELETE' });
+        faqRecords = faqRecords.filter(entry => entry.chunk_id !== chunkId);
+        if (editingFaqId === chunkId) editingFaqId = null;
+        renderEditCategoryFaqs();
+        setEditStatus('edit-category-reorder-status', 'FAQ deleted.', 'ok');
+      } catch (error) {
+        setEditStatus('edit-category-reorder-status', error.message, 'err');
+      }
+    }
+
     // Drag-to-reorder FAQ rows — handle-gated, same pattern as the category cards.
     const editFaqsEl = document.getElementById('edit-category-faqs');
 
     // Open the inline FAQ editor; saving is handled by the single "Save" button.
     editFaqsEl.addEventListener('click', event => {
+      const delBtn = event.target.closest('.faq-delete');
+      if (delBtn) {
+        deleteFaqFromCategory(delBtn.dataset.id, delBtn.dataset.title);
+        return;
+      }
       const openBtn = event.target.closest('.faq-edit-open');
       if (openBtn) {
         editingFaqId = openBtn.dataset.id;
