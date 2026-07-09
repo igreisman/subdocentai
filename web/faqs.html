@@ -842,11 +842,14 @@
       line-height: 1.7;
     }
 
-    .faq-answer a {
+    /* Only color real hyperlinks. Word paste leaves bookmark anchors like
+       <a name="_Hlk..."> (no href) around text; without the [href] guard those
+       inherit the blue link color and look like an unfixable blue paragraph. */
+    .faq-answer a[href] {
       color: #0366d6;
     }
 
-    .faq-answer a:hover {
+    .faq-answer a[href]:hover {
       text-decoration: underline;
     }
 

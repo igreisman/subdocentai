@@ -2109,6 +2109,10 @@ def _normalize_faq_html(text: str) -> str:
         return value
 
     value = re.sub(r'<span class="ql-ui"[^>]*></span>', "", value, flags=re.I)
+    # Unwrap Word bookmark anchors like <a name="_Hlk...">text</a> (no href).
+    # They carry no behavior but inherit the blue link color on the public page,
+    # showing up as an "unfixable" blue paragraph. Keep the inner text, drop the tag.
+    value = re.sub(r'<a\b(?![^>]*\bhref=)[^>]*>(.*?)</a>', r"\1", value, flags=re.I | re.S)
     value = re.sub(r'\sdata-row="\d+"', "", value, flags=re.I)
     value = re.sub(r'\sstyle="color:\s*black;?"', "", value, flags=re.I)
     value = re.sub(r'\sclass="ql-align-right"', ' style="text-align: right;"', value, flags=re.I)
