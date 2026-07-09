@@ -21,3 +21,6 @@ corpora_local/
 
 # Generated NotebookLM corpus exports (kept local)
 notebooklm_export/
+
+# Incident/data-recovery snapshots (local only)
+backups/
