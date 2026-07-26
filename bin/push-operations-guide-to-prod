@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+
+import base64
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+
+REPO = Path(__file__).resolve().parent.parent
+PROD = os.environ.get("PROD_URL", "https://submarinedocent.org").rstrip("/")
+
+
+def load_env(path: Path) -> dict[str, str]:
+    env: dict[str, str] = {}
+    if not path.exists():
+        return env
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        env[key.strip()] = value.strip().strip('"').strip("'")
+    return env
+
+
+ENV = load_env(REPO / ".env.local")
+USER = ENV.get("ADMIN_USERNAME", "")
+PASSWORD = ENV.get("ADMIN_PASSWORD", "")
+if not USER or not PASSWORD:
+    sys.exit("ERROR: ADMIN_USERNAME / ADMIN_PASSWORD not found in .env.local")
+
+CONTENT_ROOT = ENV.get("CONTENT_ROOT", "corpora_local")
+CORPORA_DIR = Path(CONTENT_ROOT) if Path(CONTENT_ROOT).is_absolute() else REPO / CONTENT_ROOT
+OPERATIONS_GUIDE_PATH = CORPORA_DIR / "dieselsubs_operations_guide.jsonl"
+FAQ_SCHEMA_PATH = CORPORA_DIR / "dieselsubs_operations_guide_faq_schema.jsonl"
+HTML_RECORD_PATH = CORPORA_DIR / "dieselsubs_operations_guide_single_record_html.jsonl"
+
+AUTH = base64.b64encode(f"{USER}:{PASSWORD}".encode()).decode()
+DRY_RUN = "--dry-run" in sys.argv
+
+
+def request_json(method: str, path: str, payload: dict | None = None) -> object:
+    data = None
+    headers = {"Authorization": "Basic " + AUTH}
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(PROD + path, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(request, timeout=60) as response:
+        raw = response.read().decode("utf-8")
+    return json.loads(raw) if raw else None
+
+
+def load_jsonl(path: Path) -> list[dict]:
+    rows: list[dict] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    return rows
+
+
+def save_jsonl(path: Path, rows: list[dict]) -> None:
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with tmp_path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    tmp_path.replace(path)
+
+
+def make_slug(title: str) -> str:
+    slug = re.sub(r"[^a-z0-9\s-]", "", (title or "").lower())
+    return re.sub(r"\s+", "-", slug.strip())[:120]
+
+
+def operations_text_blocks(text: str) -> list[dict]:
+    blocks: list[dict] = []
+    current_paragraph: list[str] = []
+    current_list: list[str] = []
+
+    def flush_paragraph() -> None:
+        nonlocal current_paragraph
+        if current_paragraph:
+            blocks.append({"type": "paragraph", "text": " ".join(part.strip() for part in current_paragraph if part.strip())})
+            current_paragraph = []
+
+    def flush_list() -> None:
+        nonlocal current_list
+        if current_list:
+            blocks.append({"type": "list", "items": current_list[:]})
+            current_list = []
+
+    for raw_line in str(text or "").replace("\r\n", "\n").split("\n"):
+        stripped = raw_line.strip()
+        if not stripped:
+            flush_paragraph()
+            flush_list()
+            continue
+        if stripped.startswith("- "):
+            flush_paragraph()
+            current_list.append(stripped[2:].strip())
+            continue
+        flush_list()
+        current_paragraph.append(stripped)
+
+    flush_paragraph()
+    flush_list()
+    return blocks
+
+
+def operations_text_to_html(text: str) -> str:
+    html_parts: list[str] = []
+    for block in operations_text_blocks(text):
+        if block["type"] == "paragraph":
+            html_parts.append("<p>" + escape_html(block["text"]) + "</p>")
+        else:
+            items = "".join("<li>" + escape_html(item) + "</li>" for item in block["items"])
+            html_parts.append("<ul>" + items + "</ul>")
+    return "".join(html_parts)
+
+
+def escape_html(text: str) -> str:
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def operations_topic_tags(entry: dict) -> list[str]:
+    seed_text = " ".join([
+        str(entry.get("section") or "").replace("_", " "),
+        str(entry.get("title") or ""),
+    ])
+    tags: list[str] = []
+    seen: set[str] = set()
+    for token in re.findall(r"[a-z0-9]+", seed_text.lower()):
+        if len(token) < 3 or token in seen:
+            continue
+        seen.add(token)
+        tags.append(token)
+        if len(tags) >= 6:
+            break
+    if "ww2" not in seen:
+        tags.append("ww2")
+    return tags[:7]
+
+
+def build_faq_schema_records(entries: list[dict]) -> list[dict]:
+    rows: list[dict] = []
+    for entry in entries:
+        title = str(entry.get("title") or "Operations Guide Entry").strip()
+        chunk_id = str(entry.get("chunk_id") or "ops_000")
+        rows.append({
+            "chunk_id": f"faq_{chunk_id}",
+            "doc_type": "dieselsubs_faq",
+            "source": "Submarine Operations Guide",
+            "title": title,
+            "slug": make_slug(title),
+            "category": "Operations Guide",
+            "text": operations_text_to_html(str(entry.get("text") or "")),
+            "topic_tags": operations_topic_tags(entry),
+            "authority_level": "reference_faq",
+            "era": "ww2",
+            "platform": ["us_diesel_electric_submarines"],
+            "pampanito_specific": False,
+            "display_citation": str(entry.get("display_citation") or f"Operations Guide - {title}"),
+        })
+    return rows
+
+
+def build_single_html_record(entries: list[dict]) -> dict:
+    groups: dict[str, list[dict]] = {}
+    for entry in entries:
+        groups.setdefault(str(entry.get("section") or "custom"), []).append(entry)
+
+    html_parts = [
+        '<div id="operations-view">',
+        '<h1>Submarine Operations</h1>',
+        '<p>Explore the fascinating world of submarine operations, tactics, and missions throughout history.</p>',
+    ]
+
+    for section_name, heading in [
+        ("overview", "About Submarine Operations"),
+        ("types_of_operations", "Types of Operations"),
+        ("tactical_approaches", "Tactical Approaches"),
+        ("related_faqs", "Related FAQs"),
+        ("statistics", "WWII Pacific Theater Statistics"),
+        ("additional_resources", "Additional Resources"),
+    ]:
+        section_entries = groups.pop(section_name, [])
+        if not section_entries:
+            continue
+        html_parts.append(f"<section><h2>{escape_html(heading)}</h2>")
+        for entry in section_entries:
+            title = str(entry.get("title") or "").strip()
+            content = operations_text_to_html(str(entry.get("text") or ""))
+            if section_name != "overview" and title and title.lower() != heading.lower():
+                html_parts.append(f"<article><h3>{escape_html(title)}</h3>{content}</article>")
+            else:
+                html_parts.append(content)
+        html_parts.append("</section>")
+
+    for section_name, section_entries in groups.items():
+        if not section_entries:
+            continue
+        html_parts.append(f"<section><h2>{escape_html(section_name.replace('_', ' ').title())}</h2>")
+        for entry in section_entries:
+            title = str(entry.get("title") or "").strip()
+            html_parts.append(f"<article><h3>{escape_html(title)}</h3>{operations_text_to_html(str(entry.get('text') or ''))}</article>")
+        html_parts.append("</section>")
+
+    html_parts.append("</div>")
+    return {
+        "chunk_id": "ops_html_001",
+        "doc_type": "dieselsubs_operations_guide_html",
+        "source": "Submarine Operations Guide",
+        "title": "Submarine Operations",
+        "slug": "submarine-operations",
+        "category": "Operations Guide",
+        "text": "".join(html_parts),
+        "display_citation": "Operations Guide - Submarine Operations",
+        "source_url": "/web/faqs.html?view=operations",
+    }
+
+
+def relevant_payload(entry: dict) -> dict:
+    return {
+        "section": str(entry.get("section") or "custom"),
+        "title": str(entry.get("title") or "").strip(),
+        "text": str(entry.get("text") or "").replace("\r\n", "\n").strip(),
+        "display_citation": str(entry.get("display_citation") or "").strip(),
+        "source_url": str(entry.get("source_url") or "").strip(),
+    }
+
+
+def chunk_id_number(chunk_id: str) -> int:
+    match = re.search(r"(\d+)$", chunk_id or "")
+    return int(match.group(1)) if match else -1
+
+
+def regenerate_local_exports(entries: list[dict]) -> None:
+    save_jsonl(FAQ_SCHEMA_PATH, build_faq_schema_records(entries))
+    save_jsonl(HTML_RECORD_PATH, [build_single_html_record(entries)])
+
+
+def sync_to_prod(entries: list[dict]) -> None:
+    remote_rows = request_json("GET", "/admin/operations-guide")
+    if not isinstance(remote_rows, list):
+        raise RuntimeError("Unexpected response from /admin/operations-guide")
+
+    local_by_id = {str(entry["chunk_id"]): entry for entry in entries}
+    remote_by_id = {str(entry.get("chunk_id") or ""): entry for entry in remote_rows}
+
+    to_update = []
+    for chunk_id, local_entry in local_by_id.items():
+        remote_entry = remote_by_id.get(chunk_id)
+        if remote_entry is None:
+            continue
+        if relevant_payload(local_entry) != relevant_payload(remote_entry):
+            to_update.append(chunk_id)
+
+    to_delete = sorted([chunk_id for chunk_id in remote_by_id if chunk_id not in local_by_id], key=chunk_id_number)
+    to_create = sorted([chunk_id for chunk_id in local_by_id if chunk_id not in remote_by_id], key=chunk_id_number)
+
+    remote_max = max([chunk_id_number(chunk_id) for chunk_id in remote_by_id] or [0])
+    expected = list(range(remote_max + 1, remote_max + 1 + len(to_create)))
+    actual = [chunk_id_number(chunk_id) for chunk_id in to_create]
+    if actual != expected:
+        raise RuntimeError(f"Cannot safely create missing chunk IDs {to_create}; expected sequential IDs after remote max {remote_max:03d}")
+
+    print(json.dumps({
+        "prod": PROD,
+        "create": to_create,
+        "update": to_update,
+        "delete": to_delete,
+        "dry_run": DRY_RUN,
+    }, indent=2))
+
+    if DRY_RUN:
+        return
+
+    for chunk_id in to_delete:
+        request_json("DELETE", f"/admin/operations-guide/{chunk_id}")
+        print(f"deleted {chunk_id}")
+
+    for chunk_id in to_update:
+        request_json("PUT", f"/admin/operations-guide/{chunk_id}", relevant_payload(local_by_id[chunk_id]))
+        print(f"updated {chunk_id}")
+
+    for chunk_id in to_create:
+        created = request_json("POST", "/admin/operations-guide", relevant_payload(local_by_id[chunk_id]))
+        entry = created.get("entry") if isinstance(created, dict) else None
+        created_id = str((entry or {}).get("chunk_id") or "")
+        if created_id != chunk_id:
+            raise RuntimeError(f"Create mismatch: expected {chunk_id}, server created {created_id}")
+        print(f"created {chunk_id}")
+
+
+def main() -> int:
+    if not OPERATIONS_GUIDE_PATH.exists():
+        print(f"ERROR: {OPERATIONS_GUIDE_PATH} does not exist")
+        return 1
+    entries = load_jsonl(OPERATIONS_GUIDE_PATH)
+    regenerate_local_exports(entries)
+    print(f"regenerated local exports from {OPERATIONS_GUIDE_PATH.relative_to(REPO)}")
+    sync_to_prod(entries)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

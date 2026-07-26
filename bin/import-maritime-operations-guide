@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+
+REPO = Path(__file__).resolve().parent.parent
+
+
+def load_env(path: Path) -> dict[str, str]:
+    env: dict[str, str] = {}
+    if not path.exists():
+        return env
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        env[key.strip()] = value.strip().strip('"').strip("'")
+    return env
+
+
+ENV = load_env(REPO / ".env.local")
+CONTENT_ROOT = ENV.get("CONTENT_ROOT", "corpora_local")
+CORPORA_DIR = Path(CONTENT_ROOT) if Path(CONTENT_ROOT).is_absolute() else REPO / CONTENT_ROOT
+OPERATIONS_GUIDE_PATH = CORPORA_DIR / "dieselsubs_operations_guide.jsonl"
+
+
+PACIFIC_CAMPAIGN_ENTRIES = [
+    {
+        "section": "maritime_campaign_chapters",
+        "title": "Pacific Campaign: War in the Pacific Theater",
+        "text": "William P. Gruner's U.S. Pacific Submarines in World War II opens with a theater-level framing of the Pacific war and the sudden shift forced by Pearl Harbor.\n\nIt explains that submarines became the first U.S. Pacific Fleet units able to carry the war back to Japan after the battle force had been disabled, and that their speed, endurance, and weapon load made them suitable for a campaign against Japanese shipping.\n\nThis section is useful whenever a visitor's question moves from one compartment on Pampanito to why submarines mattered strategically across the Pacific.",
+        "display_citation": "Submarine Operations Guide — Pacific Campaign: War in the Pacific Theater",
+        "source_url": "https://maritime.org/doc/subsinpacific.htm",
+    },
+    {
+        "section": "maritime_campaign_chapters",
+        "title": "Pacific Campaign: Submarine Warfare Directives",
+        "text": "The campaign summary includes a dedicated section on U.S. submarine warfare directives.\n\nIt places submarine operations in the context of formal wartime guidance rather than treating patrols as independent actions disconnected from higher command.\n\nThis section helps explain how patrol areas, target priorities, and shifting submarine missions were shaped by theater-level direction.",
+        "display_citation": "Submarine Operations Guide — Pacific Campaign: Submarine Warfare Directives",
+        "source_url": "https://maritime.org/doc/subsinpacific.htm",
+    },
+    {
+        "section": "maritime_campaign_chapters",
+        "title": "Pacific Campaign: Fleet Boats and S-Boats",
+        "text": "Gruner's summary separates U.S. World War II submarines into fleet type submarines and S-class boats.\n\nThat division is useful because it highlights differences in age, range, endurance, and combat role rather than treating all U.S. submarines in the war as if they were identical to Pampanito.\n\nThis section is helpful when visitors ask how Pampanito compared with earlier boats or why some older submarines were assigned differently during the war.",
+        "display_citation": "Submarine Operations Guide — Pacific Campaign: Fleet Boats and S-Boats",
+        "source_url": "https://maritime.org/doc/subsinpacific.htm",
+    },
+    {
+        "section": "maritime_campaign_chapters",
+        "title": "Pacific Campaign: Command Organization",
+        "text": "The campaign summary includes a section on U.S. submarine command organizations.\n\nIt gives operational context for how patrols, intelligence, and theater-level submarine activity were coordinated rather than improvised boat by boat.\n\nThis section is useful when explaining how a submarine such as Pampanito fit into a much larger command structure stretching from local wolfpack work to Pacific theater direction.",
+        "display_citation": "Submarine Operations Guide — Pacific Campaign: Command Organization",
+        "source_url": "https://maritime.org/doc/subsinpacific.htm",
+    },
+    {
+        "section": "maritime_campaign_chapters",
+        "title": "Pacific Campaign: Shipping Losses and Lifeguard Duty",
+        "text": "The Japanese ship-loss section of the campaign summary ties commerce destruction directly to submarine effectiveness and also includes lifeguard missions.\n\nThat pairing is important because it shows that U.S. submarines were used both for economic strangulation and for rescue work supporting the broader Pacific offensive.\n\nThis section is useful when visitors ask whether submarines only hunted ships or also performed missions such as aircrew rescue.",
+        "display_citation": "Submarine Operations Guide — Pacific Campaign: Shipping Losses and Lifeguard Duty",
+        "source_url": "https://maritime.org/doc/subsinpacific.htm",
+    },
+    {
+        "section": "maritime_campaign_chapters",
+        "title": "Pacific Campaign: Special Missions and Statistics",
+        "text": "The campaign summary includes sections for special missions and for submarine statistics such as patrol totals, losses, torpedoes fired, sonar attacks, awards, and personnel losses.\n\nTaken together, these sections broaden the picture of submarine warfare beyond sinkings alone and quantify the cost and scale of the campaign.\n\nThis material is useful when a visitor wants a high-level overview of what submarines accomplished and what they paid for that success.",
+        "display_citation": "Submarine Operations Guide — Pacific Campaign: Special Missions and Statistics",
+        "source_url": "https://maritime.org/doc/subsinpacific.htm",
+    },
+    {
+        "section": "maritime_campaign_chapters",
+        "title": "Pacific Campaign: Patrol Highlights and Search Tactics",
+        "text": "Later sections of the campaign summary move from organization into patrol highlights and U.S. submarine search tactics.\n\nThese sections are useful for showing how submariners hunted across wide patrol areas, translated intelligence into interceptions, and adapted their search methods to geography, convoy movement, and target opportunity.\n\nThey help connect technical questions about sensors and fire control to the practical problem of finding a target in the first place.",
+        "display_citation": "Submarine Operations Guide — Pacific Campaign: Patrol Highlights and Search Tactics",
+        "source_url": "https://maritime.org/doc/subsinpacific.htm",
+    },
+    {
+        "section": "maritime_campaign_chapters",
+        "title": "Pacific Campaign: Counterattacks and the End of the War",
+        "text": "The closing part of the campaign summary addresses Japanese counterattacks, attacks by friendly forces, miscellaneous operational notes, and the Japanese situation at the end of the war.\n\nThis material is useful because it reminds visitors that submarine warfare was not one-sided: boats were hunted hard, sometimes misidentified by friendly units, and operated inside a changing enemy defensive system.\n\nIt provides a useful capstone for questions about risk, attrition, and how submarine pressure contributed to Japan's final wartime position.",
+        "display_citation": "Submarine Operations Guide — Pacific Campaign: Counterattacks and the End of the War",
+        "source_url": "https://maritime.org/doc/subsinpacific.htm",
+    },
+]
+
+
+ENTRY_SETS = {
+    "pacific-campaign": PACIFIC_CAMPAIGN_ENTRIES,
+}
+
+
+def load_jsonl(path: Path) -> list[dict]:
+    rows: list[dict] = []
+    if not path.exists():
+        return rows
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    return rows
+
+
+def save_jsonl(path: Path, rows: list[dict]) -> None:
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with tmp_path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    tmp_path.replace(path)
+
+
+def next_chunk_id(rows: list[dict]) -> str:
+    max_value = 0
+    for row in rows:
+        match = re.search(r"(\d+)$", str(row.get("chunk_id") or ""))
+        if match:
+            max_value = max(max_value, int(match.group(1)))
+    return f"ops_{max_value + 1:03d}"
+
+
+def chunk_id_number(chunk_id: str) -> int:
+    match = re.search(r"(\d+)$", chunk_id or "")
+    return int(match.group(1)) if match else -1
+
+
+def entry_key(entry: dict) -> tuple[str, str]:
+    return (str(entry.get("title") or "").strip(), str(entry.get("source_url") or "").strip())
+
+
+def materialize_entries(rows: list[dict], template_entries: list[dict]) -> tuple[list[dict], list[str]]:
+    existing_keys = {entry_key(row): row for row in rows}
+    created_ids: list[str] = []
+    for template in template_entries:
+        key = entry_key(template)
+        if key in existing_keys:
+            continue
+        chunk_id = next_chunk_id(rows)
+        rows.append({
+            "chunk_id": chunk_id,
+            "doc_type": "dieselsubs_operations_guide",
+            "section": template["section"],
+            "title": template["title"],
+            "text": template["text"],
+            "display_citation": template["display_citation"],
+            "source_url": template["source_url"],
+        })
+        created_ids.append(chunk_id)
+    rows.sort(key=lambda row: chunk_id_number(str(row.get("chunk_id") or "")))
+    return rows, created_ids
+
+
+def usage() -> int:
+    print("Usage: bin/import-maritime-operations-guide <set-name> [--dry-run]")
+    print("Available sets:")
+    for key in sorted(ENTRY_SETS):
+        print(f"  - {key}")
+    return 1
+
+
+def main() -> int:
+    args = [arg for arg in sys.argv[1:] if arg != "--dry-run"]
+    dry_run = "--dry-run" in sys.argv[1:]
+    if len(args) != 1 or args[0] not in ENTRY_SETS:
+        return usage()
+
+    set_name = args[0]
+    rows = load_jsonl(OPERATIONS_GUIDE_PATH)
+    updated_rows, created_ids = materialize_entries(rows, ENTRY_SETS[set_name])
+    summary = {
+        "set": set_name,
+        "created": created_ids,
+        "count_after": len(updated_rows),
+        "dry_run": dry_run,
+        "path": str(OPERATIONS_GUIDE_PATH.relative_to(REPO)),
+    }
+    print(json.dumps(summary, indent=2))
+    if not dry_run:
+        save_jsonl(OPERATIONS_GUIDE_PATH, updated_rows)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

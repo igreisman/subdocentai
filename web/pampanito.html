@@ -308,17 +308,26 @@
       background: rgba(6, 10, 18, 0.85);
       z-index: 2;
     }
-    #videoLoadingOverlay.visible { display: grid; }
+
+    #videoLoadingOverlay.visible {
+      display: grid;
+    }
+
     #videoLoadingOverlay::after {
       content: '';
       width: 40px;
       height: 40px;
-      border: 3px solid rgba(255,255,255,0.15);
+      border: 3px solid rgba(255, 255, 255, 0.15);
       border-top-color: #7eb8ff;
       border-radius: 50%;
       animation: vl-spin 0.8s linear infinite;
     }
-    @keyframes vl-spin { to { transform: rotate(360deg); } }
+
+    @keyframes vl-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
 
     #tourVisualPanel.is-empty {
       display: none;
@@ -726,7 +735,6 @@
     audio {
       display: none;
     }
-
   </style>
 </head>
 
@@ -1152,7 +1160,25 @@
       return window.matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop';
     }
 
-    const VIDEO_BASE = (window.PAMPANITO_VIDEO_BASE || '/web/videos').replace(/\/$/, '');
+    function normalizeVideoBase(storedVideoBase) {
+      const defaultVideoBase = '/web/videos';
+      const currentIsLocal = isPrivateNetworkHost(window.location.hostname);
+      if (!storedVideoBase) return defaultVideoBase;
+
+      try {
+        const storedUrl = new URL(storedVideoBase, window.location.origin);
+        if (currentIsLocal && !isPrivateNetworkHost(storedUrl.hostname)) {
+          return defaultVideoBase;
+        }
+        return storedUrl.origin === window.location.origin
+          ? `${storedUrl.origin}${storedUrl.pathname}`.replace(/\/$/, '')
+          : storedUrl.href.replace(/\/$/, '');
+      } catch (e) {
+        return storedVideoBase.replace(/\/$/, '') || defaultVideoBase;
+      }
+    }
+
+    const VIDEO_BASE = normalizeVideoBase(window.PAMPANITO_VIDEO_BASE || '/web/videos');
 
     function getVariantSrc(playbackMedia, variant) {
       if (!playbackMedia) return '';
