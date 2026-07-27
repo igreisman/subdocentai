@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 import html
 import io
 import json
+import math
 import os
 import re
 import secrets
@@ -580,6 +581,11 @@ FAQ = load_jsonl(FAQ_PATH)
 SHORTS = load_jsonl(SHORTS_PATH)
 CATEGORIES = load_jsonl(CATEGORIES_PATH)
 OPERATIONS_GUIDE = load_jsonl(OPERATIONS_GUIDE_PATH)
+
+# Retrieval weight for the operations guide reference corpus.  Sits below FAQ
+# (1.2) and just above shorts (0.8): reference material should supplement the
+# museum's own narration and FAQ answers, never displace them.
+OPERATIONS_GUIDE_WEIGHT = float(os.getenv("OPERATIONS_GUIDE_WEIGHT", "0.9"))
 print(f"Loaded: {len(TOUR)} tour, {len(FAQ)} faq, {len(SHORTS)} shorts chunks, {len(CATEGORIES)} categories, {len(OPERATIONS_GUIDE)} operations guide records")
 
 
@@ -652,6 +658,7 @@ def health():
         "tour_chunks": len(TOUR),
         "faq_chunks": len(FAQ),
         "shorts_chunks": len(SHORTS),
+        "operations_guide_chunks": len(OPERATIONS_GUIDE),
         "corpora_dir": CORPORA_DIR,
     }
 
@@ -1360,7 +1367,12 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
     "attack scope":["periscope", "periscopes", "search scope", "thin", "feather"],
     "search scope":["periscope", "periscopes", "attack scope", "large", "magnification"],
     # Pampanito's war record / ships sunk (pam_226)
-    "pampanito":   ["sank", "sunk", "ships", "patrols", "war record", "citation", "pow"],
+    # NOTE: "pampanito" itself is deliberately NOT expanded.  Nearly every
+    # visitor question names the boat they are standing on, so mapping it to
+    # war-record vocabulary injected "sank / patrols / war record" into
+    # unrelated questions — "when was the Pampanito built" retrieved the
+    # ships-sunk narration instead of the build date.  The reverse mappings
+    # below still route genuine war-record questions to the right chunks.
     "record":      ["pampanito", "sank", "sunk", "ships", "patrols", "war record"],
     "patrols":     ["war patrol", "patrol", "pampanito", "record", "six", "missions"],
     # ----------  batch 12 follow-up synonym fixes  ----------
@@ -1413,15 +1425,83 @@ def expand_query_tokens(tokens: List[str]) -> List[str]:
     return expanded
 
 
-def overlap_score(query_tokens: List[str], text: str) -> int:
-    """Count token overlap using synonym-expanded query against text.
-    Multiple matches from the same synonym group each count separately,
-    so a food-rich chunk (breakfast + meal + galley) outranks one with a
-    single synonym hit.  We avoid synonym inflation by not mapping generic
-    terms (like 'officers') into the synonym table."""
+# Multiplier applied when a question matches a FAQ title verbatim.  Raised from
+# a hardcoded 8.0 when scoring moved to BM25: the score scale changed, and at
+# 8.0 an exact title match no longer outranked chunks that merely shared more
+# synonym-expanded tokens ("Where is the Pampanito?" returned her war record).
+EXACT_TITLE_BOOST = float(os.getenv("EXACT_TITLE_BOOST", "20.0"))
+
+# BM25 length-normalisation parameters.  k1 controls how quickly additional
+# term matches stop adding score; b controls how strongly length is penalised
+# (0 = ignore length, 1 = fully normalise).
+BM25_K1 = 1.5
+BM25_B = 0.6
+
+_avg_chunk_tokens: Optional[float] = None
+_doc_freq: Optional[Dict[str, int]] = None
+_doc_count: int = 0
+
+
+def _corpus_stats() -> tuple[float, Dict[str, int], int]:
+    """Mean chunk length and per-token document frequency, computed once.
+
+    Both are needed for BM25 and both depend on every corpus being loaded, so
+    they are built lazily on first retrieval rather than at import time.
+    """
+    global _avg_chunk_tokens, _doc_freq, _doc_count
+    if _avg_chunk_tokens is None:
+        counts: List[int] = []
+        freq: Dict[str, int] = {}
+        for corpus in (TOUR, FAQ, SHORTS, OPERATIONS_GUIDE):
+            for ch in corpus:
+                toks = set(tokenize(ch.get("text", "") or ""))
+                if not toks:
+                    continue
+                counts.append(len(toks))
+                for tok in toks:
+                    freq[tok] = freq.get(tok, 0) + 1
+        _avg_chunk_tokens = (sum(counts) / len(counts)) if counts else 1.0
+        _doc_freq = freq
+        _doc_count = len(counts)
+    return _avg_chunk_tokens, _doc_freq or {}, _doc_count
+
+
+def _idf(token: str) -> float:
+    """Inverse document frequency: rare terms discriminate, common ones don't.
+
+    Without this every matched term counts the same, so "how did the
+    ventilation work" scores a chunk containing only the synonym-expanded
+    "watch" as highly as one that actually discusses ventilation.
+    """
+    _, freq, total = _corpus_stats()
+    n = freq.get(token, 0)
+    return math.log(1 + (total - n + 0.5) / (n + 0.5))
+
+
+def overlap_score(query_tokens: List[str], text: str) -> float:
+    """Length-normalised token overlap between a synonym-expanded query and text.
+
+    A raw match count rewards long chunks purely for having a large vocabulary:
+    a 24,000-character FAQ entry intersects almost any query and so won every
+    question that didn't match a FAQ title outright, answering "how did the air
+    system work" from an entry about depth-charge attacks.
+
+    BM25 saturation fixes that.  Additional matched terms give diminishing
+    returns (k1), and the score is divided by chunk length relative to the
+    corpus average (b), so a long chunk must match proportionally more of the
+    query to outrank a short, precise one.
+    """
     expanded = expand_query_tokens(query_tokens)
     text_tokens = set(tokenize(text))
-    return len(set(expanded) & text_tokens)
+    matched = set(expanded) & text_tokens
+    if not matched:
+        return 0.0
+    avg_len, _, _ = _corpus_stats()
+    length_ratio = len(text_tokens) / avg_len
+    # Binary term frequency (presence, not count), so the saturation term is
+    # the same for every matched token and only the IDF weighting varies.
+    saturation = (BM25_K1 + 1) / (1 + BM25_K1 * (1 - BM25_B + BM25_B * length_ratio))
+    return sum(_idf(tok) for tok in matched) * saturation
 
 
 def detect_intent(query_tokens: List[str], raw_question: str = "") -> Dict[str, Any]:
@@ -1611,7 +1691,7 @@ def retrieve(
                     )
                     if normalized_question_text and normalized_question_text == normalized_title_text:
                         # Exact FAQ wording should outrank broader topical chunks.
-                        effective_weight = max(effective_weight, weight * 8.0)
+                        effective_weight = max(effective_weight, weight * EXACT_TITLE_BOOST)
 
             # For comparison queries, strongly boost chunks that discuss both sides
             if intent.get("wants_mark_compare") and _has_both_marks(text):
@@ -1646,6 +1726,14 @@ def retrieve(
     # Shorts (global)
     add_hits(SHORTS, "dieselsubs_shorts", weight=0.8, compartment_filter=False)
 
+    # Operations guide (global) – maritime.org reference material.  Weighted
+    # below FAQ so it supplements the museum's own answers rather than
+    # displacing them; a visitor standing in a compartment should still hear
+    # the tour narration first.  Tunable without a code edit so the weight can
+    # be re-checked against real questions after the corpus grows.
+    add_hits(OPERATIONS_GUIDE, "dieselsubs_operations_guide",
+             weight=OPERATIONS_GUIDE_WEIGHT, compartment_filter=False)
+
     hits.sort(key=lambda x: x[0], reverse=True)
     return hits[:top_k]
 
@@ -1653,6 +1741,44 @@ def retrieve(
 # ------------------------------------------------------------
 # Synthesis: Extractive now, OpenAI later (stubbed)
 # ------------------------------------------------------------
+
+def html_to_speakable(value: str) -> str:
+    """Convert rich-text FAQ HTML into plain prose with paragraph breaks.
+
+    FAQ entries are authored in the admin rich-text editor and stored as HTML;
+    that stored markup is the source of truth for editing and must not be
+    rewritten on disk.  Answers, however, are spoken aloud and rendered as
+    plain text, so tags have to come out at synthesis time.
+
+    Block-level closers become blank lines.  This matters beyond cosmetics:
+    much of the FAQ corpus is stored as a single line with no newlines at all,
+    which defeats every downstream routine that works paragraph- or
+    line-at-a-time (see clean_for_audio) and could blank an entire answer.
+    """
+    if not value:
+        return ""
+    if not re.search(r"</?[a-z][^>]*>|&(?:nbsp|amp|lt|gt|quot|#39);", value, re.I):
+        return value
+    v = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", " ", value, flags=re.I | re.S)
+    # Newlines inside HTML source are insignificant whitespace — Word and Quill
+    # both hard-wrap their markup mid-sentence.  Collapse them before inserting
+    # our own breaks, or the wrapping leaks into the spoken answer.
+    v = re.sub(r"\s+", " ", v)
+    v = re.sub(r"<br\s*/?>", "\n", v, flags=re.I)
+    v = re.sub(r"</(p|div|li|h[1-6]|tr|blockquote)\s*>", "\n\n", v, flags=re.I)
+    v = re.sub(r"<li\b[^>]*>", "• ", v, flags=re.I)
+    v = re.sub(r"<[^>]+>", "", v)
+    v = html.unescape(v).replace("\xa0", " ")
+    v = re.sub(r"[ \t]+", " ", v)
+    v = re.sub(r" *\n *", "\n", v)
+    v = re.sub(r"\n{3,}", "\n\n", v)
+    return v.strip()
+
+
+def chunk_display_text(ch: Dict[str, Any]) -> str:
+    """Speakable text for a retrieved chunk, with any stored HTML removed."""
+    return html_to_speakable(ch.get("text", "") or "")
+
 
 def split_sentences(text: str) -> List[str]:
     # Normalize non-breaking spaces; split on whitespace after .!?
@@ -1709,7 +1835,7 @@ def synthesize_extractive(
         blank line from the answer body.  Split on double-newlines first so
         abbreviations like 'U. S.' don't leave stray fragments behind.
         """
-        text = (ch.get("text", "") or "").replace("\xa0", " ")
+        text = chunk_display_text(ch)
         # Drop the leading question / title paragraph (ends with '?')
         paragraphs = [p.strip() for p in re.split(r"\n\n+", text) if p.strip()]
         if paragraphs and paragraphs[0].rstrip().endswith("?"):
@@ -1732,7 +1858,7 @@ def synthesize_extractive(
         # For FAQ chunks: capture the question and build a paragraph-structured body
         if ch.get("doc_type") in ("dieselsubs_faq", "dieselsubs_shorts"):
             faq_chunk_id = ch.get("chunk_id") or None
-            raw_text = (ch.get("text", "") or "").replace("\xa0", " ")
+            raw_text = chunk_display_text(ch)
             raw_paragraphs = [p.strip() for p in re.split(r"\n\n+", raw_text) if p.strip()]
             if raw_paragraphs and raw_paragraphs[0].rstrip().endswith("?"):
                 faq_question = raw_paragraphs[0].strip()
@@ -1798,6 +1924,7 @@ def synthesize_extractive(
                 "source_id": source_id,
                 "display_citation": ch.get("display_citation"),
                 "chunk_id": ch.get("chunk_id"),
+                "source_url": ch.get("source_url"),
             })
 
     # Secondary chunk: supplement if primary is thin.
@@ -1828,6 +1955,7 @@ def synthesize_extractive(
                     "source_id": src2,
                     "display_citation": ch2.get("display_citation"),
                     "chunk_id": ch2.get("chunk_id"),
+                    "source_url": ch2.get("source_url"),
                 })
                 break
 
@@ -1835,7 +1963,7 @@ def synthesize_extractive(
         # fallback: try any hit that has sentences containing query terms,
         # preferring FAQ/shorts over tour for this last-resort path
         for _, ch_fb, src_fb in sorted(hits, key=lambda h: 0 if h[2] != "pampanito_tour" else 1):
-            sents_fb = split_sentences(ch_fb.get("text", "") or "")
+            sents_fb = split_sentences(chunk_display_text(ch_fb))
             rel = [s for s in sents_fb if any(w in s.lower() for w in want_terms_l)] if want_terms_l else sents_fb[:2]
             if rel:
                 used_sentences = rel[:3]
@@ -1843,17 +1971,19 @@ def synthesize_extractive(
                     "source_id": src_fb,
                     "display_citation": ch_fb.get("display_citation"),
                     "chunk_id": ch_fb.get("chunk_id"),
+                    "source_url": ch_fb.get("source_url"),
                 }]
                 break
         # absolute last resort: first two sentences of the top chunk
         if not used_sentences:
             _, ch, source_id = hits[0]
-            sents = split_sentences(ch.get("text", "") or "")
+            sents = split_sentences(chunk_display_text(ch))
             used_sentences = sents[:2] if sents else ["(No text available in retrieved chunk.)"]
             citations = [{
                 "source_id": source_id,
                 "display_citation": ch.get("display_citation"),
                 "chunk_id": ch.get("chunk_id"),
+                "source_url": ch.get("source_url"),
             }]
 
     if faq_question and faq_body is not None:
@@ -1887,10 +2017,10 @@ def synthesize_extractive(
     # may have leaked through from long FAQ chunks.  Applied per-line so we
     # don't accidentally drop valid prose containing an arrow in a sentence.
     _DIAGRAM_LINE_RE = re.compile(
-        r"==>|-->"                        # arrow diagrams
-        r"|\[[A-Z][\w\s]{0,20}\].*\["    # [Foo] ... [Bar] bracket chains
-        r"|^\s*[|+][-+|]+[|+]\s*$"       # box-drawing lines
-        r"|^Note\s*:",                    # "NOTE :" headers from FAQ
+        r"==>|-->"                          # arrow diagrams
+        r"|\[[A-Z][\w\s]{0,20}\].{0,40}\["  # [Foo] ... [Bar] bracket chains
+        r"|^\s*[|+][-+|]+[|+]\s*$"          # box-drawing lines
+        r"|^Note\s*:",                      # "NOTE :" headers from FAQ
         re.IGNORECASE,
     )
 
@@ -1962,7 +2092,7 @@ def synthesize_extractive(
                 text_why = (ch_why.get("text", "") or "").lower()
                 if any(m in text_why for m in CAUSAL_MARKERS):
                     # Found a causal chunk — synthesise from it directly.
-                    raw_text = (ch_why.get("text", "") or "").replace("\xa0", " ")
+                    raw_text = chunk_display_text(ch_why)
                     raw_paras = [p.strip() for p in re.split(r"\n\n+", raw_text) if p.strip()]
                     if raw_paras and raw_paras[0].rstrip().endswith("?"):
                         faq_question = raw_paras[0].strip()
