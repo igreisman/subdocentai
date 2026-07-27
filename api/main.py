@@ -1413,11 +1413,33 @@ QUERY_SYNONYMS: Dict[str, List[str]] = {
 }
 
 
+# Compound terms whose meaning is unrelated to the words they are built from.
+# When the query contains one, the listed constituent is kept but NOT expanded:
+# "depth" normally maps to deep/feet/dive/underwater, which turns "what is a
+# depth charge" into a query about diving depth and buries the depth-charge
+# entry entirely.  Tokenisation is word-at-a-time, so these are matched as
+# adjacent token pairs rather than as multi-word synonym keys (which can never
+# fire — see the dead "war record" / "attack scope" keys in QUERY_SYNONYMS).
+COMPOUND_GUARDS: Dict[tuple[str, str], set[str]] = {
+    ("depth", "charge"): {"depth"},
+    ("depth", "charges"): {"depth"},
+    ("depth", "charging"): {"depth"},
+}
+
+
 def expand_query_tokens(tokens: List[str]) -> List[str]:
     """Return query tokens plus corpus-side synonyms for better vocabulary coverage."""
+    suppress: set[str] = set()
+    for first, second in zip(tokens, tokens[1:]):
+        guarded = COMPOUND_GUARDS.get((first, second))
+        if guarded:
+            suppress |= guarded
+
     expanded = list(tokens)
     seen = set(tokens)
     for t in tokens:
+        if t in suppress:
+            continue
         for syn in QUERY_SYNONYMS.get(t, []):
             if syn not in seen:
                 expanded.append(syn)
@@ -1434,8 +1456,15 @@ EXACT_TITLE_BOOST = float(os.getenv("EXACT_TITLE_BOOST", "20.0"))
 # BM25 length-normalisation parameters.  k1 controls how quickly additional
 # term matches stop adding score; b controls how strongly length is penalised
 # (0 = ignore length, 1 = fully normalise).
+#
+# b is well below the usual 0.75 default because chunk length here reflects
+# *kind*, not verbosity: a 12-token line of tour narration and an 89-token FAQ
+# answer are different sorts of content, not a terse and a padded version of
+# the same thing.  Penalising length hard let short narration fragments outrank
+# the FAQ entry that directly answered the question — "what is a depth charge"
+# returned a remark about atheists in foxholes ahead of the depth-charge entry.
 BM25_K1 = 1.5
-BM25_B = 0.6
+BM25_B = float(os.getenv("BM25_B", "0.3"))
 
 _avg_chunk_tokens: Optional[float] = None
 _doc_freq: Optional[Dict[str, int]] = None
@@ -1679,9 +1708,14 @@ def retrieve(
                         for t in q_set
                     )
                     if all_q_covered:
-                        # All query intent represented in title: scale 4x by coverage
-                        # Clamp to at least weight so long titles are not penalized
-                        effective_weight = max(weight, weight * 4.0 * coverage)
+                        # Every query token appears in the title, so the entry
+                        # answers the whole question: apply the full boost and
+                        # do NOT scale by coverage.  Scaling diluted the match
+                        # for titles carrying extra words — "what is a depth
+                        # charge" against "What is a depth charge and how did
+                        # it work?" lost two thirds of the boost and ranked
+                        # below a passing mention in tour narration.
+                        effective_weight = max(weight, weight * 4.0)
                     elif matched >= max(1, len(q_set) - 1):
                         # Near-exact (all but one): scale 2x by coverage
                         effective_weight = weight * 2.0 * coverage
