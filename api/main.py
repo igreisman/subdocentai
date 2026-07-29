@@ -348,6 +348,10 @@ ETERNAL_PATROL_IMAGE_DIR = os.path.join(WEB_DIR, "images", "extracted")
 
 TOUR_PATH = os.path.join(CORPORA_DIR, "pampanito_tour_corpus.jsonl")
 SHORTS_PATH = os.path.join(CORPORA_DIR, "dieselsubs_shorts_corpus.jsonl")
+# Fleet Type Submarine manual series (NAVPERS 16160-16169) — reference text,
+# not museum-authored content, so it is read-only and deliberately absent from
+# REQUIRED_CORPORA_FILES: the app runs normally without it.
+FLEETSUB_MANUAL_PATH = os.path.join(CORPORA_DIR, "dieselsubs_fleetsub_manual.jsonl")
 # Editable corpora — on Render these live on the persistent disk (/data) so
 # that edits made on the live site survive redeploys. The bundled copy under
 # corpora/ seeds the disk on first boot and is the fallback for local/dev runs
@@ -581,11 +585,19 @@ FAQ = load_jsonl(FAQ_PATH)
 SHORTS = load_jsonl(SHORTS_PATH)
 CATEGORIES = load_jsonl(CATEGORIES_PATH)
 OPERATIONS_GUIDE = load_jsonl(OPERATIONS_GUIDE_PATH)
+FLEETSUB_MANUAL = load_jsonl(FLEETSUB_MANUAL_PATH)
 
 # Retrieval weight for the operations guide reference corpus.  Sits below FAQ
 # (1.2) and just above shorts (0.8): reference material should supplement the
 # museum's own narration and FAQ answers, never displace them.
 OPERATIONS_GUIDE_WEIGHT = float(os.getenv("OPERATIONS_GUIDE_WEIGHT", "0.9"))
+
+# The manual corpus is an order of magnitude larger than everything else the
+# app holds (roughly 2,200 chunks against ~760 of tour and FAQ combined), and
+# it is 1946 Navy engineering prose rather than docent narration.  It is
+# weighted well below every museum-authored source so it answers only what
+# nothing else can.
+FLEETSUB_MANUAL_WEIGHT = float(os.getenv("FLEETSUB_MANUAL_WEIGHT", "0.5"))
 print(f"Loaded: {len(TOUR)} tour, {len(FAQ)} faq, {len(SHORTS)} shorts chunks, {len(CATEGORIES)} categories, {len(OPERATIONS_GUIDE)} operations guide records")
 
 
@@ -659,6 +671,7 @@ def health():
         "faq_chunks": len(FAQ),
         "shorts_chunks": len(SHORTS),
         "operations_guide_chunks": len(OPERATIONS_GUIDE),
+        "fleetsub_manual_chunks": len(FLEETSUB_MANUAL),
         "corpora_dir": CORPORA_DIR,
     }
 
@@ -1481,6 +1494,14 @@ def _corpus_stats() -> tuple[float, Dict[str, int], int]:
     if _avg_chunk_tokens is None:
         counts: List[int] = []
         freq: Dict[str, int] = {}
+        # FLEETSUB_MANUAL is deliberately excluded.  It is ~2,200 long chunks
+        # of 1946 engineering prose against ~760 of museum narration, so
+        # folding it in shifts both the average chunk length and the document
+        # frequency of common terms enough to change answers that have nothing
+        # to do with it — measured, it cost a point of self-retrieval and one
+        # of three off-script questions even with the manual's own retrieval
+        # weight set to zero.  Statistics stay anchored to the museum corpora;
+        # the manual is scored against them as a supplementary index.
         for corpus in (TOUR, FAQ, SHORTS, OPERATIONS_GUIDE):
             for ch in corpus:
                 toks = set(tokenize(ch.get("text", "") or ""))
@@ -1767,6 +1788,11 @@ def retrieve(
     # be re-checked against real questions after the corpus grows.
     add_hits(OPERATIONS_GUIDE, "dieselsubs_operations_guide",
              weight=OPERATIONS_GUIDE_WEIGHT, compartment_filter=False)
+
+    # Fleet Type Submarine manual series (global) – the primary sources behind
+    # the operations guide's descriptions.  Lowest weight of any corpus.
+    add_hits(FLEETSUB_MANUAL, "fleetsub_manual",
+             weight=FLEETSUB_MANUAL_WEIGHT, compartment_filter=False)
 
     hits.sort(key=lambda x: x[0], reverse=True)
     return hits[:top_k]
