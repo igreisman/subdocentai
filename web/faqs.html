@@ -788,6 +788,50 @@
       display: block;
     }
 
+    .faq-video {
+      margin-top: 14px;
+      max-width: 640px;
+    }
+
+    .faq-video iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 0;
+      border-radius: 6px;
+      background: #000;
+      display: block;
+    }
+
+    .faq-video-play {
+      width: 100%;
+      padding: 10px 12px;
+      font: inherit;
+      font-size: 14px;
+      color: #24292e;
+      background: #f6f8fa;
+      border: 1px solid #d1d5da;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .faq-video-play:hover {
+      background: #eef1f5;
+    }
+
+    .faq-video-caption {
+      margin-top: 6px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: #444d56;
+    }
+
+    .faq-video-credit {
+      margin-top: 3px;
+      font-size: 11px;
+      color: #6a737d;
+    }
+
     .faq-answer p,
     .faq-answer li {
       font-size: 14px;
@@ -2404,6 +2448,43 @@
       return wrapper.innerHTML;
     }
 
+    // Supplementary video, offered as a button rather than an eager iframe: this
+    // page renders every FAQ in a category at once, so embedding on load would
+    // fire a request to the video host for each one whether or not the visitor
+    // ever opens that answer.
+    function faqVideoHtml(video) {
+      if (!video || !video.embed_url) return '';
+      const caption = video.caption
+        ? `<div class="faq-video-caption">${escHtml(video.caption)}</div>`
+        : '';
+      const creditInner = video.credit_url
+        ? `Courtesy of <a href="${escHtml(video.credit_url)}" target="_blank" rel="noopener noreferrer">${escHtml(video.credit)}</a>`
+        : `Courtesy of ${escHtml(video.credit)}`;
+      const credit = video.credit ? `<div class="faq-video-credit">${creditInner}</div>` : '';
+      return `<div class="faq-video" data-embed="${escHtml(video.embed_url)}">`
+        + `<button type="button" class="faq-video-play">&#9654;&nbsp; Watch this account</button>`
+        + `${caption}${credit}</div>`;
+    }
+
+    function wireFaqVideo(item) {
+      const holder = item.querySelector('.faq-video');
+      if (!holder) return;
+      const btn = holder.querySelector('.faq-video-play');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const src = holder.getAttribute('data-embed');
+        btn.remove();
+        const frame = document.createElement('iframe');
+        frame.src = src + (src.indexOf('?') !== -1 ? '&' : '?') + 'autoplay=1';
+        frame.title = holder.querySelector('.faq-video-caption')?.textContent || 'Video';
+        frame.loading = 'lazy';
+        frame.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+        frame.referrerPolicy = 'strict-origin-when-cross-origin';
+        frame.setAttribute('allowfullscreen', '');
+        holder.insertBefore(frame, holder.firstChild);
+      });
+    }
+
     function answerToHtml(text, query) {
       if (hasHtmlContent(text)) {
         return applyHighlightToHtml(normalizeRichHtml(text), query);
@@ -2461,11 +2542,12 @@
               <span class="faq-q-text">${highlight(faq.title, q)}</span>
               <span class="faq-chevron">&#9654;</span>
             </div>
-            <div class="faq-answer">${answerToHtml(faq.answer, q)}</div>`;
+            <div class="faq-answer">${answerToHtml(faq.answer, q)}${faqVideoHtml(faq.video)}</div>`;
           item.querySelector('.faq-q').addEventListener('click', () => {
             const isOpen = item.classList.toggle('open');
             item.querySelector('.faq-q').setAttribute('aria-expanded', String(isOpen));
           });
+          wireFaqVideo(item);
           section.appendChild(item);
         });
       });

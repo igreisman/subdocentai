@@ -1864,6 +1864,50 @@ def best_sentences(text: str, want_terms: List[str], max_sentences: int = 2) -> 
     return [s for _, s in scored[:max_sentences]]
 
 
+# ── Supplementary video attachments ──────────────────────────────────────────
+# A record may carry a video that illustrates its answer — oral-history
+# testimony, museum footage.  Third-party clips are embedded from the host
+# rather than copied into web/videos/, so the file, the rights, and any takedown
+# stay with the uploader; see docs/MediaRightsReview.md.  The answer text has to
+# stand on its own: an uploader can pull a video at any time, and when that
+# happens the embed goes dark while the answer still reads.
+_YT_ID_RE = re.compile(
+    r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/)|youtu\.be/)([A-Za-z0-9_-]{11})"
+)
+
+
+def _video_payload(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Normalize a record's video_* fields into an embeddable payload, or None.
+
+    YouTube links are rewritten to the youtube-nocookie host: a standard embed
+    sets YouTube's tracking cookie on a museum page for visitors who never
+    opted into it.  A non-YouTube URL is passed through untouched so this isn't
+    locked to one host.
+    """
+    raw_url = (entry.get("video_url") or "").strip()
+    if not raw_url:
+        return None
+    try:
+        start = int(entry.get("video_start") or 0)
+    except (TypeError, ValueError):
+        start = 0
+    match = _YT_ID_RE.search(raw_url)
+    if match:
+        embed_url = f"https://www.youtube-nocookie.com/embed/{match.group(1)}?rel=0"
+        if start > 0:
+            embed_url += f"&start={start}"
+    else:
+        embed_url = raw_url
+    return {
+        "embed_url": embed_url,
+        "watch_url": raw_url,
+        "caption": (entry.get("video_caption") or "").strip(),
+        "credit": (entry.get("video_credit") or "").strip(),
+        "credit_url": (entry.get("video_credit_url") or "").strip(),
+        "start": start,
+    }
+
+
 def synthesize_extractive(
     question_text: str,
     hits: List[Hit]
@@ -2252,11 +2296,22 @@ def synthesize_extractive(
         or answer_missing_superlative
     )
 
+    # Any video belongs to the chunk that actually supplied the answer text, not
+    # to hits[0] — the "why"-question rebuild above can cite a different chunk.
+    video = None
+    if citations:
+        cited_id = citations[0].get("chunk_id")
+        for _, ch_video, _src_video in hits:
+            if ch_video.get("chunk_id") == cited_id:
+                video = _video_payload(ch_video)
+                break
+
     return {
         "answer_mode": "standard",
         "answer_short": answer_short,
         "partial_match": partial_match,
         "faq_id": faq_chunk_id,
+        "video": video,
         "answer_deep": None,
         "what_you_are_seeing": None,
         "citations": citations[:2],
@@ -3428,6 +3483,7 @@ def public_faqs():
                 "id": e["chunk_id"],
                 "title": title,
                 "answer": answer,
+                "video": _video_payload(e),
                 "display_order": e.get("display_order"),
             }
         )
