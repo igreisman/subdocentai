@@ -2064,6 +2064,18 @@ def synthesize_extractive(
             if stop_loc:
 
                     answer_short = f"From the audio tour in {stop_loc}\n\n{answer_short}"
+    # Answers drawn from the Fleet Type Submarine manuals are 1946 Navy
+    # engineering prose, not museum-authored narration, and without a lead-in
+    # they reach the visitor in the docent's own voice with nothing marking the
+    # difference.  Name the manual the text actually came from.
+    elif citations and answer_short and citations[0].get("source_id") == "fleetsub_manual":
+        used_chunk_id = citations[0].get("chunk_id")
+        man_ch = next((c for c in FLEETSUB_MANUAL if c.get("chunk_id") == used_chunk_id), None)
+        manual_name = (man_ch or {}).get("manual", "").strip()
+        if manual_name:
+            answer_short = f"From the Navy's 1946 manual {manual_name}\n\n{answer_short}"
+        else:
+            answer_short = f"From the Navy's 1946 fleet submarine manuals\n\n{answer_short}"
     if intent.get("is_where_question") and hits and answer_short:
         top_ch = hits[0][1]
         loc = (top_ch.get("location_context") or "").strip()
