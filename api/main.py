@@ -3697,6 +3697,15 @@ async def update_faq(chunk_id: str, request: Request):
             entry["text"] = text
         if "category" in body:
             entry["category"] = (body.get("category") or "").strip()
+        # Only touched when the caller sends the key, so an ordinary title/text
+        # save from the editor can't silently drop a record's links.  Stored
+        # through the same validator that serves them, so an unsafe URL is
+        # rejected at write time rather than persisting and being filtered on
+        # every later read.  An empty list clears them.
+        if "related_links" in body:
+            entry["related_links"] = _related_links_payload(
+                {"related_links": body.get("related_links")}
+            )
         _save_faq_corpus()
     return {"status": "saved", "chunk_id": chunk_id}
 
