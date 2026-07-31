@@ -301,6 +301,11 @@ if os.path.isdir(WEB_DIR):
     def redirect_glossary_html():
         return RedirectResponse(url="/web/glossary.html")
 
+    @app.get("/videos", include_in_schema=False)
+    @app.get("/videos.html", include_in_schema=False)
+    def redirect_videos_html():
+        return RedirectResponse(url="/web/videos.html")
+
     @app.get("/index.html", include_in_schema=False)
     @app.get("/web/index.html", include_in_schema=False)
     def redirect_index_html():
@@ -352,6 +357,11 @@ SHORTS_PATH = os.path.join(CORPORA_DIR, "dieselsubs_shorts_corpus.jsonl")
 # not museum-authored content, so it is read-only and deliberately absent from
 # REQUIRED_CORPORA_FILES: the app runs normally without it.
 FLEETSUB_MANUAL_PATH = os.path.join(CORPORA_DIR, "dieselsubs_fleetsub_manual.jsonl")
+# Videos page.  Read straight from CORPORA_DIR rather than the persistent disk:
+# there is no admin editor for it, so it is maintained by editing the file and
+# pushing.  Routing it through _editable_corpus_path() would seed /data once and
+# then silently ignore every later edit to the committed file.
+VIDEOS_PATH = os.path.join(CORPORA_DIR, "videos.jsonl")
 # Editable corpora — on Render these live on the persistent disk (/data) so
 # that edits made on the live site survive redeploys. The bundled copy under
 # corpora/ seeds the disk on first boot and is the fallback for local/dev runs
@@ -1871,6 +1881,12 @@ def best_sentences(text: str, want_terms: List[str], max_sentences: int = 2) -> 
 # stay with the uploader; see docs/MediaRightsReview.md.  The answer text has to
 # stand on its own: an uploader can pull a video at any time, and when that
 # happens the embed goes dark while the answer still reads.
+# Shared by every field that ends up in an href or an iframe src.  Anything that
+# isn't plainly http(s) is rejected: these records are editable through the admin
+# screens and by hand, so a "javascript:" URL would be a script-injection path
+# into visitors' pages rather than a merely broken link.
+_SAFE_LINK_SCHEME_RE = re.compile(r"^https?://", re.I)
+
 _YT_ID_RE = re.compile(
     r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/)|youtu\.be/)([A-Za-z0-9_-]{11})"
 )
@@ -1885,7 +1901,11 @@ def _video_payload(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     locked to one host.
     """
     raw_url = (entry.get("video_url") or "").strip()
-    if not raw_url:
+    # Only http(s) may reach an iframe src.  Records are editable through the
+    # admin screens and hand-maintained in videos.jsonl, so a "javascript:" URL
+    # is a live script-injection path into every visitor's page, not a typo that
+    # merely renders a broken embed.  Reject rather than pass through.
+    if not raw_url or not _SAFE_LINK_SCHEME_RE.match(raw_url):
         return None
     try:
         start = int(entry.get("video_start") or 0)
@@ -1906,6 +1926,43 @@ def _video_payload(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "credit_url": (entry.get("video_credit_url") or "").strip(),
         "start": start,
     }
+
+
+# ── Related outside sources ──────────────────────────────────────────────────
+# A referral, not a reproduction.  Some material we'd like visitors to hear can't
+# be hosted or embedded: Veterans History Project oral histories, for instance,
+# are held by the Library of Congress but the veterans retain copyright, and LoC
+# states it "cannot give or deny permission" to republish them.  A hyperlink to
+# the holding institution's own page carries none of that exposure, so a record
+# can point at such material without our copying a byte of it.
+
+
+def _related_links_payload(entry: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Normalize a record's related_links into a safe, renderable list.
+
+    Records are editable through the admin screens, so the URL scheme is
+    checked here rather than trusted: only http(s) survives, which keeps a
+    pasted ``javascript:`` URL from reaching an href.  Entries without a usable
+    URL are dropped rather than rendered as dead links.
+    """
+    raw = entry.get("related_links")
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        url = (item.get("url") or "").strip()
+        if not url or not _SAFE_LINK_SCHEME_RE.match(url):
+            continue
+        out.append({
+            "url": url,
+            "label": (item.get("label") or "").strip() or url,
+            # Holding institutions often prescribe an exact citation format;
+            # VHP does, down to the collection ID.  Carry it verbatim.
+            "citation": (item.get("citation") or "").strip(),
+        })
+    return out
 
 
 def synthesize_extractive(
@@ -2299,11 +2356,13 @@ def synthesize_extractive(
     # Any video belongs to the chunk that actually supplied the answer text, not
     # to hits[0] — the "why"-question rebuild above can cite a different chunk.
     video = None
+    related_links: List[Dict[str, str]] = []
     if citations:
         cited_id = citations[0].get("chunk_id")
         for _, ch_video, _src_video in hits:
             if ch_video.get("chunk_id") == cited_id:
                 video = _video_payload(ch_video)
+                related_links = _related_links_payload(ch_video)
                 break
 
     return {
@@ -2312,6 +2371,7 @@ def synthesize_extractive(
         "partial_match": partial_match,
         "faq_id": faq_chunk_id,
         "video": video,
+        "related_links": related_links,
         "answer_deep": None,
         "what_you_are_seeing": None,
         "citations": citations[:2],
@@ -3484,6 +3544,7 @@ def public_faqs():
                 "title": title,
                 "answer": answer,
                 "video": _video_payload(e),
+                "related_links": _related_links_payload(e),
                 "display_order": e.get("display_order"),
             }
         )
@@ -3492,6 +3553,40 @@ def public_faqs():
     ordered_categories = [entry["title"] for entry in _get_category_records() if entry.get("title") in groups]
     unordered_categories = sorted(cat for cat in groups.keys() if cat not in set(ordered_categories))
     return [{"category": cat, "faqs": groups[cat]} for cat in [*ordered_categories, *unordered_categories]]
+
+
+@app.get("/api/videos")
+def public_videos():
+    """Return the curated videos, in display order, for the Videos page.
+
+    Read per request rather than cached at import so editing videos.jsonl takes
+    effect on refresh without a restart.  Only entries with a usable video_url
+    are returned: this page exists to show video, and a record without one would
+    render as a description with an empty frame above it.
+    """
+    def _order_key(entry: Dict[str, Any]) -> tuple[int, Any]:
+        try:
+            return (0, int(entry.get("display_order")))
+        except (TypeError, ValueError):
+            return (1, entry.get("id") or "")
+
+    out: List[Dict[str, Any]] = []
+    for entry in load_jsonl(VIDEOS_PATH):
+        video = _video_payload(entry)
+        if not video:
+            continue
+        out.append({
+            "id": entry.get("id") or "",
+            "title": (entry.get("title") or "").strip(),
+            "description": (entry.get("description") or "").strip(),
+            # Why we are permitted to show this one — shown on the page so the
+            # basis is visible rather than buried in a commit message.
+            "rights_note": (entry.get("rights_note") or "").strip(),
+            "video": video,
+            "display_order": entry.get("display_order"),
+        })
+    out.sort(key=_order_key)
+    return out
 
 
 @app.get("/api/operations-guide")

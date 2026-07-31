@@ -832,6 +832,38 @@
       color: #6a737d;
     }
 
+    .faq-related {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #f0f3f6;
+    }
+
+    .faq-related-head {
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #6a737d;
+      margin-bottom: 6px;
+    }
+
+    .faq-related ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .faq-related li {
+      margin-bottom: 10px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .faq-related-citation {
+      margin-top: 2px;
+      font-size: 11px;
+      color: #6a737d;
+    }
+
     .faq-answer p,
     .faq-answer li {
       font-size: 14px;
@@ -2485,6 +2517,19 @@
       });
     }
 
+    // Links out to material held elsewhere — see the API-side note: a referral
+    // costs us no rights, a copy would.
+    function relatedLinksHtml(links) {
+      if (!links || !links.length) return '';
+      const items = links.map(l => {
+        const cite = l.citation
+          ? `<div class="faq-related-citation">${escHtml(l.citation)}</div>`
+          : '';
+        return `<li><a href="${escHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escHtml(l.label)}</a>${cite}</li>`;
+      }).join('');
+      return `<div class="faq-related"><div class="faq-related-head">Hear it firsthand</div><ul>${items}</ul></div>`;
+    }
+
     function answerToHtml(text, query) {
       if (hasHtmlContent(text)) {
         return applyHighlightToHtml(normalizeRichHtml(text), query);
@@ -2542,7 +2587,7 @@
               <span class="faq-q-text">${highlight(faq.title, q)}</span>
               <span class="faq-chevron">&#9654;</span>
             </div>
-            <div class="faq-answer">${answerToHtml(faq.answer, q)}${faqVideoHtml(faq.video)}</div>`;
+            <div class="faq-answer">${answerToHtml(faq.answer, q)}${faqVideoHtml(faq.video)}${relatedLinksHtml(faq.related_links)}</div>`;
           item.querySelector('.faq-q').addEventListener('click', () => {
             const isOpen = item.classList.toggle('open');
             item.querySelector('.faq-q').setAttribute('aria-expanded', String(isOpen));

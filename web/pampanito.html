@@ -564,6 +564,42 @@
       color: #6a8ab0;
     }
 
+    .answer-related {
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1px solid #24354a;
+    }
+
+    .answer-related-head {
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #6a8ab0;
+      margin-bottom: 6px;
+    }
+
+    .answer-related ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .answer-related li {
+      margin-bottom: 8px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .answer-related a {
+      color: #8fb6e8;
+    }
+
+    .answer-related-citation {
+      margin-top: 2px;
+      font-size: 11px;
+      color: #6a8ab0;
+    }
+
     .faq-body p {
       margin-bottom: 8px;
     }
@@ -1751,13 +1787,28 @@
       };
     }
 
+    // Links out to material held elsewhere — oral histories we can point at but
+    // may not reproduce.  Rendered as links, never as an embed, because the
+    // referral is the whole point: the recording stays with the institution that
+    // holds it and the visitor goes there to hear it.
+    function relatedLinksHtml(links) {
+      if (!links || !links.length) return '';
+      const items = links.map(l => {
+        const cite = l.citation
+          ? `<div class="answer-related-citation">${esc(l.citation)}</div>`
+          : '';
+        return `<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>${cite}</li>`;
+      }).join('');
+      return `<div class="answer-related"><div class="answer-related-head">Hear it firsthand</div><ul>${items}</ul></div>`;
+    }
+
     function renderAnswer(data) {
       console.log('[renderAnswer] partial_match=', data.partial_match, 'answer_short length=', (data.answer_short || '').length);
       const text = data.answer_short || '';
       const disclaimer = data.partial_match
         ? `<p class="partial-match-note">I don’t have a direct answer to that, but here’s something related:</p>`
         : '';
-      const videoHtml = videoBlockHtml(data.video);
+      const videoHtml = videoBlockHtml(data.video) + relatedLinksHtml(data.related_links);
       if (containsHtmlMarkup(text)) {
         answerText.innerHTML = disclaimer + text + videoHtml;
         wireAnswerVideo();
