@@ -1642,6 +1642,28 @@
       });
       grid.appendChild(musCard);
 
+      // Videos card
+      const vidCard = document.createElement('div');
+      vidCard.className = 'special-card special-card-blue';
+      vidCard.tabIndex = 0;
+      vidCard.setAttribute('role', 'button');
+      vidCard.setAttribute('aria-label', 'Videos');
+      vidCard.innerHTML = `
+        <div class="special-card-header">
+          <span class="cat-card-icon">🎬</span>
+          <div class="cat-card-body">
+            <div class="cat-card-title">Videos</div>
+          </div>
+        </div>`;
+      vidCard.addEventListener('click', () => { window.location.href = '/web/videos.html'; });
+      vidCard.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          window.location.href = '/web/videos.html';
+        }
+      });
+      grid.appendChild(vidCard);
+
       async function showOperationsView() {
         document.getElementById('dashboard').style.display = 'none';
         document.getElementById('faq-view').style.display = 'none';

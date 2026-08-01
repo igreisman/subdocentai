@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Edit Videos</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f7fb;
+      color: #1d2734;
+    }
+
+    header {
+      background: #1a1f2e;
+      color: #e6edf3;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    header a {
+      color: #9ec5f5;
+      font-size: 14px;
+      text-decoration: none;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 20px 64px;
+    }
+
+    .note {
+      background: #fff8e6;
+      border: 1px solid #f0dca8;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #5c4a1a;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e1e7ef;
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+    }
+
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      color: #14213d;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #44506a;
+      margin: 10px 0 4px;
+    }
+
+    .hint {
+      font-weight: 400;
+      color: #7a8698;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    textarea {
+      width: 100%;
+      padding: 8px 10px;
+      font: inherit;
+      font-size: 14px;
+      border: 1px solid #cfd8e3;
+      border-radius: 6px;
+      background: #fff;
+      color: #1d2734;
+    }
+
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .row>div {
+      flex: 1 1 200px;
+    }
+
+    .actions {
+      margin-top: 14px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font: inherit;
+      font-size: 14px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid #cfd8e3;
+      background: #fff;
+      color: #1d2734;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: #2f6fd0;
+      border-color: #2f6fd0;
+      color: #fff;
+    }
+
+    button.danger {
+      color: #a12a1f;
+      border-color: #e6c3bf;
+    }
+
+    button:hover {
+      filter: brightness(0.97);
+    }
+
+    .status {
+      font-size: 13px;
+      color: #5a6a80;
+    }
+
+    .status.error {
+      color: #a12a1f;
+    }
+
+    .status.ok {
+      color: #1f7a3d;
+    }
+
+    .preview {
+      margin-top: 12px;
+    }
+
+    .preview iframe {
+      width: 100%;
+      max-width: 480px;
+      aspect-ratio: 16 / 9;
+      border: 0;
+      border-radius: 6px;
+      background: #000;
+    }
+
+    .empty {
+      background: #fff;
+      border: 1px dashed #cfd8e3;
+      border-radius: 10px;
+      padding: 28px;
+      text-align: center;
+      color: #5a6a80;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Edit Videos</h1>
+    <div>
+      <a href="/web/edit.html">&larr; Admin</a>
+      &nbsp;·&nbsp;
+      <a href="/web/videos.html" target="_blank" rel="noopener">View public page</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="note">
+      <strong>Only add video we have the right to show.</strong>
+      Embeddable is not the same as permitted. Record the basis in
+      <em>Rights note</em> — it is shown on the public page. Library of Congress
+      oral histories are <em>not</em> free to use: link to them from a question
+      instead.
+    </div>
+
+    <datalist id="video-categories"></datalist>
+
+    <div id="list"><div class="empty">Loading&hellip;</div></div>
+
+    <div class="card">
+      <h2>Add a video</h2>
+      <div id="new-form"></div>
+    </div>
+  </main>
+
+  <script>
+    const esc = s => String(s ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+    const listEl = document.getElementById('list');
+    const newFormEl = document.getElementById('new-form');
+
+    function fieldsHtml(v, idPrefix) {
+      const p = idPrefix;
+      return `
+        <label for="${p}-url">Video URL <span class="hint">required — paste the ordinary YouTube watch link</span></label>
+        <input type="text" id="${p}-url" value="${esc(v.video_url || '')}" placeholder="https://www.youtube.com/watch?v=...">
+
+        <label for="${p}-title">Title</label>
+        <input type="text" id="${p}-title" value="${esc(v.title || '')}">
+
+        <label for="${p}-desc">Description <span class="hint">shown under the player</span></label>
+        <textarea id="${p}-desc">${esc(v.description || '')}</textarea>
+
+        <label for="${p}-category">Category <span class="hint">groups the video on the public page — blank means General</span></label>
+        <input type="text" id="${p}-category" list="video-categories" value="${esc(v.category || '')}">
+
+        <div class="row">
+          <div>
+            <label for="${p}-start">Start at (seconds) <span class="hint">optional</span></label>
+            <input type="number" id="${p}-start" min="0" value="${v.video_start ?? ''}">
+          </div>
+          <div>
+            <label for="${p}-order">Display order <span class="hint">also orders the categories</span></label>
+            <input type="number" id="${p}-order" value="${v.display_order ?? ''}">
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="${p}-credit">Credit <span class="hint">rendered as "Courtesy of …"</span></label>
+            <input type="text" id="${p}-credit" value="${esc(v.video_credit || '')}">
+          </div>
+          <div>
+            <label for="${p}-crediturl">Credit link</label>
+            <input type="text" id="${p}-crediturl" value="${esc(v.video_credit_url || '')}">
+          </div>
+        </div>
+
+        <label for="${p}-rights">Rights note <span class="hint">why we may show this — appears on the public page</span></label>
+        <input type="text" id="${p}-rights" value="${esc(v.rights_note || '')}"
+               placeholder="e.g. Embedded with the uploader's written permission, 4 August 2026">`;
+    }
+
+    function readFields(p) {
+      const val = id => document.getElementById(`${p}-${id}`).value.trim();
+      return {
+        video_url: val('url'),
+        title: val('title'),
+        description: document.getElementById(`${p}-desc`).value.trim(),
+        category: val('category'),
+        video_start: val('start'),
+        display_order: val('order'),
+        video_credit: val('credit'),
+        video_credit_url: val('crediturl'),
+        rights_note: val('rights'),
+      };
+    }
+
+    // Suggest categories already in use, so "Oral Histories" and "Oral
+    // histories" don't quietly become two sections on the public page.
+    function renderCategoryOptions(videos) {
+      const names = [...new Set(videos.map(v => (v.category || '').trim()).filter(Boolean))].sort();
+      document.getElementById('video-categories').innerHTML =
+        names.map(n => `<option value="${esc(n)}"></option>`).join('');
+    }
+
+    function setStatus(el, message, kind) {
+      el.className = 'status' + (kind ? ' ' + kind : '');
+      el.textContent = message;
+    }
+
+    async function send(method, path, body) {
+      const res = await fetch(path, {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (e) { /* non-JSON error body */ }
+      if (!res.ok) {
+        throw new Error((data && data.detail) || text || `HTTP ${res.status}`);
+      }
+      return data;
+    }
+
+    function renderList(videos) {
+      if (!videos.length) {
+        listEl.innerHTML = `<div class="empty">No videos yet. Add the first one below.</div>`;
+        return;
+      }
+      listEl.innerHTML = videos.map(v => {
+        const p = `v-${esc(v.id)}`;
+        return `
+          <div class="card" data-id="${esc(v.id)}">
+            <h2>${esc(v.title || v.id || 'Untitled')}</h2>
+            ${fieldsHtml(v, p)}
+            <div class="actions">
+              <button class="primary" data-act="save" data-id="${esc(v.id)}">Save</button>
+              <button class="danger" data-act="delete" data-id="${esc(v.id)}">Delete</button>
+              <span class="status" id="${p}-status"></span>
+            </div>
+          </div>`;
+      }).join('');
+
+      listEl.querySelectorAll('button[data-act]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          const statusEl = document.getElementById(`v-${id}-status`);
+          try {
+            if (btn.dataset.act === 'delete') {
+              if (!confirm('Delete this video? This removes it from the public page.')) return;
+              await send('DELETE', `/admin/videos/${encodeURIComponent(id)}`);
+            } else {
+              setStatus(statusEl, 'Saving…');
+              await send('PUT', `/admin/videos/${encodeURIComponent(id)}`, readFields(`v-${id}`));
+              setStatus(statusEl, 'Saved', 'ok');
+            }
+            await load();
+          } catch (err) {
+            setStatus(statusEl, err.message, 'error');
+          }
+        });
+      });
+    }
+
+    function renderNewForm() {
+      newFormEl.innerHTML = `
+        ${fieldsHtml({}, 'new')}
+        <div class="actions">
+          <button class="primary" id="new-save">Add video</button>
+          <span class="status" id="new-status"></span>
+        </div>`;
+      document.getElementById('new-save').addEventListener('click', async () => {
+        const statusEl = document.getElementById('new-status');
+        try {
+          setStatus(statusEl, 'Adding…');
+          await send('POST', '/admin/videos', readFields('new'));
+          setStatus(statusEl, 'Added', 'ok');
+          renderNewForm();
+          await load();
+        } catch (err) {
+          setStatus(statusEl, err.message, 'error');
+        }
+      });
+    }
+
+    async function load() {
+      try {
+        const videos = await send('GET', '/admin/videos');
+        renderCategoryOptions(videos || []);
+        renderList(videos || []);
+      } catch (err) {
+        listEl.innerHTML = `<div class="empty">Unable to load videos: ${esc(err.message)}</div>`;
+      }
+    }
+
+    renderNewForm();
+    load();
+  </script>
+</body>
+
+</html>

@@ -27,6 +27,20 @@
       padding: 24px 20px 64px;
     }
 
+    .video-group {
+      margin-bottom: 36px;
+    }
+
+    .video-group-title {
+      margin: 0 0 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #dbe3ee;
+      font-size: 15px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #44506a;
+    }
+
     .video-card {
       background: #fff;
       border: 1px solid #e1e7ef;
@@ -176,9 +190,19 @@
         if (!r.ok) throw new Error('Server returned ' + r.status);
         return r.json();
       })
-      .then(videos => {
-        const cards = (videos || []).map(cardHtml).filter(Boolean).join('');
-        list.innerHTML = cards || `
+      .then(groups => {
+        const sections = (groups || []).map(g => {
+          const cards = (g.videos || []).map(cardHtml).filter(Boolean).join('');
+          // A category whose videos all failed to render would otherwise leave a
+          // heading standing over nothing.
+          if (!cards) return '';
+          return `<section class="video-group">
+                    <h2 class="video-group-title">${esc(g.category)}</h2>
+                    ${cards}
+                  </section>`;
+        }).filter(Boolean).join('');
+
+        list.innerHTML = sections || `
           <div class="state">
             <strong>No videos yet</strong>
             We only publish video we have the rights to show. As permissions come

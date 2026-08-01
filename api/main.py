@@ -357,11 +357,6 @@ SHORTS_PATH = os.path.join(CORPORA_DIR, "dieselsubs_shorts_corpus.jsonl")
 # not museum-authored content, so it is read-only and deliberately absent from
 # REQUIRED_CORPORA_FILES: the app runs normally without it.
 FLEETSUB_MANUAL_PATH = os.path.join(CORPORA_DIR, "dieselsubs_fleetsub_manual.jsonl")
-# Videos page.  Read straight from CORPORA_DIR rather than the persistent disk:
-# there is no admin editor for it, so it is maintained by editing the file and
-# pushing.  Routing it through _editable_corpus_path() would seed /data once and
-# then silently ignore every later edit to the committed file.
-VIDEOS_PATH = os.path.join(CORPORA_DIR, "videos.jsonl")
 # Editable corpora — on Render these live on the persistent disk (/data) so
 # that edits made on the live site survive redeploys. The bundled copy under
 # corpora/ seeds the disk on first boot and is the fallback for local/dev runs
@@ -401,6 +396,13 @@ def _editable_corpus_dir(dirname: str) -> str:
     return os.path.join(base, dirname)
 
 
+# Videos page.  Editable through the admin screens, so it lives on the persistent
+# disk like every other corpus a human maintains: a video added on the live site
+# has to survive the next redeploy.  The consequence is the usual one -- the
+# bundled corpora/videos.jsonl seeds /data once and is ignored thereafter, so
+# editing the committed file no longer changes production.  See
+# docs/AddingVideos.md.
+VIDEOS_PATH = _editable_corpus_path("videos.jsonl")
 GLOSSARY_PATH = _editable_corpus_path("dieselsubs_glossary.jsonl")
 OPERATIONS_GUIDE_PATH = _editable_corpus_path("dieselsubs_operations_guide.jsonl")
 OPERATIONS_GUIDE_FAQ_SCHEMA_PATH = _editable_corpus_path("dieselsubs_operations_guide_faq_schema.jsonl")
@@ -2412,6 +2414,7 @@ def synthesize_openai_stub(
 _GENERATED_PREFIXES = {"der", "pam", "fix"}
 _faq_write_lock = threading.Lock()
 _category_write_lock = threading.Lock()
+_videos_write_lock = threading.Lock()
 _glossary_write_lock = threading.Lock()
 _incidents_write_lock = threading.Lock()
 _operations_guide_write_lock = threading.Lock()
@@ -3555,6 +3558,136 @@ def public_faqs():
     return [{"category": cat, "faqs": groups[cat]} for cat in [*ordered_categories, *unordered_categories]]
 
 
+# ── Videos storage ───────────────────────────────────────────────────────────
+# Deliberately uncached: the file is small, and reading it per request means an
+# edit through the admin screens shows on the public page immediately without a
+# restart, which is how a curator expects a save to behave.
+VIDEO_EDITABLE_FIELDS = (
+    "title", "video_url", "video_start", "description",
+    "video_credit", "video_credit_url", "rights_note", "category",
+)
+# Bucket for records with no category, matching what the FAQ grouping uses.
+VIDEO_DEFAULT_CATEGORY = "General"
+
+
+def _load_videos_raw() -> List[Dict[str, Any]]:
+    return load_jsonl(VIDEOS_PATH)
+
+
+def _save_videos(entries: List[Dict[str, Any]]) -> None:
+    """Write the whole file atomically so a crash mid-write can't truncate it.
+
+    load_jsonl stops at the first unparseable line, so a half-written file would
+    silently drop every video after the break rather than erroring.
+    """
+    tmp_path = VIDEOS_PATH + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as handle:
+        for entry in entries:
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    os.replace(tmp_path, VIDEOS_PATH)
+
+
+def _next_video_id(entries: List[Dict[str, Any]]) -> str:
+    max_n = 0
+    for entry in entries:
+        match = re.search(r"(\d+)$", str(entry.get("id") or ""))
+        if match:
+            max_n = max(max_n, int(match.group(1)))
+    return f"vid_{max_n + 1:03d}"
+
+
+def _apply_video_payload(target: Dict[str, Any], payload: Dict[str, Any]) -> None:
+    """Copy the editable fields off a request body onto a record.
+
+    video_url is validated here rather than only on read: an unusable URL should
+    be refused at the point the curator can still fix it, not silently swallowed
+    and then filtered out of the page with no explanation.
+    """
+    url = (payload.get("video_url") or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="video_url is required")
+    if not _SAFE_LINK_SCHEME_RE.match(url):
+        raise HTTPException(
+            status_code=400,
+            detail="video_url must start with http:// or https://",
+        )
+    target["video_url"] = url
+
+    for field in ("title", "description", "video_credit", "video_credit_url",
+                  "rights_note", "category"):
+        if field in payload:
+            target[field] = (payload.get(field) or "").strip()
+
+    if "video_start" in payload:
+        raw_start = payload.get("video_start")
+        if raw_start in (None, ""):
+            target.pop("video_start", None)
+        else:
+            try:
+                target["video_start"] = max(0, int(raw_start))
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="video_start must be a whole number of seconds")
+
+    if "display_order" in payload:
+        raw_order = payload.get("display_order")
+        if raw_order in (None, ""):
+            target.pop("display_order", None)
+        else:
+            try:
+                target["display_order"] = int(raw_order)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="display_order must be a number")
+
+
+@app.get("/admin/videos")
+def get_admin_videos():
+    """Return raw video records for the editor, unfiltered.
+
+    Unlike /api/videos this keeps records the public page would drop, so a
+    curator can see and repair a broken entry instead of wondering where it went.
+    """
+    return _load_videos_raw()
+
+
+@app.post("/admin/videos")
+async def create_admin_video(request: Request):
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        payload = {}
+    with _videos_write_lock:
+        entries = _load_videos_raw()
+        entry: Dict[str, Any] = {"id": _next_video_id(entries)}
+        _apply_video_payload(entry, payload)
+        entry.setdefault("display_order", len(entries) + 1)
+        entries.append(entry)
+        _save_videos(entries)
+    return {"status": "created", "entry": entry}
+
+
+@app.put("/admin/videos/{video_id}")
+async def update_admin_video(video_id: str, request: Request):
+    payload = await request.json()
+    with _videos_write_lock:
+        entries = _load_videos_raw()
+        target = next((e for e in entries if str(e.get("id")) == video_id), None)
+        if target is None:
+            raise HTTPException(status_code=404, detail=f"{video_id} not found")
+        _apply_video_payload(target, payload)
+        _save_videos(entries)
+    return {"status": "updated", "entry": target}
+
+
+@app.delete("/admin/videos/{video_id}")
+def delete_admin_video(video_id: str):
+    with _videos_write_lock:
+        entries = _load_videos_raw()
+        remaining = [e for e in entries if str(e.get("id")) != video_id]
+        if len(remaining) == len(entries):
+            raise HTTPException(status_code=404, detail=f"{video_id} not found")
+        _save_videos(remaining)
+    return {"status": "deleted", "id": video_id}
+
+
 @app.get("/api/videos")
 def public_videos():
     """Return the curated videos, in display order, for the Videos page.
@@ -3571,7 +3704,7 @@ def public_videos():
             return (1, entry.get("id") or "")
 
     out: List[Dict[str, Any]] = []
-    for entry in load_jsonl(VIDEOS_PATH):
+    for entry in _load_videos_raw():
         video = _video_payload(entry)
         if not video:
             continue
@@ -3582,11 +3715,20 @@ def public_videos():
             # Why we are permitted to show this one — shown on the page so the
             # basis is visible rather than buried in a commit message.
             "rights_note": (entry.get("rights_note") or "").strip(),
+            "category": (entry.get("category") or "").strip() or VIDEO_DEFAULT_CATEGORY,
             "video": video,
             "display_order": entry.get("display_order"),
         })
     out.sort(key=_order_key)
-    return out
+
+    # Grouped by category, mirroring the shape /api/faqs returns. There is no
+    # separate category corpus for videos, so a category's position follows the
+    # lowest display_order among its videos: ordering one video ahead of another
+    # moves its section too, rather than needing a second thing to maintain.
+    groups: Dict[str, List[Dict[str, Any]]] = {}
+    for item in out:
+        groups.setdefault(item["category"], []).append(item)
+    return [{"category": name, "videos": videos} for name, videos in groups.items()]
 
 
 @app.get("/api/operations-guide")
