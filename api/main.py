@@ -3860,6 +3860,38 @@ async def update_faq(chunk_id: str, request: Request):
             entry["related_links"] = _related_links_payload(
                 {"related_links": body.get("related_links")}
             )
+        # Same contract as related_links: only touched when the key is sent, so
+        # an ordinary text save can't strip a record's video.  Sending an empty
+        # video_url clears the whole attachment rather than leaving orphaned
+        # caption and credit fields behind.
+        if "video_url" in body:
+            video_url = (body.get("video_url") or "").strip()
+            if not video_url:
+                for field in ("video_url", "video_start", "video_caption",
+                              "video_credit", "video_credit_url"):
+                    entry.pop(field, None)
+            elif not _SAFE_LINK_SCHEME_RE.match(video_url):
+                raise HTTPException(
+                    status_code=400,
+                    detail="video_url must start with http:// or https://",
+                )
+            else:
+                entry["video_url"] = video_url
+                for field in ("video_caption", "video_credit", "video_credit_url"):
+                    if field in body:
+                        entry[field] = (body.get(field) or "").strip()
+                if "video_start" in body:
+                    raw_start = body.get("video_start")
+                    if raw_start in (None, ""):
+                        entry.pop("video_start", None)
+                    else:
+                        try:
+                            entry["video_start"] = max(0, int(raw_start))
+                        except (TypeError, ValueError):
+                            raise HTTPException(
+                                status_code=400,
+                                detail="video_start must be a whole number of seconds",
+                            )
         _save_faq_corpus()
     return {"status": "saved", "chunk_id": chunk_id}
 

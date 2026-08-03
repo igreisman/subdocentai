@@ -2511,9 +2511,10 @@
       const caption = video.caption
         ? `<div class="faq-video-caption">${escHtml(video.caption)}</div>`
         : '';
+      // Verbatim — a rights holder's required wording is not ours to prefix.
       const creditInner = video.credit_url
-        ? `Courtesy of <a href="${escHtml(video.credit_url)}" target="_blank" rel="noopener noreferrer">${escHtml(video.credit)}</a>`
-        : `Courtesy of ${escHtml(video.credit)}`;
+        ? `<a href="${escHtml(video.credit_url)}" target="_blank" rel="noopener noreferrer">${escHtml(video.credit)}</a>`
+        : escHtml(video.credit);
       const credit = video.credit ? `<div class="faq-video-credit">${creditInner}</div>` : '';
       return `<div class="faq-video" data-embed="${escHtml(video.embed_url)}">`
         + `<button type="button" class="faq-video-play">&#9654;&nbsp; Watch this account</button>`

@@ -159,9 +159,13 @@
         ? `<p class="video-description">${esc(v.description)}</p>`
         : '';
 
+      // Rendered verbatim. Rights holders dictate exact wording -- Omni Media
+      // Services requires "Courtesy warexperience.org. Produced for the Regis
+      // University Center for the Study of War Experience" -- and prepending
+      // our own "Courtesy of" would corrupt the credit we agreed to give.
       const creditInner = video.credit_url && isSafeUrl(video.credit_url)
-        ? `Courtesy of <a href="${esc(video.credit_url)}" target="_blank" rel="noopener noreferrer">${esc(video.credit)}</a>`
-        : (video.credit ? `Courtesy of ${esc(video.credit)}` : '');
+        ? `<a href="${esc(video.credit_url)}" target="_blank" rel="noopener noreferrer">${esc(video.credit)}</a>`
+        : (video.credit ? esc(video.credit) : '');
       const rights = v.rights_note
         ? `<div class="video-rights">${esc(v.rights_note)}</div>`
         : '';
