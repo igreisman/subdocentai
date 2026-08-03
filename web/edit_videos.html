@@ -181,6 +181,35 @@
       text-align: center;
       color: #5a6a80;
     }
+
+    .section-heading {
+      margin: 32px 0 4px;
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #44506a;
+    }
+
+    .section-note {
+      margin: 0 0 14px;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #5a6a80;
+    }
+
+    .attached-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #14213d;
+      margin-bottom: 4px;
+    }
+
+    .attached-meta {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #5a6a80;
+      word-break: break-all;
+    }
   </style>
 </head>
 
@@ -205,12 +234,21 @@
 
     <datalist id="video-categories"></datalist>
 
+    <h2 class="section-heading">Videos on the Videos page</h2>
     <div id="list"><div class="empty">Loading&hellip;</div></div>
 
     <div class="card">
       <h2>Add a video</h2>
       <div id="new-form"></div>
     </div>
+
+    <h2 class="section-heading">Videos attached to a question</h2>
+    <p class="section-note">
+      These play underneath an answer in the FAQ and on the tour. They are
+      separate from the list above — if you need to take a video down
+      completely, remove it in <em>both</em> places.
+    </p>
+    <div id="attached"><div class="empty">Loading&hellip;</div></div>
   </main>
 
   <script>
@@ -367,6 +405,59 @@
       });
     }
 
+    // ── Videos attached to a question ──────────────────────────────────────
+    // A rights holder can ask for a video to come down at any time, so removal
+    // has to be one obvious button and no technical knowledge. Clearing
+    // video_url on the record clears the whole attachment server-side.
+    const attachedEl = document.getElementById('attached');
+
+    function renderAttached(faqs) {
+      const withVideo = (faqs || []).filter(f => (f.video_url || '').trim());
+      if (!withVideo.length) {
+        attachedEl.innerHTML = `<div class="empty">No videos are attached to a question.</div>`;
+        return;
+      }
+      attachedEl.innerHTML = withVideo.map(f => `
+        <div class="card">
+          <div class="attached-title">${esc(f.title || f.chunk_id)}</div>
+          <div class="attached-meta">
+            ${f.video_caption ? esc(f.video_caption) + '<br>' : ''}
+            ${esc(f.video_url)}
+            ${f.video_credit ? '<br>' + esc(f.video_credit) : ''}
+          </div>
+          <div class="actions">
+            <button class="danger" data-remove="${esc(f.chunk_id)}">Remove this video</button>
+            <span class="status" id="att-${esc(f.chunk_id)}-status"></span>
+          </div>
+        </div>`).join('');
+
+      attachedEl.querySelectorAll('button[data-remove]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.remove;
+          const statusEl = document.getElementById(`att-${id}-status`);
+          if (!confirm('Remove this video from that question?\n\nThe written answer stays exactly as it is — only the video goes away.')) return;
+          try {
+            setStatus(statusEl, 'Removing…');
+            // Empty video_url clears the caption and credit too, so nothing is
+            // left orphaned on the record.
+            await send('PUT', `/admin/faq/${encodeURIComponent(id)}`, { video_url: '' });
+            setStatus(statusEl, 'Removed', 'ok');
+            await loadAttached();
+          } catch (err) {
+            setStatus(statusEl, err.message, 'error');
+          }
+        });
+      });
+    }
+
+    async function loadAttached() {
+      try {
+        renderAttached(await send('GET', '/admin/faqs'));
+      } catch (err) {
+        attachedEl.innerHTML = `<div class="empty">Unable to load: ${esc(err.message)}</div>`;
+      }
+    }
+
     async function load() {
       try {
         const videos = await send('GET', '/admin/videos');
@@ -379,6 +470,7 @@
 
     renderNewForm();
     load();
+    loadAttached();
   </script>
 </body>
 

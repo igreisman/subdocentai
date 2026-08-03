@@ -237,11 +237,12 @@ Two cautions:
 - `{"status":"saved"}` does **not** mean the field was understood. An older build
   accepts the request and ignores fields it does not know. Always read back with
   `curl -s https://submarinedocent.org/api/faqs` and confirm the links appear.
-- `GET /admin/faqs` returns only `chunk_id`, `title`, `text`, `category`, and
-  `display_order`. It does **not** show `related_links` or the `video_*` fields,
-  so their absence there is not evidence they are missing. It also means
-  [bin/sync-local-from-prod](../bin/sync-local-from-prod) will not bring them
-  down, and running it can silently strip them from your local copy.
+- `GET /admin/faqs` now returns `related_links` and the `video_*` fields, so the
+  Videos editor can show a video attached to an answer and offer to remove it.
+  [bin/sync-local-from-prod](../bin/sync-local-from-prod) still builds records
+  from a four-field subset, but it merges rather than replaces — extras survive
+  on records that already exist locally. A record appearing in your local copy
+  for the first time will arrive without them.
 
 ## Attaching A Video To One Question
 
@@ -276,6 +277,8 @@ question about submarines.
 
 ## Related
 
+- [TakingAVideoDown.md](TakingAVideoDown.md) — the removal procedure, written
+  for a non-technical curator. Point new docents at that one.
 - [MediaRightsReview.md](MediaRightsReview.md) — why `web/videos/` and
   `web/images/` are held back from public release, and the standing caution
   about media of unclear provenance.

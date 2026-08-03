@@ -2923,6 +2923,10 @@ def get_generated_faqs():
 @app.get("/admin/faqs")
 def get_all_faqs():
     """Return all FAQ entries for the editor tool."""
+    # video_* and related_links are included so an editor can show what a record
+    # actually carries.  Without them a curator has no way to see -- let alone
+    # remove -- a video attached to an answer, which is the one thing a rights
+    # holder may ask for at any time.
     return [
         {
             "chunk_id": e.get("chunk_id", ""),
@@ -2930,6 +2934,12 @@ def get_all_faqs():
             "text": e.get("text", ""),
             "category": e.get("category", ""),
             "display_order": e.get("display_order"),
+            "video_url": e.get("video_url", ""),
+            "video_start": e.get("video_start"),
+            "video_caption": e.get("video_caption", ""),
+            "video_credit": e.get("video_credit", ""),
+            "video_credit_url": e.get("video_credit_url", ""),
+            "related_links": e.get("related_links") or [],
         }
         for e in FAQ
     ]
