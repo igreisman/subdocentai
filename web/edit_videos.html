@@ -249,6 +249,14 @@
       completely, remove it in <em>both</em> places.
     </p>
     <div id="attached"><div class="empty">Loading&hellip;</div></div>
+
+    <h2 class="section-heading">Links to recordings on other sites</h2>
+    <p class="section-note">
+      These appear under an answer as &ldquo;Hear it firsthand&rdquo;. We do not
+      show these recordings — we only point at the archive that holds them — but
+      if an archive or a family asks us to stop linking, remove them here.
+    </p>
+    <div id="links"><div class="empty">Loading&hellip;</div></div>
   </main>
 
   <script>
@@ -450,11 +458,62 @@
       });
     }
 
+    // ── Links out to recordings held elsewhere ─────────────────────────────
+    // Removed one at a time rather than all at once: a single family may object
+    // to their relative's interview being pointed at while the others stand.
+    const linksEl = document.getElementById('links');
+
+    function renderLinks(faqs) {
+      const withLinks = (faqs || []).filter(f => (f.related_links || []).length);
+      if (!withLinks.length) {
+        linksEl.innerHTML = `<div class="empty">No questions link to outside recordings.</div>`;
+        return;
+      }
+      linksEl.innerHTML = withLinks.map(f => `
+        <div class="card">
+          <div class="attached-title">${esc(f.title || f.chunk_id)}</div>
+          ${f.related_links.map((l, i) => `
+            <div class="attached-meta" style="margin-top:10px">
+              ${esc(l.label || l.url)}<br>${esc(l.url)}
+              <div class="actions">
+                <button class="danger" data-faq="${esc(f.chunk_id)}" data-idx="${i}">Remove this link</button>
+                <span class="status" id="lnk-${esc(f.chunk_id)}-${i}-status"></span>
+              </div>
+            </div>`).join('')}
+        </div>`).join('');
+
+      linksEl.querySelectorAll('button[data-faq]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const faqId = btn.dataset.faq;
+          const idx = Number(btn.dataset.idx);
+          const statusEl = document.getElementById(`lnk-${faqId}-${idx}-status`);
+          const record = withLinks.find(f => f.chunk_id === faqId);
+          if (!record) return;
+          if (!confirm('Remove this link from that question?\n\nThe written answer stays exactly as it is.')) return;
+          try {
+            setStatus(statusEl, 'Removing…');
+            // Send the links that remain; the server stores exactly what it is
+            // given, so omitting one removes it.
+            const remaining = record.related_links.filter((_, i) => i !== idx);
+            await send('PUT', `/admin/faq/${encodeURIComponent(faqId)}`, { related_links: remaining });
+            setStatus(statusEl, 'Removed', 'ok');
+            await loadAttached();
+          } catch (err) {
+            setStatus(statusEl, err.message, 'error');
+          }
+        });
+      });
+    }
+
     async function loadAttached() {
       try {
-        renderAttached(await send('GET', '/admin/faqs'));
+        const faqs = await send('GET', '/admin/faqs');
+        renderAttached(faqs);
+        renderLinks(faqs);
       } catch (err) {
-        attachedEl.innerHTML = `<div class="empty">Unable to load: ${esc(err.message)}</div>`;
+        const msg = `<div class="empty">Unable to load: ${esc(err.message)}</div>`;
+        attachedEl.innerHTML = msg;
+        linksEl.innerHTML = msg;
       }
     }
 

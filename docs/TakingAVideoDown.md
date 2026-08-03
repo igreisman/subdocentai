@@ -11,27 +11,34 @@ knowledge. Nothing here can break the website.
 You'll be asked for the admin username and password — the same ones you use for
 editing FAQs.
 
-That page has two lists, and **a video can be in either or both**:
+That page has three lists, and **the same recording can appear in more than
+one**:
 
 1. **Videos on the Videos page** — the public Videos page visitors browse.
 2. **Videos attached to a question** — videos that play underneath an answer in
    the FAQ or on the tour.
+3. **Links to recordings on other sites** — we don't show these; we point at the
+   archive that holds them. Remove them here if an archive or a family asks us
+   to stop linking.
 
 ## To Remove A Video
 
-Look through **both** lists for the video.
+Look through **all three** lists for it.
 
-- In the first list, press **Delete** on it, then confirm.
+- In the first list, press **Delete**, then confirm.
 - In the second list, press **Remove this video**, then confirm.
+- In the third list, press **Remove this link**, then confirm. Links come off
+  one at a time, so if only one family objects you can remove theirs and leave
+  the others.
 
 That's it. The change is live immediately — no waiting, nothing to publish, no
 one else to notify. Refresh <https://submarinedocent.org/web/videos.html> and it
 will be gone.
 
-**Check both lists.** The same video can appear in both places, and removing it
-from one does not remove it from the other. If you are taking something down
-because the owner asked, search both lists for the title before you consider it
-done.
+**Check all three lists.** The same recording can appear in more than one place,
+and removing it from one does not remove it from the others. If you are taking
+something down because the owner asked, search all three for the title before
+you consider it done.
 
 ## What Removing Does And Doesn't Do
 
@@ -51,10 +58,6 @@ A video might also be:
 - **On the welcome page or in the tour narration.** These are built into the
   site rather than managed from the editor. You'll need technical help; write
   down the video's title and where you saw it.
-- **A link to someone else's site, rather than a video we show.** Links to the
-  Library of Congress and similar archives appear under an answer as "Hear it
-  firsthand." Those are links, not copies — we're not showing the video, only
-  pointing at it. Removing them still needs technical help today.
 
 If in doubt, take down what you can find in the editor, then tell whoever
 maintains the site what's left. Partial removal, done quickly, is better than
