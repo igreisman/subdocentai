@@ -169,16 +169,23 @@
         ? `<div class="video-meta">${creditInner}${rights}</div>`
         : '';
 
+      // A file we host plays in <video>; anything else is framed. preload
+      // "metadata" fetches the header for duration and the poster frame without
+      // pulling the whole file down before a visitor has asked to watch.
+      const player = video.kind === 'file'
+        ? `<video src="${esc(video.embed_url)}"
+                  controls preload="metadata" playsinline
+                  title="${esc(v.title || 'Video')}"></video>`
+        : `<iframe src="${esc(video.embed_url)}"
+                   title="${esc(v.title || 'Video')}"
+                   loading="lazy"
+                   allow="encrypted-media; picture-in-picture; fullscreen"
+                   referrerpolicy="strict-origin-when-cross-origin"
+                   allowfullscreen></iframe>`;
+
       return `
         <article class="video-card">
-          <div class="video-frame">
-            <iframe src="${esc(video.embed_url)}"
-                    title="${esc(v.title || 'Video')}"
-                    loading="lazy"
-                    allow="encrypted-media; picture-in-picture; fullscreen"
-                    referrerpolicy="strict-origin-when-cross-origin"
-                    allowfullscreen></iframe>
-          </div>
+          <div class="video-frame">${player}</div>
           <div class="video-body">
             ${title}${description}${meta}
           </div>

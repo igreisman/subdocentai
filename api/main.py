@@ -1893,6 +1893,9 @@ _YT_ID_RE = re.compile(
     r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/)|youtu\.be/)([A-Za-z0-9_-]{11})"
 )
 
+# A URL ending in a media extension is a file we serve, not a page to frame.
+_MEDIA_FILE_RE = re.compile(r"\.(mp4|m4v|mov|webm|ogv)$", re.I)
+
 
 def _video_payload(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Normalize a record's video_* fields into an embeddable payload, or None.
@@ -1918,9 +1921,18 @@ def _video_payload(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         embed_url = f"https://www.youtube-nocookie.com/embed/{match.group(1)}?rel=0"
         if start > 0:
             embed_url += f"&start={start}"
+        kind = "embed"
     else:
         embed_url = raw_url
+        # A media file we host ourselves plays in a <video> element, not an
+        # iframe: real controls, no third party, and it keeps working where a
+        # phone can't reach the open internet -- which inside a steel hull is
+        # most places.  #t= is the direct-file equivalent of YouTube's start.
+        kind = "file" if _MEDIA_FILE_RE.search(raw_url.split("?", 1)[0]) else "embed"
+        if kind == "file" and start > 0:
+            embed_url += f"#t={start}"
     return {
+        "kind": kind,
         "embed_url": embed_url,
         "watch_url": raw_url,
         "caption": (entry.get("video_caption") or "").strip(),

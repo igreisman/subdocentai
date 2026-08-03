@@ -139,6 +139,78 @@ curl -s https://submarinedocent.org/api/videos | python3 -m json.tool
 This is the truth for the public page, whatever the committed file says. If your
 video isn't there, add it through the editor.
 
+## Hosting A Video Ourselves
+
+When a rights holder gives us the actual file — as Omni Media Services did for
+the Clay Decker interviews — host it rather than embedding someone's player. It
+plays with real controls, sends nothing to a third party, and keeps working in
+the compartments where a phone can't reach the open internet, which inside a
+steel hull is most of them.
+
+Files go to the Cloudflare R2 bucket that already serves the compartment videos,
+not into git. `web/videos/*.mp4` is gitignored precisely so large media never
+enters the repo.
+
+### 1. Transcode for the web
+
+Camera and mastering exports are far too large to serve. The Decker originals
+were 1080p at ~20 Mbps — 1.0 GB and 1.7 GB. Re-encode to 720p:
+
+```bash
+ffmpeg -i "source.mp4" \
+  -vf "scale=-2:720" -c:v libx264 -preset medium -crf 23 \
+  -c:a aac -b:a 128k -movflags +faststart \
+  web/videos/clean_lowercase_name.mp4
+```
+
+That produced 88 MB and 105 MB — around a 92% reduction with no visible loss on
+a phone. `+faststart` is not optional: it moves the index to the front of the
+file so playback begins immediately instead of after the whole download.
+
+Check it worked:
+
+```bash
+ffprobe -v error -show_entries format=duration,size,bit_rate \
+  -show_entries stream=codec_name,width,height \
+  -of default=noprint_wrappers=1 web/videos/clean_lowercase_name.mp4
+```
+
+Aim for roughly 1–2 Mbps. Much above that and a visitor on cellular pays for it.
+
+### 2. Upload to R2
+
+```bash
+./scripts/upload_videos_r2.sh
+```
+
+That syncs everything under `web/videos/`. To push a single file instead —
+safer when you don't want to touch the compartment videos:
+
+```bash
+aws s3 cp web/videos/clean_lowercase_name.mp4 \
+  "s3://${R2_BUCKET}/clean_lowercase_name.mp4" \
+  --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+  --content-type "video/mp4" \
+  --cache-control "public, max-age=31536000, immutable"
+```
+
+Credentials come from `.env.local`. Confirm it is publicly readable:
+
+```bash
+curl -sI "https://pub-34b1a64673774e649acc1425a543bb50.r2.dev/clean_lowercase_name.mp4" \
+  | grep -iE "^HTTP|content-type|accept-ranges"
+```
+
+You want `200`, `video/mp4`, and `Accept-Ranges: bytes` — the last is what lets a
+visitor scrub without downloading the whole file.
+
+### 3. Add it in the editor
+
+Use the public R2 URL as the **Video URL**. A URL ending in `.mp4`, `.m4v`,
+`.mov`, `.webm`, or `.ogv` is played in a real `<video>` element rather than an
+iframe; anything else is treated as an embed. A start time still works — it
+becomes a `#t=` fragment instead of YouTube's `&start=`.
+
 ## Linking Instead Of Embedding
 
 When we may point at a video but not show it, attach a link to the relevant
