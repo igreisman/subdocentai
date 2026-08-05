@@ -88,6 +88,28 @@ make public-release-check
 
 `make public-release-check` stages that tree, boots it with no production corpora present, verifies automatic fallback to `sample_data/corpora/`, checks public APIs, and confirms admin routes stay disabled by default when credentials are unset.
 
+## Unpublished Pages
+
+Some pages are deployed but deliberately not distributed with the source, because the content rights are still being settled. They are not in the repository and are ignored by git.
+
+Currently: `web/pampanito.html`, the USS Pampanito tour, pending permission from the Maritime Association.
+
+The server looks for such a page in two places, in order:
+
+1. `/data/web/<name>` — the Render persistent disk, which survives redeploys
+2. `web/<name>` — the ordinary checkout, for local development by anyone who holds the file
+
+If neither exists the route returns a `404` explaining what is missing. The rest of the site is unaffected.
+
+To deploy or update one, upload it to the disk from the Render Shell — a redeploy rebuilds the container from git, so a copy placed anywhere else is lost:
+
+```bash
+mkdir -p /data/web
+# paste or transfer the file to /data/web/pampanito.html
+```
+
+Because the disk copy takes precedence, uploading a new build replaces what visitors see without a deploy. Remove the file from `/data/web/` to take the page down again.
+
 ## Tests And CI
 
 There is no unit test suite. Two kinds of checking exist instead.

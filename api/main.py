@@ -36,6 +36,34 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(BASE_DIR, "web")
 
+# Render persistent disk.  Editable corpora live here so on-site edits survive a
+# redeploy; see _editable_corpus_path below.  Pages that are deployed but not
+# published to the repository live under <disk>/web for the same reason — a
+# redeploy rebuilds the container from git, so anything absent from git and not
+# on the disk is gone.
+_RENDER_DATA_DIR = "/data"
+_UNPUBLISHED_WEB_DIR = os.path.join(_RENDER_DATA_DIR, "web")
+
+
+def _unpublished_page_path(filename: str) -> Optional[str]:
+    """Locate a page that ships outside the repository.
+
+    Checks the persistent disk first, so a deployment serves the uploaded copy,
+    then the ordinary checkout, so local development works for anyone who holds
+    the file. Returns None when neither exists, letting the caller answer with
+    an explanation instead of a stack trace.
+    """
+    # Callers pass a literal today, but keep this a lookup of one file in one
+    # of two directories rather than something a path could ever escape.
+    filename = os.path.basename(filename)
+    if not filename:
+        return None
+    for candidate in (os.path.join(_UNPUBLISHED_WEB_DIR, filename),
+                      os.path.join(WEB_DIR, filename)):
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
 
 def _env_flag(name: str, default: str = "false") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
@@ -311,11 +339,29 @@ if os.path.isdir(WEB_DIR):
     def redirect_index_html():
         return RedirectResponse(url="/web/faqs.html")
 
-    # Serve pampanito.html with no-cache so Safari always loads the latest version
+    # Serve pampanito.html with no-cache so Safari always loads the latest version.
+    #
+    # The tour page is deliberately not in the repository: it is shown to the
+    # Maritime Association as a proof of concept, and stays unpublished until
+    # they grant permission.  So it is deployed by placing it on the Render
+    # persistent disk at /data/web/pampanito.html, which survives redeploys the
+    # same way editable corpora do, and a checkout copy is used when present for
+    # local development.  Absent both, say so plainly rather than 500 on a
+    # missing file.
     @app.get("/web/pampanito.html", include_in_schema=False)
     def serve_tour_html():
+        path = _unpublished_page_path("pampanito.html")
+        if path is None:
+            return PlainTextResponse(
+                "The Pampanito tour page is not installed on this server.\n\n"
+                "It is not distributed with the source. To run it, place "
+                "pampanito.html in web/ locally, or upload it to "
+                f"{os.path.join(_RENDER_DATA_DIR, 'web')}/ on a deployment with a "
+                "persistent disk.",
+                status_code=404,
+            )
         return FileResponse(
-            os.path.join(WEB_DIR, "pampanito.html"),
+            path,
             media_type="text/html",
             headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -361,7 +407,6 @@ FLEETSUB_MANUAL_PATH = os.path.join(CORPORA_DIR, "dieselsubs_fleetsub_manual.jso
 # that edits made on the live site survive redeploys. The bundled copy under
 # corpora/ seeds the disk on first boot and is the fallback for local/dev runs
 # (or when CORPORA_DIR is overridden, e.g. sample-content mode).
-_RENDER_DATA_DIR = "/data"
 _using_nondefault_corpora = os.path.abspath(CORPORA_DIR) != os.path.abspath(DEFAULT_CORPORA_DIR)
 _persistent_disk_available = (not _using_nondefault_corpora) and os.path.isdir(_RENDER_DATA_DIR)
 
