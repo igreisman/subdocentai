@@ -3,13 +3,10 @@
 
 <head>
   <meta charset="UTF-8">
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7QFL9JV7MF"></script>
   <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag() { dataLayer.push(arguments); }
-    gtag('js', new Date());
-    gtag('config', 'G-7QFL9JV7MF');
-
+    // The `visited` cookie below is first-party and functional: it is the only
+    // thing that decides whether a returning visitor sees this page or goes
+    // straight to the FAQs.  No analytics or third-party tracking on this site.
     const welcomeParams = new URLSearchParams(window.location.search);
     const hasVisitedCookie = document.cookie.split(';').some(cookie => cookie.trim() === 'visited=1');
     if (hasVisitedCookie && !welcomeParams.has('force')) {
@@ -21,7 +18,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welcome - Diesel-Electric Submarine FAQs</title>
   <link rel="icon" type="image/svg+xml" href="/web/favicon.svg">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous" referrerpolicy="no-referrer">
   <style>
     body {
       background: #111;
@@ -218,9 +216,12 @@
           Inside a WWII Submarine</h2>
         <p>Get a feel for the spaces we are talking about before you dive into the FAQs:</p>
         <div class="ratio ratio-16x9 mb-3">
-          <iframe src="https://www.youtube.com/embed/FctRpaleRFc" title="Inside a WWII Submarine"
+          <!-- nocookie host, matching _video_payload() in api/main.py: a standard
+               embed sets a tracking cookie on a museum page before the visitor
+               has chosen to watch anything. -->
+          <iframe src="https://www.youtube-nocookie.com/embed/FctRpaleRFc?rel=0" title="Inside a WWII Submarine"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowfullscreen></iframe>
+            referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
         </div>
         <p class="fst-italic text-muted">Tip: After watching, scroll down for stories and FAQs that connect directly to
           what you just saw.</p>

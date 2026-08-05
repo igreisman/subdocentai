@@ -1,8 +1,14 @@
 # Open Source Readiness Checklist
 
-Last updated: March 25, 2026
+Last updated: August 5, 2026
 
 This checklist tracks what must be completed before this repository should be published as open source.
+
+## Current Standing Risk
+
+The repository is already public, and Content Rights Review below is still open on all four items. The gate at the bottom of this document says not to publish until that section is complete, and it was crossed. `docs/MediaRightsReview.md` separately recommends excluding `web/videos/` and `web/images/` from any public branch until provenance is confirmed; both are on public `main` today, at roughly 807 MB and 82 MB.
+
+The staging flow exists and works (`make public-release-stage`, `make public-release-check`). What has not happened is cutting the stripped `public-release` branch and deciding what `main` itself should hold.
 
 ## Completed In This Pass
 
@@ -18,8 +24,8 @@ This checklist tracks what must be completed before this repository should be pu
 ### 1. Licensing
 
 - [x] Add a `LICENSE` file
-- [ ] Decide whether the code license also applies to the bundled content and media
-- [ ] If content and code have different rights, document that explicitly
+- [x] Decide whether the code license also applies to the bundled content and media — it does not; `LICENSE` scopes MIT to source code only
+- [x] If content and code have different rights, document that explicitly — `LICENSE` states the split and `NOTICE` lists the asset classes needing provenance review
 
 ### 2. Repository Entry Docs
 
@@ -34,7 +40,7 @@ This checklist tracks what must be completed before this repository should be pu
 - [x] Document `ADMIN_USERNAME` and `ADMIN_PASSWORD`
 - [x] Document `PREVIEW_USERNAME` and `PREVIEW_PASSWORD`
 - [x] Document `GROQ_API_KEY`, `SMTP_USER`, and `SMTP_PASS`
-- [ ] Move any remaining host-specific settings into environment variables or config files
+- [x] Move any remaining host-specific settings into environment variables or config files — `start_https.sh` reads host and port from the environment; no private-network IP remains hardcoded in the startup scripts or `api/`
 
 ### 4. Content Rights Review
 
