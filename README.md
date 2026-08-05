@@ -27,7 +27,8 @@ This repository contains both application code and project-specific content.
 - `web/` — public and admin frontend pages
 - `corpora/` — JSONL corpora and retrieval configuration
 - `docs/` — project documentation and planning notes
-- `render.yaml` — Render deployment definition
+- `sample_data/corpora/` — redistribution-safe sample dataset used by sample mode
+- `scripts/` — public-release staging and verification
 
 ## Quick Start
 
@@ -143,13 +144,13 @@ This is a deliberate hardening change so the repository can be prepared for open
 
 ## Deployment Notes
 
-The app is currently configured for Render via [render.yaml](render.yaml).
+The app is currently deployed on Render, configured in the Render dashboard rather than by a blueprint in this repository. The `render.yaml` blueprint was removed in July 2026 because it recreated a duplicate service on sync; service settings, environment variables, and the persistent disk are managed in the dashboard.
 
-For local museum-style HTTPS startup, [start_https.sh](start_https.sh) and [serve_https.py](serve_https.py) now read host and port display values from environment variables rather than assuming one fixed local IP.
+For local museum-style HTTPS startup, [start_https.sh](start_https.sh) reads host and port display values from environment variables rather than assuming one fixed local IP. It expects a TLS key and certificate at `certs/key.pem` and `certs/cert.pem`; `certs/` is not tracked, so generate your own for local use.
 
 ## Documentation
 
-- Overview: [docs/Overview.md](docs/Overview.md)
+- Overview: [docs/overview.md](docs/overview.md)
 - Open-source release checklist: [docs/OpenSourceReadinessChecklist.md](docs/OpenSourceReadinessChecklist.md)
 - Media rights review: [docs/MediaRightsReview.md](docs/MediaRightsReview.md)
 - Cost summary: [docs/ProjectCostsNonTechnical.md](docs/ProjectCostsNonTechnical.md)
