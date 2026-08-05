@@ -1568,14 +1568,21 @@
         grid.appendChild(card);
       });
 
-      // Special section cards
-      // Special section cards
+      // Special section cards.  `action` switches to a view on this page;
+      // `href` navigates away.  Order here is the order they appear in the grid.
       const SPECIAL = [
         { label: 'Medal of Honor', icon: '🎖️', cls: 'special-card-green', action: showMohView },
         { label: 'Lost Submarines', icon: '⚓', cls: 'special-card-gold', action: showLostSubsView },
-        { label: 'Incidents Database', icon: '⚠️', cls: 'special-card-red', action: showIncidentsView }
+        { label: 'Incidents Database', icon: '⚠️', cls: 'special-card-red', action: showIncidentsView },
+        { label: 'Operations Guide', icon: '⚓', cls: 'special-card-blue', action: showOperationsView },
+        // The way out when browsing categories hasn't turned up what the
+        // visitor actually came to ask.
+        { label: 'Ask the Docent', icon: '🎙', cls: 'special-card-blue', href: '/web/askthedocent.html' },
+        { label: 'Museums', icon: '🏛', cls: 'special-card-blue', href: '/web/museums.html' },
+        { label: 'Videos', icon: '🎬', cls: 'special-card-blue', href: '/web/videos.html' }
       ];
       SPECIAL.forEach(s => {
+        const activate = s.action || (() => { window.location.href = s.href; });
         const card = document.createElement('div');
         card.className = `special-card ${s.cls}`;
         card.tabIndex = 0;
@@ -1588,81 +1595,15 @@
               <div class="cat-card-title">${s.label}</div>
             </div>
           </div>`;
-        card.addEventListener('click', s.action);
+        card.addEventListener('click', activate);
         card.addEventListener('keydown', (event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            s.action();
+            activate();
           }
         });
         grid.appendChild(card);
       });
-
-      // Operations Guide card (standalone, blue, prominent)
-      const opCard = document.createElement('div');
-      opCard.className = 'special-card special-card-blue';
-      opCard.tabIndex = 0;
-      opCard.setAttribute('role', 'button');
-      opCard.setAttribute('aria-label', 'Operations Guide');
-      opCard.innerHTML = `
-        <div class="special-card-header">
-          <span class="cat-card-icon">⚓</span>
-          <div class="cat-card-body">
-            <div class="cat-card-title">Operations Guide</div>
-          </div>
-        </div>`;
-      opCard.addEventListener('click', showOperationsView);
-      opCard.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          showOperationsView();
-        }
-      });
-      grid.appendChild(opCard);
-
-      // Museums card
-      const musCard = document.createElement('div');
-      musCard.className = 'special-card special-card-blue';
-      musCard.tabIndex = 0;
-      musCard.setAttribute('role', 'button');
-      musCard.setAttribute('aria-label', 'Museums');
-      musCard.innerHTML = `
-        <div class="special-card-header">
-          <span class="cat-card-icon">🏛</span>
-          <div class="cat-card-body">
-            <div class="cat-card-title">Museums</div>
-          </div>
-        </div>`;
-      musCard.addEventListener('click', () => { window.location.href = '/web/museums.html'; });
-      musCard.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          window.location.href = '/web/museums.html';
-        }
-      });
-      grid.appendChild(musCard);
-
-      // Videos card
-      const vidCard = document.createElement('div');
-      vidCard.className = 'special-card special-card-blue';
-      vidCard.tabIndex = 0;
-      vidCard.setAttribute('role', 'button');
-      vidCard.setAttribute('aria-label', 'Videos');
-      vidCard.innerHTML = `
-        <div class="special-card-header">
-          <span class="cat-card-icon">🎬</span>
-          <div class="cat-card-body">
-            <div class="cat-card-title">Videos</div>
-          </div>
-        </div>`;
-      vidCard.addEventListener('click', () => { window.location.href = '/web/videos.html'; });
-      vidCard.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          window.location.href = '/web/videos.html';
-        }
-      });
-      grid.appendChild(vidCard);
 
       async function showOperationsView() {
         document.getElementById('dashboard').style.display = 'none';
