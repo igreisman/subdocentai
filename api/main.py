@@ -1952,10 +1952,16 @@ _SAFE_LINK_SCHEME_RE = re.compile(r"^https?://", re.I)
 #   rights_note     the basis, in words, e.g. who agreed and when
 #   rights_expires  ISO date after which permission lapses (optional)
 
-RIGHTS_GRANTED = "granted"
-RIGHTS_PENDING = "pending"
-RIGHTS_WITHHELD = "withheld"
-_RIGHTS_KNOWN = {RIGHTS_GRANTED, RIGHTS_PENDING, RIGHTS_WITHHELD}
+RIGHTS_GRANTED = "granted"          # the holder gave us permission
+RIGHTS_NOT_REQUIRED = "not_required"  # no permission needed for this use
+RIGHTS_PENDING = "pending"          # asked, or intending to ask; not yet cleared
+RIGHTS_WITHHELD = "withheld"        # refused, withdrawn, or a takedown honoured
+_RIGHTS_KNOWN = {RIGHTS_GRANTED, RIGHTS_NOT_REQUIRED, RIGHTS_PENDING, RIGHTS_WITHHELD}
+# The two that may be shown.  not_required is distinct from granted on purpose:
+# linking out to an institution's own public page is not something they grant us,
+# and recording it as a grant would misstate what we hold when someone later
+# asks what our permission for it was.
+_RIGHTS_CLEARED = {RIGHTS_GRANTED, RIGHTS_NOT_REQUIRED}
 
 # Records written before these fields existed carry no status and are already
 # live, so an absent status keeps today's behaviour rather than blanking the
@@ -1983,7 +1989,7 @@ def _rights_state(entry: Dict[str, Any]) -> Tuple[bool, str, str]:
         # and the safe reading of "I can't tell" is "don't publish it".
         return False, status, f"unrecognised rights_status {status!r}"
 
-    if status != RIGHTS_GRANTED:
+    if status not in _RIGHTS_CLEARED:
         return False, status, f"rights_status is {status}"
 
     expires = str(entry.get("rights_expires") or "").strip()
@@ -1995,7 +2001,7 @@ def _rights_state(entry: Dict[str, Any]) -> Tuple[bool, str, str]:
         if lapsed:
             return False, "expired", f"permission lapsed on {expires}"
 
-    return True, RIGHTS_GRANTED, ""
+    return True, status, ""
 
 
 def _rights_cleared(entry: Dict[str, Any]) -> bool:
@@ -2070,37 +2076,60 @@ def _video_payload(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 # can point at such material without our copying a byte of it.
 
 
-def _related_links_payload(entry: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Normalize a record's related_links into a safe, renderable list.
+RIGHTS_FIELDS = ("museum_id", "rights_status", "rights_note", "rights_expires")
 
-    Records are editable through the admin screens, so the URL scheme is
-    checked here rather than trusted: only http(s) survives, which keeps a
-    pasted ``javascript:`` URL from reaching an href.  Entries without a usable
-    URL are dropped rather than rendered as dead links.
+
+def _related_links_for_storage(raw: Any) -> List[Dict[str, Any]]:
+    """Validate related_links for writing to disk.
+
+    Separate from the serving view on purpose.  This is what an admin save is
+    stored as, so it must keep every link the curator sent -- including ones
+    currently withheld, which still need a record -- and must carry the rights
+    fields through.  Filtering belongs at serve time, not at write time: a save
+    that quietly dropped a withheld link would destroy the very thing saying we
+    may not show it.
+
+    The URL scheme is checked rather than trusted, because these records are
+    editable through the admin screens and a pasted ``javascript:`` URL would
+    otherwise reach an href.
     """
-    raw = entry.get("related_links")
     if not isinstance(raw, list):
         return []
-    out: List[Dict[str, str]] = []
+    out: List[Dict[str, Any]] = []
     for item in raw:
         if not isinstance(item, dict):
             continue
         url = (item.get("url") or "").strip()
         if not url or not _SAFE_LINK_SCHEME_RE.match(url):
             continue
-        # Rights are per link, not per record: three oral histories on one
-        # answer can be held by three institutions, and one may be withdrawn
-        # while the others stand.
-        if not _rights_cleared(item):
-            continue
-        out.append({
+        link: Dict[str, Any] = {
             "url": url,
             "label": (item.get("label") or "").strip() or url,
             # Holding institutions often prescribe an exact citation format;
             # VHP does, down to the collection ID.  Carry it verbatim.
             "citation": (item.get("citation") or "").strip(),
-        })
+        }
+        for field in RIGHTS_FIELDS:
+            value = item.get(field)
+            value = value.strip() if isinstance(value, str) else value
+            if value:
+                link[field] = value
+        out.append(link)
     return out
+
+
+def _related_links_payload(entry: Dict[str, Any]) -> List[Dict[str, str]]:
+    """The renderable view of a record's related_links.
+
+    Rights are per link, not per record: three oral histories on one answer can
+    be held by three institutions, and one may be withdrawn while the others
+    stand.
+    """
+    return [
+        {"url": link["url"], "label": link["label"], "citation": link["citation"]}
+        for link in _related_links_for_storage(entry.get("related_links"))
+        if _rights_cleared(link)
+    ]
 
 
 def synthesize_extractive(
@@ -3809,6 +3838,92 @@ def get_admin_videos():
     return _load_videos_raw()
 
 
+# ── Unpublished pages ────────────────────────────────────────────────────────
+# Pages deployed but deliberately not distributed with the source (see
+# _unpublished_page_path).  Installing one meant a Render Shell session, which
+# is fine once and wrong as a platform: adding a museum should not require
+# somebody with production shell access.  These endpoints put it behind the
+# admin gate instead.
+#
+# The name is checked against a fixed set rather than sanitised, because the
+# effect of a write here is a page served from our own origin: an arbitrary
+# filename would let an admin session install anything, anywhere under the
+# static root.  A new unpublished page is a code change, and should be.
+_UNPUBLISHED_PAGES = frozenset({"pampanito.html"})
+_UNPUBLISHED_MAX_BYTES = 5 * 1024 * 1024
+
+
+def _unpublished_target(filename: str) -> str:
+    if filename not in _UNPUBLISHED_PAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{filename!r} is not an unpublished page. Known: {sorted(_UNPUBLISHED_PAGES)}",
+        )
+    if not os.path.isdir(_RENDER_DATA_DIR):
+        raise HTTPException(
+            status_code=503,
+            detail=("No persistent disk at /data on this host, so an uploaded page would "
+                    "not survive a redeploy. Place the file in web/ instead."),
+        )
+    os.makedirs(_UNPUBLISHED_WEB_DIR, exist_ok=True)
+    return os.path.join(_UNPUBLISHED_WEB_DIR, filename)
+
+
+@app.get("/admin/unpublished")
+def list_unpublished_pages():
+    """Which unpublished pages are installed on this host, and from where."""
+    out = []
+    for name in sorted(_UNPUBLISHED_PAGES):
+        resolved = _unpublished_page_path(name)
+        on_disk = os.path.join(_UNPUBLISHED_WEB_DIR, name)
+        out.append({
+            "filename": name,
+            "installed": resolved is not None,
+            "source": ("persistent disk" if resolved == on_disk
+                       else "checkout" if resolved else None),
+            "bytes": os.path.getsize(resolved) if resolved else 0,
+        })
+    return {"persistent_disk": os.path.isdir(_RENDER_DATA_DIR), "pages": out}
+
+
+@app.post("/admin/unpublished/{filename}")
+async def install_unpublished_page(filename: str, file: UploadFile = File(...)):
+    """Install or replace an unpublished page on the persistent disk."""
+    dest = _unpublished_target(filename)
+    tmp = dest + ".tmp"
+    total = 0
+    try:
+        with open(tmp, "wb") as out:
+            while True:
+                chunk = await file.read(64 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > _UNPUBLISHED_MAX_BYTES:
+                    raise HTTPException(status_code=413, detail="Page is larger than 5 MB")
+                out.write(chunk)
+        if total == 0:
+            raise HTTPException(status_code=400, detail="Empty upload")
+        # Replace atomically: a half-written page is served just as readily as a
+        # whole one, and this route exists to put a demo in front of people.
+        os.replace(tmp, dest)
+    except Exception:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        raise
+    return {"status": "installed", "filename": filename, "bytes": total, "path": dest}
+
+
+@app.delete("/admin/unpublished/{filename}")
+def remove_unpublished_page(filename: str):
+    """Take an unpublished page down without a deploy."""
+    dest = _unpublished_target(filename)
+    if not os.path.exists(dest):
+        raise HTTPException(status_code=404, detail=f"{filename} is not installed")
+    os.remove(dest)
+    return {"status": "removed", "filename": filename}
+
+
 def _museum_names() -> Dict[str, str]:
     """Map museum id -> display name, for labelling rights rows."""
     names: Dict[str, str] = {}
@@ -4077,9 +4192,7 @@ async def update_faq(chunk_id: str, request: Request):
         # rejected at write time rather than persisting and being filtered on
         # every later read.  An empty list clears them.
         if "related_links" in body:
-            entry["related_links"] = _related_links_payload(
-                {"related_links": body.get("related_links")}
-            )
+            entry["related_links"] = _related_links_for_storage(body.get("related_links"))
         # Same contract as related_links: only touched when the key is sent, so
         # an ordinary text save can't strip a record's video.  Sending an empty
         # video_url clears the whole attachment rather than leaving orphaned
@@ -4088,7 +4201,7 @@ async def update_faq(chunk_id: str, request: Request):
             video_url = (body.get("video_url") or "").strip()
             if not video_url:
                 for field in ("video_url", "video_start", "video_caption",
-                              "video_credit", "video_credit_url"):
+                              "video_credit", "video_credit_url", *RIGHTS_FIELDS):
                     entry.pop(field, None)
             elif not _SAFE_LINK_SCHEME_RE.match(video_url):
                 raise HTTPException(
@@ -4097,9 +4210,21 @@ async def update_faq(chunk_id: str, request: Request):
                 )
             else:
                 entry["video_url"] = video_url
-                for field in ("video_caption", "video_credit", "video_credit_url"):
+                for field in ("video_caption", "video_credit", "video_credit_url",
+                              "museum_id", "rights_note", "rights_expires"):
                     if field in body:
                         entry[field] = (body.get(field) or "").strip()
+                # Rejected at write time for the same reason as on videos.jsonl:
+                # stored unrecognised it reads as not-cleared, and the video
+                # would vanish while the curator saw a successful save.
+                if "rights_status" in body:
+                    status = (body.get("rights_status") or "").strip().lower()
+                    if status and status not in _RIGHTS_KNOWN:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"rights_status must be one of {sorted(_RIGHTS_KNOWN)}",
+                        )
+                    entry["rights_status"] = status
                 if "video_start" in body:
                     raw_start = body.get("video_start")
                     if raw_start in (None, ""):
