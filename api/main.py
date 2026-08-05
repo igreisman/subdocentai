@@ -4517,9 +4517,23 @@ async def update_museum(museum_id: int, request: Request):
         raise HTTPException(status_code=404, detail="Museum not found")
     body = await request.json()
     with _museums_write_lock:
-        for field in ("name", "designation", "location", "url", "description"):
+        # "website" is what the records actually carry; "url" was in this list
+        # without it, so editing a museum's website through the admin API was a
+        # silent no-op.  tour_url points at that museum's audio tour, so a tour
+        # is a property of the museum rather than a link hardcoded in a page.
+        for field in ("name", "designation", "location", "url", "website",
+                      "tour_url", "description"):
             if field in body:
-                target[field] = (body[field] or "").strip()
+                value = (body[field] or "").strip()
+                if field in ("website", "url", "tour_url") and value:
+                    # Same rule as every other stored link: only http(s), and a
+                    # site-relative path for a tour we host ourselves.
+                    if not (_SAFE_LINK_SCHEME_RE.match(value) or value.startswith("/")):
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"{field} must start with http://, https://, or /",
+                        )
+                target[field] = value
         _save_museums()
     return {"status": "updated", "museum": target}
 

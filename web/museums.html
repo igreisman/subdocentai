@@ -87,6 +87,27 @@
       opacity: 0.85;
     }
 
+    .museum-tour-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 14px;
+      padding: 9px 16px;
+      background: #1f6feb;
+      border: 1px solid #388bfd;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .museum-tour-link:hover {
+      background: #388bfd;
+      border-color: #58a6ff;
+    }
+
     .museum-page-link {
       display: block;
       padding: 14px 16px;
@@ -307,6 +328,7 @@
             ${m.designation ? `<div class="designation">${esc(m.designation)}</div>` : ''}
             ${m.location    ? `<div class="designation">${esc(m.location)}</div>` : ''}
             ${m.description ? `<p>${esc(m.description)}</p>` : ''}
+            ${m.tour_url ? `<a class="museum-tour-link" href="${esc(m.tour_url)}">🎙 Take the audio tour</a>` : ''}
             ${renderTopPages(pages, m.id)}
           </div>
         </div>`;
