@@ -1,5 +1,6 @@
 from __future__ import annotations
 import base64
+from datetime import date as _date
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
@@ -1934,6 +1935,73 @@ def best_sentences(text: str, want_terms: List[str], max_sentences: int = 2) -> 
 # into visitors' pages rather than a merely broken link.
 _SAFE_LINK_SCHEME_RE = re.compile(r"^https?://", re.I)
 
+
+# ── Content rights ───────────────────────────────────────────────────────────
+# Museum material is licensed to this project by the institution that holds it,
+# not owned outright.  Permission can be given for one use, limited in time, or
+# withdrawn on a phone call, and it differs per asset: one family may object to
+# a relative's interview while the others stand.  With a single museum that is
+# a conversation you keep in your head; across twenty it has to be data.
+#
+# So every asset records who it belongs to and what was agreed, and one gate
+# decides whether it may be shown.  Showing something we have not cleared is the
+# failure this exists to prevent.
+#
+#   museum_id       joins corpora/museums.jsonl
+#   rights_status   granted | pending | withheld
+#   rights_note     the basis, in words, e.g. who agreed and when
+#   rights_expires  ISO date after which permission lapses (optional)
+
+RIGHTS_GRANTED = "granted"
+RIGHTS_PENDING = "pending"
+RIGHTS_WITHHELD = "withheld"
+_RIGHTS_KNOWN = {RIGHTS_GRANTED, RIGHTS_PENDING, RIGHTS_WITHHELD}
+
+# Records written before these fields existed carry no status and are already
+# live, so an absent status keeps today's behaviour rather than blanking the
+# site the moment this ships.  Once every asset has been reviewed, a deployment
+# should fail closed instead: RIGHTS_STRICT=true treats "unrecorded" as "not
+# cleared", which is the safer default but only after the review is done.
+RIGHTS_STRICT = _env_flag("RIGHTS_STRICT")
+
+
+def _rights_state(entry: Dict[str, Any]) -> Tuple[bool, str, str]:
+    """Return (cleared, status, reason) for one asset.
+
+    `reason` is empty when cleared and otherwise says why not, so the admin
+    report can explain itself rather than just hiding things.
+    """
+    status = str(entry.get("rights_status") or "").strip().lower()
+
+    if not status:
+        if RIGHTS_STRICT:
+            return False, "unrecorded", "no rights_status recorded, and RIGHTS_STRICT is on"
+        return True, "unrecorded", ""
+
+    if status not in _RIGHTS_KNOWN:
+        # Don't guess. An unrecognised value is a typo or a half-finished edit,
+        # and the safe reading of "I can't tell" is "don't publish it".
+        return False, status, f"unrecognised rights_status {status!r}"
+
+    if status != RIGHTS_GRANTED:
+        return False, status, f"rights_status is {status}"
+
+    expires = str(entry.get("rights_expires") or "").strip()
+    if expires:
+        try:
+            lapsed = _date.fromisoformat(expires) < _date.today()
+        except ValueError:
+            return False, "invalid", f"rights_expires is not an ISO date: {expires!r}"
+        if lapsed:
+            return False, "expired", f"permission lapsed on {expires}"
+
+    return True, RIGHTS_GRANTED, ""
+
+
+def _rights_cleared(entry: Dict[str, Any]) -> bool:
+    """True when this asset may be served to the public."""
+    return _rights_state(entry)[0]
+
 _YT_ID_RE = re.compile(
     r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/)|youtu\.be/)([A-Za-z0-9_-]{11})"
 )
@@ -1956,6 +2024,12 @@ def _video_payload(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     # is a live script-injection path into every visitor's page, not a typo that
     # merely renders a broken embed.  Reject rather than pass through.
     if not raw_url or not _SAFE_LINK_SCHEME_RE.match(raw_url):
+        return None
+    # Rights are checked here rather than at each call site because this is the
+    # single place a video becomes something a visitor can play. /admin/videos
+    # deliberately reads raw records instead, so a curator can still see and fix
+    # an asset the public page is withholding.
+    if not _rights_cleared(entry):
         return None
     try:
         start = int(entry.get("video_start") or 0)
@@ -2013,6 +2087,11 @@ def _related_links_payload(entry: Dict[str, Any]) -> List[Dict[str, str]]:
             continue
         url = (item.get("url") or "").strip()
         if not url or not _SAFE_LINK_SCHEME_RE.match(url):
+            continue
+        # Rights are per link, not per record: three oral histories on one
+        # answer can be held by three institutions, and one may be withdrawn
+        # while the others stand.
+        if not _rights_cleared(item):
             continue
         out.append({
             "url": url,
@@ -3631,7 +3710,9 @@ def public_faqs():
 # restart, which is how a curator expects a save to behave.
 VIDEO_EDITABLE_FIELDS = (
     "title", "video_url", "video_start", "description",
-    "video_credit", "video_credit_url", "rights_note", "category",
+    "video_credit", "video_credit_url", "category",
+    # Who it belongs to and what was agreed. See "Content rights" above.
+    "museum_id", "rights_status", "rights_note", "rights_expires",
 )
 # Bucket for records with no category, matching what the FAQ grouping uses.
 VIDEO_DEFAULT_CATEGORY = "General"
@@ -3681,9 +3762,21 @@ def _apply_video_payload(target: Dict[str, Any], payload: Dict[str, Any]) -> Non
     target["video_url"] = url
 
     for field in ("title", "description", "video_credit", "video_credit_url",
-                  "rights_note", "category"):
+                  "category", "museum_id", "rights_note", "rights_expires"):
         if field in payload:
             target[field] = (payload.get(field) or "").strip()
+
+    # Refuse an unrecognised status at write time.  Stored unrecognised, it
+    # would read as "not cleared" and the video would silently vanish from the
+    # page with the curator seeing only a successful save.
+    if "rights_status" in payload:
+        status = (payload.get("rights_status") or "").strip().lower()
+        if status and status not in _RIGHTS_KNOWN:
+            raise HTTPException(
+                status_code=400,
+                detail=f"rights_status must be one of {sorted(_RIGHTS_KNOWN)}",
+            )
+        target["rights_status"] = status
 
     if "video_start" in payload:
         raw_start = payload.get("video_start")
@@ -3714,6 +3807,78 @@ def get_admin_videos():
     curator can see and repair a broken entry instead of wondering where it went.
     """
     return _load_videos_raw()
+
+
+def _museum_names() -> Dict[str, str]:
+    """Map museum id -> display name, for labelling rights rows."""
+    names: Dict[str, str] = {}
+    for row in load_jsonl(_editable_corpus_path("museums.jsonl")) or []:
+        mid = str(row.get("id") or "").strip()
+        if mid:
+            names[mid] = (row.get("name") or "").strip() or mid
+    return names
+
+
+@app.get("/admin/rights")
+def get_rights_report():
+    """Every third-party asset, who it belongs to, and whether it may be shown.
+
+    The question a curator actually has is "what are we publishing that we have
+    not cleared, and whose is it" -- which otherwise means opening several
+    editors and remembering what was agreed on the phone. One list answers it,
+    including assets that are currently being withheld and would therefore be
+    invisible everywhere else.
+    """
+    names = _museum_names()
+    rows: List[Dict[str, Any]] = []
+
+    def add(kind: str, ref: str, label: str, entry: Dict[str, Any]) -> None:
+        cleared, status, reason = _rights_state(entry)
+        museum_id = str(entry.get("museum_id") or "").strip()
+        rows.append({
+            "kind": kind,
+            "ref": ref,
+            "label": label,
+            "museum_id": museum_id,
+            "museum": names.get(museum_id, "") if museum_id else "",
+            "status": status,
+            "cleared": cleared,
+            "reason": reason,
+            "note": (entry.get("rights_note") or "").strip(),
+            "expires": (entry.get("rights_expires") or "").strip(),
+            "credit": (entry.get("video_credit") or entry.get("citation") or "").strip(),
+        })
+
+    for entry in _load_videos_raw():
+        add("video", str(entry.get("id") or ""), (entry.get("title") or "").strip(), entry)
+
+    for entry in load_jsonl(FAQ_PATH) or []:
+        chunk_id = str(entry.get("chunk_id") or "")
+        if (entry.get("video_url") or "").strip():
+            add("faq_video", chunk_id, (entry.get("video_caption") or "").strip(), entry)
+        for link in entry.get("related_links") or []:
+            if isinstance(link, dict) and (link.get("url") or "").strip():
+                add("related_link", chunk_id, (link.get("label") or "").strip(), link)
+
+    # Tour narration is the museum's own recording, and the largest rights
+    # question in the project even though nothing filters on it yet.
+    tour = load_jsonl(TOUR_PATH) or []
+    if tour:
+        museum_ids = {str(r.get("museum_id") or "").strip() for r in tour}
+        for mid in sorted(museum_ids):
+            sample = next(r for r in tour if str(r.get("museum_id") or "").strip() == mid)
+            count = sum(1 for r in tour if str(r.get("museum_id") or "").strip() == mid)
+            add("tour", f"{count} records", "Tour narration", sample)
+
+    uncleared = [r for r in rows if not r["cleared"]]
+    unrecorded = [r for r in rows if r["status"] == "unrecorded"]
+    return {
+        "strict": RIGHTS_STRICT,
+        "total": len(rows),
+        "uncleared": len(uncleared),
+        "unrecorded": len(unrecorded),
+        "assets": rows,
+    }
 
 
 @app.post("/admin/videos")

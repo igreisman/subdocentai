@@ -88,6 +88,29 @@ make public-release-check
 
 `make public-release-check` stages that tree, boots it with no production corpora present, verifies automatic fallback to `sample_data/corpora/`, checks public APIs, and confirms admin routes stay disabled by default when credentials are unset.
 
+## Content Rights
+
+The goal is to host tours and video from several submarine museums. That material is licensed to this project by the institution holding it, not owned outright: permission can be given for one use, limited in time, or withdrawn on a phone call, and it differs per asset — one family may object to a relative's oral history while the others stand.
+
+With one museum that is a conversation you keep in your head. Across twenty it has to be data, so every third-party asset carries:
+
+| field | meaning |
+| --- | --- |
+| `museum_id` | joins `corpora/museums.jsonl` |
+| `rights_status` | `granted`, `pending`, or `withheld` |
+| `rights_note` | the basis in words — who agreed, when, on what terms |
+| `rights_expires` | ISO date after which permission lapses (optional) |
+
+These live on video records, on the `video_*` fields of a Q&A record, and on each entry in `related_links` individually.
+
+One gate, `_rights_cleared()`, decides whether an asset may be served, applied where media becomes something a visitor can play. Anything not cleared is simply absent — the surrounding answer renders unchanged, because answer text is written to stand on its own. Admin endpoints deliberately read raw records instead, so a curator can still see and fix an asset the public pages are withholding.
+
+`GET /admin/rights` lists every third-party asset with its owner, status, and reason, including ones being withheld and therefore invisible everywhere else. It answers the question a curator actually has: what are we publishing that we have not cleared, and whose is it.
+
+### `RIGHTS_STRICT`
+
+Records predating these fields carry no status, so by default an unrecorded asset is still served and shipping this changes nothing. Once every asset has been reviewed, set `RIGHTS_STRICT=true`: unrecorded then means not cleared, and the deployment fails closed. Check `GET /admin/rights` before turning it on — anything still `unrecorded` disappears from the public site the moment you do.
+
 ## Unpublished Pages
 
 Some pages are deployed but deliberately not distributed with the source, because the content rights are still being settled. They are not in the repository and are ignored by git.
@@ -147,6 +170,7 @@ If neither pair is set, the routes each protects return `503` rather than a logi
 ### Answer behaviour
 
 - `USE_LLM` — when true, answers are synthesized rather than extracted. Off by default; the deployed configuration answers extractively.
+- `RIGHTS_STRICT` — when true, an asset with no recorded rights is treated as not cleared and is not served. Off by default so existing content is unaffected. See Content Rights.
 
 ### Retrieval tuning
 
