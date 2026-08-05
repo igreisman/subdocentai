@@ -1,10 +1,13 @@
 # SubmarineDocent
 
-SubmarineDocent is a FastAPI-backed historical docent application with a static web frontend. In its current form, it powers three main experiences:
+SubmarineDocent is a FastAPI-backed historical docent application with a static web frontend. In its current form, it powers four main experiences:
 
-- a mobile-first USS Pampanito tour and question-answering app
-- a public FAQ and history dashboard for WWII diesel-electric submarines
-- curator/admin tools for managing FAQs, glossary entries, incidents, and visitor feedback
+- a mobile-first USS Pampanito audio and video tour, where a visitor can ask a question about the compartment they are standing in
+- a standalone "Ask the Docent" page for asking a question without taking the tour, by voice or by typing
+- a public FAQ and history dashboard for WWII diesel-electric submarines, including war patrols, lost boats, Medal of Honor recipients, incidents, a glossary, museums, and video
+- curator/admin tools for managing FAQs, glossary entries, incidents, videos, and visitor feedback
+
+Questions are answered by local retrieval over JSONL corpora — BM25 with IDF, weighted so museum-authored material outranks reference sources — not by a language model. Voice input uses the browser's own speech recognition where it works and falls back to server-side Whisper transcription where it does not.
 
 ## Repository Scope
 
@@ -23,12 +26,15 @@ This repository contains both application code and project-specific content.
 
 ## Project Layout
 
-- `api/` — FastAPI application
-- `web/` — public and admin frontend pages
+- `api/` — FastAPI application; `api/main.py` holds the routes, retrieval, and auth middleware
+- `web/` — public and admin frontend pages, each a self-contained HTML file
 - `corpora/` — JSONL corpora and retrieval configuration
-- `docs/` — project documentation and planning notes
 - `sample_data/corpora/` — redistribution-safe sample dataset used by sample mode
+- `docs/` — project documentation and planning notes
 - `scripts/` — public-release staging and verification
+- `bin/` — one-off import and sync utilities, not part of the running app
+- `_test/` — retrieval evaluation and corpus-migration scripts (see Tests below)
+- `.github/workflows/` — CI
 
 ## Quick Start
 
@@ -82,22 +88,52 @@ make public-release-check
 
 `make public-release-check` stages that tree, boots it with no production corpora present, verifies automatic fallback to `sample_data/corpora/`, checks public APIs, and confirms admin routes stay disabled by default when credentials are unset.
 
+## Tests And CI
+
+There is no unit test suite. Two kinds of checking exist instead.
+
+**CI** ([.github/workflows/sample-content-smoke.yml](.github/workflows/sample-content-smoke.yml)) runs on every push and pull request. It boots the app in sample mode and asserts `/health`, `/api/faqs`, `/api/incidents`, and `/api/eternal-patrol` respond, and that `/admin/faqs` and `/feedback/list` return `503` while credentials are unset. It does not run anything in `_test/`.
+
+**Retrieval evaluation** lives in `_test/`. These are scripts, not tests: they POST questions to a *running* server at `https://localhost:8443` and report whether the expected corpus entry came back. They need the full corpora, so they are meaningful only against a real local instance, not in sample mode or CI.
+
+```bash
+./start_https.sh                      # in one shell
+.venv/bin/python _test/spot_check.py  # in another
+```
+
+`spot_check.py` prints a per-question PASS/FAIL and a total; `test_batch*.py` and their `*_eval.py` counterparts run larger question sets. Treat the totals as a regression signal when changing retrieval — the constants under Retrieval tuning below were set against them.
+
 ## Environment Variables
 
 The project supports these groups of environment variables.
 
 ### Service credentials
 
-- `GROQ_API_KEY` — enables server-side transcription
-- `OPENAI_API_KEY` — reserved for future model-backed features
+- `GROQ_API_KEY` — enables server-side Whisper transcription at `/transcribe`. Without it, `/health` reports `transcribe_available: false` and voice input falls back to the browser's own speech recognition or to typing.
+- `OPENAI_API_KEY` — reserved for future model-backed features; nothing reads it today
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` — enable email delivery
+- `HISTORIAN_EMAIL` — where visitor questions from the "no answer found" flow are sent. **Set this.** The compiled-in default is a personal address.
 
 ### Route protection
 
-- `ADMIN_USERNAME`, `ADMIN_PASSWORD` — required to enable `/admin/*`, `/feedback/list`, and admin-facing pages
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD` — required to enable `/admin/*`, `/feedback/list`, and admin-facing pages. These also open the museum-admin paths below.
+- `MUSEUM_ADMIN_USERNAME`, `MUSEUM_ADMIN_PASSWORD` — a second, narrower credential pair that opens only `/admin/museum_pages*` and `/web/edit_museum_pages.html`, for a curator who should not hold the full admin password
 - `PREVIEW_USERNAME`, `PREVIEW_PASSWORD` — optional Basic Auth for preview/tour routes
 
-If `ADMIN_USERNAME` or `ADMIN_PASSWORD` is not set, admin routes are disabled by default.
+If neither pair is set, the routes each protects return `503` rather than a login prompt: access is disabled by default, not merely locked. Credentials are compared with `secrets.compare_digest`.
+
+### Answer behaviour
+
+- `USE_LLM` — when true, answers are synthesized rather than extracted. Off by default; the deployed configuration answers extractively.
+
+### Retrieval tuning
+
+Scoring constants, overridable without a code change. Defaults are in parentheses and were chosen against the evaluation scripts in `_test/`; changing them shifts which source answers a question.
+
+- `BM25_B` (0.3) — length normalisation. Low on purpose: chunk length here reflects the kind of content, not verbosity.
+- `EXACT_TITLE_BOOST` (20.0) — multiplier when a query matches an FAQ title outright
+- `OPERATIONS_GUIDE_WEIGHT` (0.9) — weight of the operations guide, below the FAQ corpus
+- `FLEETSUB_MANUAL_WEIGHT` (0.5) — weight of the Fleet Type Submarine manuals, below every museum-authored source
 
 ### Host and redirect config
 
@@ -116,21 +152,22 @@ The `/health` response reports whether sample mode is active and whether it was 
 
 ### Local HTTPS helper config
 
-- `LOCAL_HTTPS_HOST`
-- `LOCAL_HTTPS_PORT`
-- `LOCAL_STATIC_PORT`
-- `LOCAL_TOUR_PATH`
-- `LOCAL_STATIC_TOUR_PATH`
-- `SSL_KEYFILE`
-- `SSL_CERTFILE`
+Read by [start_https.sh](start_https.sh) only.
+
+- `LOCAL_HTTPS_HOST`, `LOCAL_HTTPS_PORT` — host and port shown in the startup banner, and the port uvicorn binds
+- `LOCAL_TOUR_PATH` — tour path shown in the banner
+- `LOCAL_STATIC_PORT` — legacy separate static server; the script only kills anything still listening there
+- `SSL_KEYFILE`, `SSL_CERTFILE` — TLS material, defaulting to `certs/key.pem` and `certs/cert.pem`
+
+`LOCAL_STATIC_TOUR_PATH` appears in `.env.example` but is no longer read by anything; it belonged to a helper script that has been removed.
 
 See [.env.example](.env.example) for defaults.
 
 ## Admin Access
 
-Admin pages and endpoints now use server-side Basic Auth.
+Admin pages and endpoints use server-side Basic Auth, applied in middleware rather than per-route, so a new `/admin/` route or `web/edit_*.html` page is covered the moment it exists.
 
-Protected surfaces include:
+Requires `ADMIN_USERNAME` and `ADMIN_PASSWORD`:
 
 - `/admin/*`
 - `/feedback/list`
@@ -139,6 +176,13 @@ Protected surfaces include:
 - `/faq_editor.html`
 - `/edit.html`
 - `/web/edit_*.html`
+
+Requires either the admin pair above or `MUSEUM_ADMIN_USERNAME` and `MUSEUM_ADMIN_PASSWORD`:
+
+- `/admin/museum_pages*`
+- `/web/edit_museum_pages.html`
+
+With no credentials configured these return `503`, not `401` — the surface is off, not merely locked, so an unconfigured deployment cannot be brute-forced. CI asserts this on every push.
 
 This is a deliberate hardening change so the repository can be prepared for open-source publication without exposing curator tools by default.
 
