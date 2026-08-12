@@ -1,6 +1,6 @@
 # Project Costs
 
-As of March 24, 2026, this project has a relatively low fixed software cost in its current form. Most of the application is a FastAPI server plus static HTML, JavaScript, corpus files, images, and video. The main cost drivers are hosting, domain ownership, optional voice/transcription services, email delivery, and any museum hardware used for on-site deployment.
+As of August 12, 2026, this project has a relatively low fixed software cost in its current form. Most of the application is a FastAPI server plus static HTML, JavaScript, corpus files, images, and video. The main cost drivers are hosting, domain ownership, optional voice/transcription services, email delivery, and any museum hardware used for on-site deployment.
 
 This document separates:
 
@@ -18,12 +18,13 @@ The current repo indicates:
 - No database service configured in `render.yaml`
 - No Redis, queue, cron, or separate worker configured
 - Groq used only for transcription if `GROQ_API_KEY` is set
+- OpenAI used for server-side spoken answers if `OPENAI_API_KEY` is set
 - SMTP email used only if `SMTP_USER` and `SMTP_PASS` are set
-- No server-side text-to-speech endpoint currently exists
-- ElevenLabs is only used client-side if a visitor manually enters a personal API key
+- A server-side `/tts` endpoint now exists for built-in spoken answers
+- ElevenLabs remains optional as a higher-quality alternative if the project chooses to fund it
 - The current answer path is mainly extractive and does not require paid LLM generation for every question
 
-That means the present system can run with a low baseline cost if voice features are limited.
+That means the present system can still run with a low baseline cost, but spoken answers are now an actual usage-based operating cost when enabled.
 
 ## 2. Fixed Recurring Costs
 
@@ -131,19 +132,52 @@ Practical planning number:
 - For modest traffic: covered by the selected hosting tier
 - For heavy public media traffic: expect hosting tier pressure before code changes become the problem
 
+### Spoken Answer Audio
+
+The app now has a server-side `POST /tts` endpoint.  That means spoken answers can generate real API spend even when visitors do not provide their own voice-provider key.
+
+OpenAI is now the selected built-in provider.  ElevenLabs remains the main higher-quality alternative to compare against.
+
+For ElevenLabs, the clearest budgeting split is:
+
+- `Flash / Turbo` for the lower-cost, English-oriented path
+- `Multilingual v2 / v3` for higher-quality multilingual speech
+
+Published ElevenLabs API rates observed on August 12, 2026:
+
+- `Flash / Turbo`: `0.05` dollars per `1,000` characters
+- `Multilingual v2 / v3`: `0.10` dollars per `1,000` characters
+
+Practical monthly examples for `2,000` visitors, assuming each visitor plays one spoken answer:
+
+- At `300` characters per spoken answer: about `30` dollars per month on ElevenLabs Flash / Turbo, or about `60` dollars per month on ElevenLabs Multilingual
+- At `600` characters per spoken answer: about `60` dollars per month on ElevenLabs Flash / Turbo, or about `120` dollars per month on ElevenLabs Multilingual
+- At `1,200` characters per spoken answer: about `120` dollars per month on ElevenLabs Flash / Turbo, or about `240` dollars per month on ElevenLabs Multilingual
+
+If only half of visitors tap `Listen to answer`, those totals are cut roughly in half.
+
+Practical planning number for ElevenLabs at `2,000` visitors per month:
+
+- Lower-cost English-oriented voice: budget roughly `30` to `60` dollars per month
+- Higher-quality multilingual voice: budget roughly `60` to `120` dollars per month
+
+The actual bill depends most on three product choices:
+
+- how many visitors tap the listen button
+- how aggressively spoken answers are trimmed
+- whether the project chooses the lower-cost English-oriented model or the multilingual-quality model
+
 ## 4. Current Costs That Are Effectively Zero
 
 These features do not currently create a direct project bill in the present repo configuration:
 
 - Server-side LLM answer synthesis: not implemented as an active paid path
-- Server-side TTS: no `/tts` endpoint exists today
-- ElevenLabs voice: the visitor must provide a personal API key, so there is no project-side ElevenLabs bill right now
 - Database hosting: none configured
 - Redis / cache hosting: none configured
 - Queue workers / cron jobs: none configured
 - Analytics platform: none configured
 
-This is why the current app can remain inexpensive unless you expand the feature set.
+This is why the current app can remain inexpensive unless voice usage becomes heavy or future AI features expand.
 
 ## 5. One-Time Pampanito Deployment Costs
 
@@ -284,10 +318,16 @@ The repo roadmap implies these possible future cost increases.
 
 ### Server-Side TTS
 
-If you add a `/tts` endpoint using OpenAI or ElevenLabs:
+The project now has a `/tts` endpoint using OpenAI.  If the project instead switches that path to ElevenLabs, or adds ElevenLabs as the primary spoken-answer provider:
 
 - Every spoken answer can become a billable API event
 - This is likely the single clearest new recurring cost after hosting
+
+ElevenLabs planning range at `2,000` visitors per month:
+
+- `Flash / Turbo` without multilingual-quality voice: roughly `30` to `60` dollars per month at typical short-answer lengths
+- `Multilingual v2 / v3` with higher multilingual quality: roughly `60` to `120` dollars per month at typical short-answer lengths
+- If answers regularly reach the app's `1,200` character cap, those figures can roughly double
 
 ### LLM Answer Synthesis
 
@@ -316,6 +356,7 @@ For planning and approval purposes, the project is best described like this:
 - Current software baseline: low-cost
 - Main fixed recurring cost: hosting plus domain renewal
 - Main variable recurring cost: Groq transcription, only if voice input is enabled
+- Main new variable recurring cost when spoken answers are enabled: server-side TTS
 - Main one-time Pampanito cost: hardware, submarine-specific full-vessel BYOD network design, and deployment labor
 - Main future budget risk: adding server-side TTS or full LLM generation
 

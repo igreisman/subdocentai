@@ -650,6 +650,7 @@
     <div id="answerPanel">
       <div id="questionEcho"></div>
       <div id="answerText"></div>
+      <button id="answerSpeakBtn" type="button" style="display:none">Listen to answer</button>
       <div id="answerDebug"></div>
       <!-- Feedback widget -->
       <div id="feedbackRow">
@@ -679,7 +680,8 @@
     <div class="field">
       <label>ElevenLabs API Key <span style="color:#4a5a7a;">(optional — for AI voice)</span></label>
       <input id="settElKey" type="password" placeholder="sk_..." />
-      <div class="hint">Leave blank to use browser speech synthesis</div>
+      <div class="hint">Leave blank to use the built-in server voice when available, otherwise recorded answer audio
+        only</div>
     </div>
     <div class="field">
       <label>ElevenLabs Voice ID</label>
@@ -780,6 +782,7 @@
     const answerPanel = document.getElementById('answerPanel');
     const questionEcho = document.getElementById('questionEcho');
     const answerText = document.getElementById('answerText');
+    const answerSpeakBtn = document.getElementById('answerSpeakBtn');
     const answerDebug = document.getElementById('answerDebug');
     const settingsModal = document.getElementById('settingsModal');
     const settingsBtn = document.getElementById('settingsBtn');
@@ -818,7 +821,13 @@
     // ── Feedback widget ──────────────────────────────────────────────────────
     let _lastQuestion = '';
     let _lastAnswer = '';
+    let _lastAnswerData = null;
+    let _lastAnswerPlain = '';
+    let _answerAudioPrefetchKey = '';
+    let _answerAudioPrefetchPromise = null;
+    let _answerAudioPrefetchBuffer = null;
     let _feedbackRating = null;
+    let ttsAvailable = false;
 
     const feedbackRow = document.getElementById('feedbackRow');
     const feedbackExtra = document.getElementById('feedbackExtra');
@@ -838,6 +847,73 @@
       thumbsUpBtn.style.pointerEvents = '';
       thumbsDownBtn.style.pointerEvents = '';
     }
+
+    function hideAnswerSpeakButton() {
+      answerSpeakBtn.style.display = 'none';
+      answerSpeakBtn.disabled = true;
+    }
+
+    function clearAnswerAudioPrefetch() {
+      _answerAudioPrefetchKey = '';
+      _answerAudioPrefetchPromise = null;
+      _answerAudioPrefetchBuffer = null;
+    }
+
+    function buildServerTtsPrefetch(data, answerPlain) {
+      if (!ttsAvailable || !answerPlain) return null;
+      const citationSourceId = data.citations && data.citations[0] && data.citations[0].source_id;
+      const chunkId = data.citations && data.citations[0] && data.citations[0].chunk_id;
+      const s = loadSettings();
+      const stableAudioCacheKey = data.faq_id
+        ? `faq:${data.faq_id}:${s.lang}`
+        : (citationSourceId && chunkId ? `${citationSourceId}:${chunkId}:${s.lang}` : '');
+      const payload = { text: answerPlain, lang: s.lang || 'en', cache_key: stableAudioCacheKey };
+      return {
+        key: JSON.stringify(payload),
+        apiBase: s.apiBase,
+        payload,
+      };
+    }
+
+    function prefetchAnswerAudio(data, answerPlain) {
+      const req = buildServerTtsPrefetch(data, answerPlain);
+      if (!req) return;
+      _answerAudioPrefetchKey = req.key;
+      _answerAudioPrefetchBuffer = null;
+      _answerAudioPrefetchPromise = fetch(`${req.apiBase}/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.payload),
+      }).then(res => res.ok ? res.arrayBuffer() : null).then(arrayBuf => {
+        if (_answerAudioPrefetchKey === req.key) _answerAudioPrefetchBuffer = arrayBuf;
+        return arrayBuf;
+      }).catch(() => null);
+    }
+
+    function getPrefetchedAnswerAudio(data, answerPlain) {
+      const req = buildServerTtsPrefetch(data, answerPlain);
+      if (!req || _answerAudioPrefetchKey !== req.key) return null;
+      if (_answerAudioPrefetchBuffer) return Promise.resolve(_answerAudioPrefetchBuffer);
+      return _answerAudioPrefetchPromise;
+    }
+
+    function showAnswerSpeakButton(data, answerPlain) {
+      if (!answerPlain) {
+        hideAnswerSpeakButton();
+        return;
+      }
+      _lastAnswerData = data;
+      _lastAnswerPlain = answerPlain;
+      answerSpeakBtn.disabled = false;
+      answerSpeakBtn.style.display = 'inline-flex';
+      prefetchAnswerAudio(data, answerPlain);
+    }
+
+    answerSpeakBtn.addEventListener('click', async () => {
+      if (!_lastAnswerData || !_lastAnswerPlain) return;
+      unlockAudio();
+      await playFaqAudioOrSpeak(_lastAnswerData, _lastAnswerPlain);
+    });
 
     function showFeedback(question, answer) {
       _lastQuestion = question;
@@ -1059,9 +1135,15 @@
       return true;
     }
 
-    // ── Try pre-recorded FAQ audio → ElevenLabs → browser TTS ─────────────────
+    // ── Try pre-recorded FAQ audio → server TTS → ElevenLabs TTS ───────────────
     async function playFaqAudioOrSpeak(data, answerPlain) {
       stopAnswerAudio();
+
+      const citationSourceId = data.citations && data.citations[0] && data.citations[0].source_id;
+      const chunkId = data.citations && data.citations[0] && data.citations[0].chunk_id;
+      const stableAudioCacheKey = data.faq_id
+        ? `faq:${data.faq_id}:${loadSettings().lang}`
+        : (citationSourceId && chunkId ? `${citationSourceId}:${chunkId}:${loadSettings().lang}` : '');
 
       // If the answer is only a partial match, play the "no direct answer"
       // audio clip first, then play the answer audio as usual.
@@ -1078,27 +1160,10 @@
         } catch (e) { console.warn('[playFaqAudioOrSpeak] nodirectanswer fetch/play error:', e); }
       }
 
-      // If the answer comes from an FAQ source, play the "FAQ that covers this
-      // topic" preamble clip before the answer audio.
-      const citationSourceId = data.citations && data.citations[0] && data.citations[0].source_id;
-      if (citationSourceId === 'dieselsubs_faq' || citationSourceId === 'dieselsubs_shorts') {
-        try {
-          const faqCtrl = new AbortController();
-          const faqTimer = setTimeout(() => faqCtrl.abort(), 3000);
-          const faqResp = await fetch(getAudioUrl('faqThatCoversThisTopic.mp3'), { signal: faqCtrl.signal });
-          clearTimeout(faqTimer);
-          if (faqResp.ok) {
-            const faqBuf = await faqResp.arrayBuffer();
-            await new Promise(resolve => playArrayBuffer(faqBuf, resolve, 2.0));
-          }
-        } catch (e) { console.warn('[playFaqAudioOrSpeak] faqThatCoversThisTopic fetch/play error:', e); }
-      }
-
       const setSpeakStop = () => { showStopBtn(); };
       const resetSpeakBtn = () => { showAskBtn(); };
 
       // 1. Pre-recorded FAQ MP3 — fast timeout so a missing file doesn't block
-      const chunkId = data.citations && data.citations[0] && data.citations[0].chunk_id;
       if (chunkId) {
         askStatus.textContent = '🔊 Loading audio…';
         try {
@@ -1108,6 +1173,18 @@
           clearTimeout(abortTimer);
           if (resp.ok) {
             const arrayBuf = await resp.arrayBuffer();
+            if (citationSourceId === 'dieselsubs_faq' || citationSourceId === 'dieselsubs_shorts') {
+              try {
+                const faqCtrl = new AbortController();
+                const faqTimer = setTimeout(() => faqCtrl.abort(), 3000);
+                const faqResp = await fetch(getAudioUrl('faqThatCoversThisTopic.mp3'), { signal: faqCtrl.signal });
+                clearTimeout(faqTimer);
+                if (faqResp.ok) {
+                  const faqBuf = await faqResp.arrayBuffer();
+                  await new Promise(resolve => playArrayBuffer(faqBuf, resolve, 2.0));
+                }
+              } catch (e) { console.warn('[playFaqAudioOrSpeak] faqThatCoversThisTopic fetch/play error:', e); }
+            }
             playArrayBuffer(arrayBuf, resetSpeakBtn);
             setSpeakStop();
             askStatus.textContent = '';
@@ -1117,8 +1194,42 @@
         askStatus.textContent = '';
       }
 
-      // 2. ElevenLabs TTS — flash model, truncate to first 300 chars for speed
       const s = loadSettings();
+      // 2. Project-owned server TTS — preferred over visitor-supplied keys
+      if (ttsAvailable) {
+        const prefetchedAudio = getPrefetchedAnswerAudio(data, answerPlain);
+        if (prefetchedAudio) {
+          askStatus.textContent = '⏳ Generating audio…';
+          const arrayBuf = await prefetchedAudio;
+          if (arrayBuf) {
+            playArrayBuffer(arrayBuf, resetSpeakBtn);
+            setSpeakStop();
+            askStatus.textContent = '';
+            return;
+          }
+          askStatus.textContent = '';
+        }
+        try {
+          askStatus.textContent = '⏳ Generating audio…';
+          const res = await fetch(`${s.apiBase}/tts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: answerPlain, lang: s.lang || 'en', cache_key: stableAudioCacheKey }),
+          });
+          if (res.ok) {
+            const arrayBuf = await res.arrayBuffer();
+            playArrayBuffer(arrayBuf, resetSpeakBtn);
+            setSpeakStop();
+            askStatus.textContent = '';
+            return;
+          }
+        } catch (e) {
+          console.warn('Server TTS error, falling back to configured ElevenLabs:', e);
+        }
+        askStatus.textContent = '';
+      }
+
+      // 3. ElevenLabs TTS — flash model, truncate to first 300 chars for speed
       if (s.elKey) {
         // Trim to ~300 chars at a sentence boundary for fast generation
         let ttsText = answerPlain;
@@ -1147,19 +1258,14 @@
             return;
           }
         } catch (e) {
-          console.warn('ElevenLabs error, falling back to browser TTS:', e);
+          console.warn('ElevenLabs error while generating answer audio:', e);
           askStatus.textContent = '';
         }
       }
 
-      // 3. Browser SpeechSynthesis last resort
-      if (window.speechSynthesis) {
-        const utt = new SpeechSynthesisUtterance(answerPlain.replace(/\n+/g, ' '));
-        utt.rate = 0.95;
-        utt.onend = resetSpeakBtn;
-        window.speechSynthesis.speak(utt);
-        setSpeakStop();
-      }
+      askStatus.style.display = '';
+      askStatus.textContent = 'Spoken audio is not available for this answer right now.';
+      resetSpeakBtn();
     }
 
     // ── API call ───────────────────────────────────────────────────────────────
@@ -1397,6 +1503,7 @@
         }
         if (!d) return;
         transcribeAvailable = !!d.transcribe_available;
+        ttsAvailable = !!d.tts_available;
         if (transcribeAvailable) {
           applyVoiceMode();
         } else if (isAndroid && SpeechRec) {
@@ -1773,6 +1880,10 @@
       askStatus.textContent = `Heard: "${question}"`;
       questionEcho.textContent = `"${question}"`;
       answerText.textContent = '';
+      hideAnswerSpeakButton();
+      _lastAnswerData = null;
+      _lastAnswerPlain = '';
+      clearAnswerAudioPrefetch();
       answerDebug.textContent = DEBUG ? `API: ${loadSettings().apiBase}` : '';
       resetFeedback();
       answerPanel.classList.add('visible');
@@ -1836,11 +1947,10 @@
         askStatus.style.display = 'none';
         showSuggestions();
         showFeedback(question, answerPlain);
-
-        // Auto-play: pre-recorded FAQ audio if available, else TTS
-        playFaqAudioOrSpeak(data, answerPlain);
+        showAnswerSpeakButton(data, answerPlain);
       } catch (err) {
         answerText.textContent = `Error: ${err.message}`;
+        hideAnswerSpeakButton();
         answerDebug.textContent = DEBUG ? `API: ${loadSettings().apiBase}` : '';
         askStatus.textContent = '';
       }

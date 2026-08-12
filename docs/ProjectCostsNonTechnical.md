@@ -1,6 +1,6 @@
 # Project Costs Summary
 
-As of March 25, 2026, this project is relatively inexpensive to operate in its current form. The main ongoing costs are hosting and domain renewals. Optional voice features may add usage-based costs. For a physical deployment on the Pampanito, the largest launch costs are likely to be hardware, connectivity setup, and staff time.
+As of August 12, 2026, this project is relatively inexpensive to operate in its current form. The main ongoing costs are hosting and domain renewals. Optional voice features may add usage-based costs. For a physical deployment on the Pampanito, the largest launch costs are likely to be hardware, connectivity setup, and staff time.
 
 This version is intended for budgeting and approval discussions and leaves out implementation detail.
 
@@ -10,6 +10,7 @@ This version is intended for budgeting and approval discussions and leaves out i
 - The main recurring cost is hosting.
 - Domain renewal is a small annual cost.
 - Voice input, if enabled, adds a variable usage-based cost.
+- Spoken answers now also add a variable usage-based cost when used.
 - For on-site deployment, the main cost is not the software. It is the equipment, connectivity, and setup work needed to make the visitor experience reliable.
 
 ## 2. Recurring Costs
@@ -34,6 +35,18 @@ This version is intended for budgeting and approval discussions and leaves out i
 - This is optional
 - If enabled, it is a variable usage-based cost rather than a large fixed monthly bill
 - For modest use, it should remain a relatively small operating expense
+
+### Spoken Answer Voice
+
+- The project now includes built-in server-side spoken answers
+- OpenAI is the selected built-in provider today
+- ElevenLabs remains the main alternative if the museum wants higher voice quality
+
+For ElevenLabs at about `2,000` visitors per month:
+
+- Lower-cost English-oriented voice can be planned at about `30` to `60` dollars per month
+- Higher-quality multilingual voice can be planned at about `60` to `120` dollars per month
+- If spoken answers are allowed to run long, those totals can increase materially
 
 ## 3. One-Time Launch Costs
 
@@ -92,7 +105,7 @@ Best fit:
 ## 5. Main Budget Risks
 
 - The largest uncertainty for the Pampanito deployment is connectivity and installation, not the software subscription cost
-- If future versions add more AI-generated voice or more advanced answer generation, recurring operating costs could rise
+- If spoken-answer usage becomes heavy, or if the project upgrades to premium multilingual voice quality, recurring operating costs could rise
 - If museum-owned visitor devices are added, capital and maintenance costs could exceed the software budget
 
 ## 6. Recommended Budget Framing
@@ -102,7 +115,7 @@ For approvals and planning, this project can be described simply as follows:
 - The software baseline is low-cost
 - Hosting is the main recurring expense
 - Domains are a small annual expense
-- Optional voice features add modest variable costs
+- Optional voice features add variable costs, with higher multilingual voice quality costing noticeably more than basic English-oriented TTS
 - The main launch budget item for Pampanito is hardware, connectivity, and deployment labor
 
 ## 7. Recommended Planning Summary

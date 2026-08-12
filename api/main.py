@@ -3,8 +3,9 @@ import base64
 from datetime import date as _date
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+import hashlib
 import html
 import io
 import json
@@ -17,6 +18,7 @@ import threading
 import shutil
 import unicodedata
 import uuid
+import httpx
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -604,6 +606,12 @@ def get_incidents():
 
 # Groq key — used for Whisper transcription (whisper-large-v3-turbo, ~0.3s latency)
 _GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+_OPENAI_TTS_MODEL = os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
+_OPENAI_TTS_VOICE = os.getenv("OPENAI_TTS_VOICE", "alloy")
+_OPENAI_TTS_CHAR_LIMIT = int(os.getenv("OPENAI_TTS_CHAR_LIMIT", "320"))
+_OPENAI_TTS_RESPONSE_FORMAT = "wav"
+_TTS_CACHE_DIR = _editable_corpus_dir("tts_cache")
 
 # ── Historian contact email ────────────────────────────────────────────────
 HISTORIAN_EMAIL = os.getenv("HISTORIAN_EMAIL", "irving.greisman@gmail.com")
@@ -725,6 +733,7 @@ def health():
         "sample_content_mode": SAMPLE_CONTENT_MODE,
         "auto_sample_fallback": AUTO_SAMPLE_FALLBACK,
         "transcribe_available": bool(_GROQ_API_KEY),
+        "tts_available": bool(_OPENAI_API_KEY),
         "tour_chunks": len(TOUR),
         "faq_chunks": len(FAQ),
         "shorts_chunks": len(SHORTS),
@@ -732,6 +741,93 @@ def health():
         "fleetsub_manual_chunks": len(FLEETSUB_MANUAL),
         "corpora_dir": CORPORA_DIR,
     }
+
+
+def _trim_tts_text(text: str, limit: int = _OPENAI_TTS_CHAR_LIMIT) -> str:
+    cleaned = re.sub(r"\s+", " ", (text or "").strip())
+    if len(cleaned) <= limit:
+        return cleaned
+    cut = cleaned.rfind(". ", 0, limit)
+    if cut >= 200:
+        return cleaned[:cut + 1].strip()
+    return cleaned[:limit].strip()
+
+
+def _tts_cache_path(text: str, lang: str, instructions: str, cache_key: str = "") -> str:
+    os.makedirs(_TTS_CACHE_DIR, exist_ok=True)
+    cache_hint = cache_key.strip()
+    cache_basis = f"{cache_hint}\n{text}" if cache_hint else text
+    cache_key = hashlib.sha256(
+        "\n".join([
+            _OPENAI_TTS_MODEL,
+            _OPENAI_TTS_VOICE,
+            _OPENAI_TTS_RESPONSE_FORMAT,
+            lang,
+            instructions,
+            cache_basis,
+        ]).encode("utf-8")
+    ).hexdigest()
+    return os.path.join(_TTS_CACHE_DIR, f"{cache_key}.{_OPENAI_TTS_RESPONSE_FORMAT}")
+
+
+@app.post("/tts")
+async def synthesize_speech(payload: dict):
+    """Generate MP3 answer audio using the project's OpenAI API key."""
+    if not _OPENAI_API_KEY:
+        raise HTTPException(status_code=503, detail="TTS not available: OPENAI_API_KEY not set")
+
+    text = _trim_tts_text(payload.get("text") or "")
+    if not text:
+        raise HTTPException(status_code=400, detail="No text provided")
+
+    lang = (payload.get("lang") or "en").strip().lower()
+    lang_label = {
+        "en": "English",
+        "fr": "French",
+        "de": "German",
+        "es": "Spanish",
+        "zh": "Chinese",
+        "ja": "Japanese",
+    }.get(lang, "English")
+
+    instructions = (
+        f"Speak in clear, natural {lang_label} with a calm museum-docent tone. "
+        "Avoid sounding synthetic, rushed, or overly animated."
+    )
+    cache_hint = (payload.get("cache_key") or "").strip()
+    cache_path = _tts_cache_path(text, lang, instructions, cache_hint)
+    if os.path.exists(cache_path):
+        return FileResponse(cache_path, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+
+    try:
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/audio/speech",
+                headers={
+                    "Authorization": f"Bearer {_OPENAI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": _OPENAI_TTS_MODEL,
+                    "voice": _OPENAI_TTS_VOICE,
+                    "input": text,
+                    "instructions": instructions,
+                    "response_format": _OPENAI_TTS_RESPONSE_FORMAT,
+                },
+            )
+        if resp.status_code >= 400:
+            detail = resp.text[:500] if resp.text else "OpenAI TTS request failed"
+            raise HTTPException(status_code=502, detail=detail)
+        tmp_path = f"{cache_path}.{uuid.uuid4().hex}.tmp"
+        with open(tmp_path, "wb") as f:
+            f.write(resp.content)
+        os.replace(tmp_path, cache_path)
+        return Response(content=resp.content, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[TTS] OpenAI TTS error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/transcribe")

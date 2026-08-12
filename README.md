@@ -155,7 +155,9 @@ The project supports these groups of environment variables.
 ### Service credentials
 
 - `GROQ_API_KEY` — enables server-side Whisper transcription at `/transcribe`. Without it, `/health` reports `transcribe_available: false` and voice input falls back to the browser's own speech recognition or to typing.
-- `OPENAI_API_KEY` — reserved for future model-backed features; nothing reads it today
+- `OPENAI_API_KEY` — enables server-side spoken answers at `/tts`. Without it, `/health` reports `tts_available: false` and answer playback falls back to recorded clips or any visitor-supplied ElevenLabs key.
+- `OPENAI_TTS_MODEL` — optional override for the server TTS model. Defaults to `gpt-4o-mini-tts`.
+- `OPENAI_TTS_VOICE` — optional override for the server TTS voice. Defaults to `alloy`.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` — enable email delivery
 - `HISTORIAN_EMAIL` — where visitor questions from the "no answer found" flow are sent. **Set this.** The compiled-in default is a personal address.
 
@@ -194,7 +196,7 @@ Scoring constants, overridable without a code change. Defaults are in parenthese
 - `SAMPLE_CONTENT_MODE` — uses the bundled sample corpus in `sample_data/corpora/`
 - `CONTENT_ROOT` — overrides the corpus directory entirely
 
-The `/health` response reports whether sample mode is active and whether it was enabled by automatic fallback.
+The `/health` response reports whether sample mode is active, whether it was enabled by automatic fallback, and whether server transcription / TTS are available.
 
 ### Local HTTPS helper config
 
