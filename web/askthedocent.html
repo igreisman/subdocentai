@@ -265,6 +265,41 @@
       color: #c9d8f0;
     }
 
+    #answerSource {
+      display: none;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #24354a;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #9ab1d1;
+    }
+
+    #answerSource.visible {
+      display: block;
+    }
+
+    .answer-source-head {
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #6a8ab0;
+      margin-bottom: 4px;
+    }
+
+    .answer-source-item + .answer-source-item {
+      margin-top: 4px;
+    }
+
+    .answer-source-label {
+      color: #c9d8f0;
+      font-weight: 600;
+    }
+
+    .answer-source-item a {
+      color: #8fb6e8;
+    }
+
     #answerDebug {
       margin-top: 10px;
       font-size: 11px;
@@ -650,6 +685,7 @@
     <div id="answerPanel">
       <div id="questionEcho"></div>
       <div id="answerText"></div>
+      <div id="answerSource"></div>
       <button id="answerSpeakBtn" type="button" style="display:none">Listen to answer</button>
       <div id="answerDebug"></div>
       <!-- Feedback widget -->
@@ -782,6 +818,7 @@
     const answerPanel = document.getElementById('answerPanel');
     const questionEcho = document.getElementById('questionEcho');
     const answerText = document.getElementById('answerText');
+    const answerSource = document.getElementById('answerSource');
     const answerSpeakBtn = document.getElementById('answerSpeakBtn');
     const answerDebug = document.getElementById('answerDebug');
     const settingsModal = document.getElementById('settingsModal');
@@ -1011,6 +1048,38 @@
       return `<div class="answer-related"><div class="answer-related-head">Hear it firsthand</div><ul>${items}</ul></div>`;
     }
 
+    function sourceLabel(sourceId) {
+      return {
+        pampanito_tour: 'Pampanito audio tour',
+        dieselsubs_faq: 'DieselSubs FAQ',
+        dieselsubs_shorts: 'DieselSubs short answer',
+        fleetsub_manual: '1946 fleet submarine manual',
+        dieselsubs_operations_guide: 'DieselSubs operations guide',
+      }[sourceId] || sourceId || 'Source';
+    }
+
+    function citationHtml(citation) {
+      if (!citation) return '';
+      const label = `<span class="answer-source-label">${esc(sourceLabel(citation.source_id))}</span>`;
+      const detailText = citation.display_citation || citation.chunk_id || '';
+      if (!detailText) return `<div class="answer-source-item">${label}</div>`;
+      const detail = citation.source_url
+        ? `<a href="${esc(citation.source_url)}" target="_blank" rel="noopener noreferrer">${esc(detailText)}</a>`
+        : esc(detailText);
+      return `<div class="answer-source-item">${label}: ${detail}</div>`;
+    }
+
+    function renderAnswerSource(data) {
+      const citations = (data.citations || []).filter(Boolean);
+      if (!citations.length) {
+        answerSource.innerHTML = '';
+        answerSource.classList.remove('visible');
+        return;
+      }
+      answerSource.innerHTML = `<div class="answer-source-head">Source</div>${citations.slice(0, 2).map(citationHtml).join('')}`;
+      answerSource.classList.add('visible');
+    }
+
     function renderAnswer(data) {
       const text = data.answer_short || '';
       const disclaimer = data.partial_match
@@ -1032,6 +1101,7 @@
       } else {
         answerText.innerHTML = disclaimer + `<span>${esc(text)}</span>` + videoHtml;
       }
+      renderAnswerSource(data);
       wireAnswerVideo();
     }
 
@@ -1880,6 +1950,8 @@
       askStatus.textContent = `Heard: "${question}"`;
       questionEcho.textContent = `"${question}"`;
       answerText.textContent = '';
+      answerSource.innerHTML = '';
+      answerSource.classList.remove('visible');
       hideAnswerSpeakButton();
       _lastAnswerData = null;
       _lastAnswerPlain = '';
