@@ -328,7 +328,6 @@
             ${m.designation ? `<div class="designation">${esc(m.designation)}</div>` : ''}
             ${m.location    ? `<div class="designation">${esc(m.location)}</div>` : ''}
             ${m.description ? `<p>${esc(m.description)}</p>` : ''}
-            ${m.tour_url ? `<a class="museum-tour-link" href="${esc(m.tour_url)}">🎙 Take the audio/video tour</a>` : ''}
             ${renderTopPages(pages, m.id)}
           </div>
         </div>`;
