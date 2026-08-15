@@ -4,6 +4,26 @@ Changes are listed newest-first. Dates are commit dates.
 
 ---
 
+## 2026-08-12 to 2026-08-14 — Spoken Answers, Source Display, Museums Cleanup, and WWII Losses Corpus
+
+Several visitor-facing and content-reference improvements shipped together over the last week.
+
+- **Server-side spoken answers added** — the app now supports built-in `POST /tts` spoken answers using an OpenAI API key, instead of relying only on prerecorded clips or visitor-supplied voice credentials.
+- **TTS latency reduced and warmed in advance** — answer audio is now trimmed more aggressively, cached on the server, and prefetched in the browser as soon as an answer appears, reducing the gap before playback.
+- **Stable audio caching added** — repeated FAQ- and chunk-backed answers now reuse cached audio, while edits to the answer text automatically invalidate stale cached speech.
+- **Visible source display added on answer pages** — the Ask page now shows where an answer came from directly in the answer panel, using the API citation payload rather than only debug text.
+- **Museums page tour link removed** — the public Museums page no longer shows the Pampanito tour button, and the Pampanito museum record no longer carries the old `tour_url` value in the tracked corpus.
+- **New WWII submarine losses corpus added** — a new `dieselsubs_sub_losses_wwii.jsonl` reference corpus was added and wired into retrieval as a low-weight historical source alongside the fleet submarine manuals.
+
+Committed changes in this window:
+
+- `439d66c` — Add server-side TTS caching and prefetch
+- `343449e` — Show answer source in Ask page
+- `5f7a172` — Remove museums page tour link
+- `566597c` — Add WWII submarine losses corpus
+
+---
+
 ## 2026-03-25 — Open Source Hardening And Config Cleanup
 
 - Replaced the hardcoded client-side `1941` PIN gates with server-side Basic Auth for admin and feedback routes.
