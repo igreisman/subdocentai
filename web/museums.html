@@ -7,7 +7,11 @@
   <title>Submarine Museums</title>
   <link rel="stylesheet" href="/web/site-header.css">
   <style>
-    *, *::before, *::after { box-sizing: border-box; }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -28,7 +32,7 @@
       padding: 24px;
       border: 1px solid #30363d;
       border-radius: 16px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
       margin-bottom: 18px;
       text-decoration: none;
       color: inherit;
@@ -40,9 +44,15 @@
       transform: translateY(-1px);
     }
 
-    .museum-body { flex: 1; min-width: 0; }
+    .museum-body {
+      flex: 1;
+      min-width: 0;
+    }
 
-    .museum-body h2 { margin: 0 0 4px; font-size: 20px; }
+    .museum-body h2 {
+      margin: 0 0 4px;
+      font-size: 20px;
+    }
 
     .museum-body .designation {
       font-size: 13px;
@@ -77,9 +87,11 @@
       color: #58a6ff;
       text-decoration: none;
     }
+
     .museum-name-link:hover {
       text-decoration: underline;
     }
+
     .museum-name-link .ext-arrow {
       font-size: 0.65em;
       vertical-align: middle;
@@ -119,6 +131,7 @@
       cursor: pointer;
       transition: border-color 0.15s, transform 0.15s;
     }
+
     .museum-page-link:hover {
       border-color: #58a6ff;
       transform: translateY(-1px);
@@ -160,15 +173,26 @@
       font-size: 14px;
       color: #8b949e;
     }
+
     .detail-breadcrumb a {
       color: #58a6ff;
       text-decoration: none;
       padding: 4px 6px;
       border-radius: 6px;
     }
-    .detail-breadcrumb a:hover { background: #161b22; }
-    .detail-breadcrumb .sep { color: #484f58; }
-    .detail-breadcrumb .current { color: #e6edf3; padding: 4px 6px; }
+
+    .detail-breadcrumb a:hover {
+      background: #161b22;
+    }
+
+    .detail-breadcrumb .sep {
+      color: #484f58;
+    }
+
+    .detail-breadcrumb .current {
+      color: #e6edf3;
+      padding: 4px 6px;
+    }
 
     .detail-content {
       font-size: 15px;
@@ -192,6 +216,7 @@
       gap: 8px;
       margin-bottom: 24px;
     }
+
     .attachment-link {
       display: inline-flex;
       align-items: center;
@@ -207,7 +232,11 @@
       max-width: 100%;
       transition: border-color 0.15s;
     }
-    .attachment-link:hover { border-color: #58a6ff; }
+
+    .attachment-link:hover {
+      border-color: #58a6ff;
+    }
+
     .attachment-link .ext {
       font-size: 10px;
       letter-spacing: 0.06em;
@@ -218,8 +247,17 @@
       border-radius: 4px;
     }
 
-    .detail-title { margin: 0 0 6px; font-size: 24px; }
-    .detail-desc { color: #8b949e; font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
+    .detail-title {
+      margin: 0 0 6px;
+      font-size: 24px;
+    }
+
+    .detail-desc {
+      color: #8b949e;
+      font-size: 14px;
+      line-height: 1.5;
+      margin: 0 0 20px;
+    }
   </style>
 </head>
 
@@ -232,12 +270,12 @@
   <script>
     SiteFooter.render();
     SiteHeader.render({
-      title:    'Submarine Museums',
+      title: 'Submarine Museums',
       subtitle: 'Preserved submarines and maritime museums open to the public, where you can step aboard and experience history firsthand.',
       feedback: 'Know of a submarine museum we should add? Have a correction?',
     });
 
-    const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const main = document.getElementById('main');
 
     let allMuseums = [];
@@ -323,10 +361,10 @@
         return `<div class="museum-card">
           <div class="museum-body">
             <h2>${m.website
-              ? `<a class="museum-name-link" href="${esc(m.website)}" target="_blank" rel="noopener">${esc(m.name)}<span class="ext-arrow">↗</span></a>`
-              : esc(m.name)}</h2>
+            ? `<a class="museum-name-link" href="${esc(m.website)}" target="_blank" rel="noopener">${esc(m.name)}<span class="ext-arrow">↗</span></a>`
+            : esc(m.name)}</h2>
             ${m.designation ? `<div class="designation">${esc(m.designation)}</div>` : ''}
-            ${m.location    ? `<div class="designation">${esc(m.location)}</div>` : ''}
+            ${m.location ? `<div class="designation">${esc(m.location)}</div>` : ''}
             ${m.description ? `<p>${esc(m.description)}</p>` : ''}
             ${renderTopPages(pages, m.id)}
           </div>

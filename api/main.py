@@ -406,6 +406,7 @@ SHORTS_PATH = os.path.join(CORPORA_DIR, "dieselsubs_shorts_corpus.jsonl")
 # not museum-authored content, so it is read-only and deliberately absent from
 # REQUIRED_CORPORA_FILES: the app runs normally without it.
 FLEETSUB_MANUAL_PATH = os.path.join(CORPORA_DIR, "dieselsubs_fleetsub_manual.jsonl")
+SUB_LOSSES_PATH = os.path.join(CORPORA_DIR, "dieselsubs_sub_losses_wwii.jsonl")
 # Editable corpora — on Render these live on the persistent disk (/data) so
 # that edits made on the live site survive redeploys. The bundled copy under
 # corpora/ seeds the disk on first boot and is the fallback for local/dev runs
@@ -652,6 +653,7 @@ SHORTS = load_jsonl(SHORTS_PATH)
 CATEGORIES = load_jsonl(CATEGORIES_PATH)
 OPERATIONS_GUIDE = load_jsonl(OPERATIONS_GUIDE_PATH)
 FLEETSUB_MANUAL = load_jsonl(FLEETSUB_MANUAL_PATH)
+SUB_LOSSES = load_jsonl(SUB_LOSSES_PATH)
 
 # Retrieval weight for the operations guide reference corpus.  Sits below FAQ
 # (1.2) and just above shorts (0.8): reference material should supplement the
@@ -664,6 +666,11 @@ OPERATIONS_GUIDE_WEIGHT = float(os.getenv("OPERATIONS_GUIDE_WEIGHT", "0.9"))
 # weighted well below every museum-authored source so it answers only what
 # nothing else can.
 FLEETSUB_MANUAL_WEIGHT = float(os.getenv("FLEETSUB_MANUAL_WEIGHT", "0.5"))
+
+# Submarine Losses WWII corpus — memorial/historical reference.  Small corpus
+# (9 chunks: dedication, introduction, notes, lost-sub list).  Weighted same as
+# fleet manual since it's primary-source government text, not docent narration.
+SUB_LOSSES_WEIGHT = float(os.getenv("SUB_LOSSES_WEIGHT", "0.5"))
 print(f"Loaded: {len(TOUR)} tour, {len(FAQ)} faq, {len(SHORTS)} shorts chunks, {len(CATEGORIES)} categories, {len(OPERATIONS_GUIDE)} operations guide records")
 
 
@@ -739,6 +746,7 @@ def health():
         "shorts_chunks": len(SHORTS),
         "operations_guide_chunks": len(OPERATIONS_GUIDE),
         "fleetsub_manual_chunks": len(FLEETSUB_MANUAL),
+        "sub_losses_chunks": len(SUB_LOSSES),
         "corpora_dir": CORPORA_DIR,
     }
 
@@ -1947,6 +1955,11 @@ def retrieve(
     # the operations guide's descriptions.  Lowest weight of any corpus.
     add_hits(FLEETSUB_MANUAL, "fleetsub_manual",
              weight=FLEETSUB_MANUAL_WEIGHT, compartment_filter=False)
+
+    # United States Submarine Losses, WWII (global) — memorial/historical
+    # primary source: dedication, introduction, notes, and lost-sub list.
+    add_hits(SUB_LOSSES, "sub_losses_wwii",
+             weight=SUB_LOSSES_WEIGHT, compartment_filter=False)
 
     hits.sort(key=lambda x: x[0], reverse=True)
     return hits[:top_k]
