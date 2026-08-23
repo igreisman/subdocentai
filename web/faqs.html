@@ -858,6 +858,18 @@
       line-height: 1.45;
     }
 
+    .faq-related-embed {
+      margin: 0 0 8px;
+    }
+
+    .faq-related-embed iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 1px solid #d1d5da;
+      border-radius: 8px;
+      background: #000;
+    }
+
     .faq-related-citation {
       margin-top: 2px;
       font-size: 11px;
@@ -2481,15 +2493,61 @@
       });
     }
 
-    // Links out to material held elsewhere — see the API-side note: a referral
-    // costs us no rights, a copy would.
+    function parseStartSeconds(raw) {
+      const v = String(raw || '').trim().toLowerCase();
+      if (!v) return 0;
+      if (/^\d+$/.test(v)) return Number(v);
+      const m = v.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/);
+      if (!m) return 0;
+      const h = Number(m[1] || 0);
+      const mins = Number(m[2] || 0);
+      const s = Number(m[3] || 0);
+      return h * 3600 + mins * 60 + s;
+    }
+
+    function youtubeEmbedUrl(rawUrl) {
+      try {
+        const u = new URL(String(rawUrl || '').trim());
+        if (!/^https?:$/i.test(u.protocol)) return '';
+        const host = u.hostname.toLowerCase().replace(/^www\./, '');
+        let id = '';
+        if (host === 'youtu.be') {
+          id = u.pathname.split('/').filter(Boolean)[0] || '';
+        } else if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
+          if (u.pathname === '/watch') {
+            id = u.searchParams.get('v') || '';
+          } else if (u.pathname.startsWith('/embed/') || u.pathname.startsWith('/shorts/')) {
+            id = u.pathname.split('/').filter(Boolean)[1] || '';
+          }
+        }
+        if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return '';
+        const start = Math.max(
+          parseStartSeconds(u.searchParams.get('t')),
+          parseStartSeconds(u.searchParams.get('start')),
+        );
+        let embed = `https://www.youtube-nocookie.com/embed/${id}?rel=0`;
+        if (start > 0) embed += `&start=${start}`;
+        return embed;
+      } catch (e) {
+        return '';
+      }
+    }
+
+    // Links out to material held elsewhere. If the link is YouTube, also show
+    // an inline player for quick playback.
     function relatedLinksHtml(links) {
       if (!links || !links.length) return '';
       const items = links.map(l => {
+        const url = String(l.url || '').trim();
+        const label = String(l.label || url);
+        const embed = youtubeEmbedUrl(url);
         const cite = l.citation
           ? `<div class="faq-related-citation">${escHtml(l.citation)}</div>`
           : '';
-        return `<li><a href="${escHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escHtml(l.label)}</a>${cite}</li>`;
+        const player = embed
+          ? `<div class="faq-related-embed"><iframe src="${escHtml(embed)}" title="${escHtml(label || 'YouTube video')}" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`
+          : '';
+        return `<li>${player}<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">${escHtml(label)}</a>${cite}</li>`;
       }).join('');
       return `<div class="faq-related"><div class="faq-related-head">Hear it firsthand</div><ul>${items}</ul></div>`;
     }

@@ -414,6 +414,18 @@
       color: #8fb6e8;
     }
 
+    .answer-related-embed {
+      margin: 0 0 8px;
+    }
+
+    .answer-related-embed iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 1px solid #24354a;
+      border-radius: 8px;
+      background: #0b1320;
+    }
+
     .answer-related-citation {
       margin-top: 2px;
       font-size: 11px;
@@ -1033,17 +1045,61 @@
       };
     }
 
-    // Links out to material held elsewhere — oral histories we can point at but
-    // may not reproduce.  Rendered as links, never as an embed, because the
-    // referral is the whole point: the recording stays with the institution that
-    // holds it and the visitor goes there to hear it.
+    function parseStartSeconds(raw) {
+      const v = String(raw || '').trim().toLowerCase();
+      if (!v) return 0;
+      if (/^\d+$/.test(v)) return Number(v);
+      const m = v.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/);
+      if (!m) return 0;
+      const h = Number(m[1] || 0);
+      const mins = Number(m[2] || 0);
+      const s = Number(m[3] || 0);
+      return h * 3600 + mins * 60 + s;
+    }
+
+    function youtubeEmbedUrl(rawUrl) {
+      try {
+        const u = new URL(String(rawUrl || '').trim());
+        if (!/^https?:$/i.test(u.protocol)) return '';
+        const host = u.hostname.toLowerCase().replace(/^www\./, '');
+        let id = '';
+        if (host === 'youtu.be') {
+          id = u.pathname.split('/').filter(Boolean)[0] || '';
+        } else if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
+          if (u.pathname === '/watch') {
+            id = u.searchParams.get('v') || '';
+          } else if (u.pathname.startsWith('/embed/') || u.pathname.startsWith('/shorts/')) {
+            id = u.pathname.split('/').filter(Boolean)[1] || '';
+          }
+        }
+        if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return '';
+        const start = Math.max(
+          parseStartSeconds(u.searchParams.get('t')),
+          parseStartSeconds(u.searchParams.get('start')),
+        );
+        let embed = `https://www.youtube-nocookie.com/embed/${id}?rel=0`;
+        if (start > 0) embed += `&start=${start}`;
+        return embed;
+      } catch (e) {
+        return '';
+      }
+    }
+
+    // Links out to material held elsewhere. When a link points to YouTube,
+    // render an inline player as well for immediate playback.
     function relatedLinksHtml(links) {
       if (!links || !links.length) return '';
       const items = links.map(l => {
+        const url = String(l.url || '').trim();
+        const label = String(l.label || url);
+        const embed = youtubeEmbedUrl(url);
         const cite = l.citation
           ? `<div class="answer-related-citation">${esc(l.citation)}</div>`
           : '';
-        return `<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>${cite}</li>`;
+        const player = embed
+          ? `<div class="answer-related-embed"><iframe src="${esc(embed)}" title="${esc(label || 'YouTube video')}" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`
+          : '';
+        return `<li>${player}<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>${cite}</li>`;
       }).join('');
       return `<div class="answer-related"><div class="answer-related-head">Hear it firsthand</div><ul>${items}</ul></div>`;
     }
