@@ -152,7 +152,6 @@
 
     .museum-related-link {
       display: inline-block;
-      margin-top: 12px;
       font-size: 13px;
       line-height: 1.5;
       color: #8fb6e8;
@@ -176,6 +175,29 @@
 
     .museum-related-byline a:hover {
       text-decoration: underline;
+    }
+
+    .museum-related-section {
+      margin-top: 18px;
+      padding: 16px 18px;
+      border-top: 1px solid rgba(88, 166, 255, 0.32);
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(31, 111, 235, 0.12), rgba(13, 17, 23, 0.12));
+      box-shadow: inset 0 1px 0 rgba(143, 182, 232, 0.12);
+    }
+
+    .museum-related-kicker {
+      margin: 0 0 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #8fb6e8;
+    }
+
+    .museum-related-items {
+      display: grid;
+      gap: 10px;
     }
 
     .museum-pages {
@@ -587,12 +609,16 @@
     function renderMuseumArticles(museumId) {
       const links = MUSEUM_ARTICLE_LINKS[museumId] || [];
       if (!links.length) return '';
-      return links.map(link => {
+      const items = links.map(link => {
         const byline = link.authorLabel
           ? `<div class="museum-related-byline">By ${link.authorUrl ? `<a href="${esc(link.authorUrl)}" target="_blank" rel="noopener noreferrer">${esc(link.authorLabel)}</a>` : esc(link.authorLabel)}</div>`
           : '';
         return `<div><a class="museum-related-link" href="${esc(link.url)}" target="_blank" rel="noopener noreferrer">${esc(link.label)}</a>${byline}</div>`;
       }).join('');
+      return `<section class="museum-related-section" aria-label="Related reading">
+        <p class="museum-related-kicker">Related reading</p>
+        <div class="museum-related-items">${items}</div>
+      </section>`;
     }
 
     function isHtml(text) {

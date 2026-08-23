@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>USS Pampanito — Ask the Docent</title>
+  <title>USS Pampanito — Audio Tour</title>
   <style>
     *,
     *::before,
@@ -40,6 +40,11 @@
       color: #c9d8f0;
     }
 
+    header .sub {
+      font-size: 12px;
+      color: #607090;
+    }
+
     #settingsBtn {
       display: none;
       background: none;
@@ -53,6 +58,29 @@
 
     #settingsBtn:hover {
       color: #c9d8f0;
+    }
+
+    #copyPageLinkBtn {
+      background: none;
+      border: 1px solid #2a3a5a;
+      border-radius: 6px;
+      color: #607090;
+      font-size: 13px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+
+    #copyPageLinkBtn:hover {
+      color: #c9d8f0;
+      border-color: #405981;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    #copyPageLinkBtn.is-copied {
+      color: #fff;
+      border-color: #1f7a3e;
+      background: #1f7a3e;
     }
 
     #headerLang {
@@ -87,26 +115,254 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 32px 20px 24px;
-      gap: 18px;
+      padding: 24px 20px 16px;
+      gap: 20px;
       max-width: 680px;
       width: 100%;
       margin: 0 auto;
     }
 
-    /* ── The microphone ──────────────────────────────── */
-    #micWrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
+    /* ── Compartment badge ───────────────────────────── */
+    #compartmentBadge {
+      text-align: center;
     }
 
-    #micBtn {
-      width: 104px;
-      height: 104px;
-      font-size: 44px;
-      line-height: 1;
+
+    #selectSizer {
+      position: fixed;
+      top: -9999px;
+      left: -9999px;
+      width: max-content;
+      visibility: hidden;
+      white-space: pre;
+      font-size: 26px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    #stopsWrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #stopsWrap::after {
+      content: '▾';
+      font-size: 28px;
+      color: #2d3f55;
+      pointer-events: none;
+      flex-shrink: 0;
+      position: relative;
+      top: -2px;
+    }
+
+    #stopsSelect {
+      font-size: 26px;
+      font-weight: 700;
+      color: #c9d8f0;
+      background: transparent;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      padding: 2px 4px 2px 0;
+    }
+
+    #stopsSelect option {
+      background: #0d1525;
+      color: #c9d8f0;
+      font-size: 15px;
+      font-weight: normal;
+    }
+
+    #progressMeta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    #trackCounter {
+      font-size: 12px;
+      color: #607090;
+    }
+
+    #tourModeSwitch {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 10px auto 0;
+      padding: 4px;
+      background: #111b2d;
+      border: 1px solid #223554;
+      border-radius: 999px;
+    }
+
+    .tour-mode-btn {
+      border: none;
+      background: transparent;
+      color: #7f93b3;
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+
+    .tour-mode-btn:hover {
+      color: #d9e5f8;
+    }
+
+    .tour-mode-btn.active {
+      background: #2e5da0;
+      color: #fff;
+    }
+
+    /* ── Waveform / progress ─────────────────────────── */
+    #progressWrap {
+      width: 100%;
+      background: #151e30;
+      border-radius: 4px;
+      height: 6px;
+      cursor: pointer;
+      position: relative;
+      overflow: visible;
+    }
+
+    #progressBar {
+      height: 100%;
+      background: #3a78cc;
+      border-radius: 4px;
+      width: 0%;
+      transition: width .25s linear;
+      pointer-events: none;
+    }
+
+    #timecode {
+      font-size: 12px;
+      color: #607090;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cueMarkers {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .cue-marker {
+      position: absolute;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #f4c542;
+      border: 2px solid #0a0f1a;
+      box-shadow: 0 0 0 2px rgba(244, 197, 66, 0.18);
+      transform: translate(-50%, -50%);
+      opacity: 0.95;
+    }
+
+    #tourVisualPanel {
+      width: 100%;
+      background: #10192b;
+      border: 1px solid #1e2d4a;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+    }
+
+    #tourVisualFrame {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #060a12;
+      overflow: hidden;
+    }
+
+    #tourVisualImage {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    #tourVideo {
+      width: 100%;
+      height: 100%;
+      display: none;
+      object-fit: cover;
+      background: #000;
+    }
+
+    #videoLoadingOverlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: rgba(6, 10, 18, 0.85);
+      z-index: 2;
+    }
+
+    #videoLoadingOverlay.visible {
+      display: grid;
+    }
+
+    #videoLoadingOverlay::after {
+      content: '';
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #7eb8ff;
+      border-radius: 50%;
+      animation: vl-spin 0.8s linear infinite;
+    }
+
+    @keyframes vl-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    #tourVisualPanel.is-empty {
+      display: none;
+    }
+
+    #tourVisualPanel.is-transitioning #tourVisualImage {
+      opacity: 0.72;
+      transform: scale(1.02);
+    }
+
+    #tourVisualMeta {
+      padding: 14px 16px 16px;
+    }
+
+    #tourVisualTitle {
+      font-size: 15px;
+      font-weight: 700;
+      color: #d9e5f8;
+      margin-bottom: 6px;
+    }
+
+    #tourVisualCaption {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #90a4c4;
+    }
+
+    /* ── Transport controls ──────────────────────────── */
+    #transport {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tBtn {
       background: #151e30;
       border: 1px solid #1e2d4a;
       border-radius: 50%;
@@ -118,9 +374,23 @@
       transition: background .15s, border-color .15s;
     }
 
-    #micBtn:hover {
+    .tBtn:hover {
       background: #1e2d4a;
       border-color: #3a78cc;
+    }
+
+    #playPauseBtn {
+      width: 36px;
+      height: 36px;
+      font-size: 16px;
+      margin: 0 4px;
+    }
+
+    #micBtn {
+      width: 36px;
+      height: 36px;
+      font-size: 18px;
+      margin: 0 4px;
     }
 
     #micBtn.listening {
@@ -134,64 +404,9 @@
       border-color: #7a3a3a;
     }
 
-    @keyframes pulse {
-
-      0%,
-      100% {
-        transform: scale(1);
-      }
-
-      50% {
-        transform: scale(1.06);
-      }
-    }
-
-    #micPrompt {
-      font-size: 15px;
-      color: #8aa0c0;
-      text-align: center;
-    }
-
-    /* ── Speak / Type switch ─────────────────────────── */
-    #inputModeSwitch {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px;
-      background: #111b2d;
-      border: 1px solid #223554;
-      border-radius: 999px;
-    }
-
-    .input-mode-btn {
-      border: none;
-      background: transparent;
-      color: #7f93b3;
-      border-radius: 999px;
-      padding: 7px 16px;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      cursor: pointer;
-      transition: background .15s, color .15s;
-    }
-
-    .input-mode-btn:hover:not(:disabled) {
-      color: #d9e5f8;
-    }
-
-    .input-mode-btn.active {
-      background: #2e5da0;
-      color: #fff;
-    }
-
-    .input-mode-btn:disabled {
-      color: #3f4c63;
-      cursor: not-allowed;
-    }
-
     #askStatus {
-      width: 100%;
+      margin-top: 6px;
+      min-height: 18px;
     }
 
     #askStatusMsg {
@@ -205,18 +420,18 @@
     #textAskRow {
       display: flex;
       gap: 6px;
-      margin-top: 10px;
+      margin-top: 6px;
       align-items: center;
     }
 
     #textAskInput {
       flex: 1;
-      padding: 8px 12px;
+      padding: 6px 10px;
       border-radius: 8px;
       border: 1px solid #2a3a5a;
       background: #0d1525;
       color: #c8d8f0;
-      font-size: 15px;
+      font-size: 14px;
     }
 
     #textAskInput::placeholder {
@@ -224,12 +439,12 @@
     }
 
     #textAskSend {
-      padding: 8px 16px;
+      padding: 6px 14px;
       border-radius: 8px;
       border: 1px solid #2a4a7a;
       background: #1a2a4a;
       color: #c8d8f0;
-      font-size: 15px;
+      font-size: 14px;
       cursor: pointer;
     }
 
@@ -430,10 +645,6 @@
       margin-bottom: 8px;
     }
 
-    .faq-body li {
-      margin-bottom: 3px;
-    }
-
     /* ── Feedback widget ─────────────────────────────── */
     #feedbackRow {
       margin-top: 14px;
@@ -531,6 +742,10 @@
       font-size: 12px;
       color: #4a9a6a;
       display: none;
+    }
+
+    .faq-body li {
+      margin-bottom: 3px;
     }
 
     /* ── Suggestion chips ─────────────────────────────── */
@@ -635,6 +850,10 @@
     .modal-btns button:hover {
       border-color: #4a88dc;
     }
+
+    audio {
+      display: none;
+    }
   </style>
 </head>
 
@@ -646,7 +865,7 @@
   <header>
     <div style="flex:1"></div>
     <div style="text-align:center">
-      <h1>USS Pampanito (SS-383)<br>Ask the Docent</h1>
+      <h1>USS Pampanito (SS-383)<br>Docent</h1>
       <select id="headerLang">
         <option value="en">English</option>
         <option value="fr">Français</option>
@@ -662,14 +881,40 @@
   </header>
 
   <main>
-    <div id="micWrap">
-      <button id="micBtn" title="Ask a Question">🎙</button>
-      <div id="micPrompt">Ask the docent anything about Pampanito.</div>
-      <div id="inputModeSwitch" role="group" aria-label="How to ask your question">
-        <button class="input-mode-btn" id="modeVoiceBtn" type="button">🎙 Speak</button>
-        <button class="input-mode-btn" id="modeTextBtn" type="button">⌨️ Type</button>
+    <!-- Compartment display -->
+    <div id="compartmentBadge">
+      <div id="stopsWrap"><select id="stopsSelect"></select><span id="selectSizer"></span></div>
+      <div id="tourModeSwitch" role="group" aria-label="Tour mode">
+        <button class="tour-mode-btn" id="tourModeAudioBtn" type="button" data-mode="audio">Audio Tour</button>
+        <button class="tour-mode-btn" id="tourModeVideoBtn" type="button" data-mode="video">Video Tour</button>
+      </div>
+      <div id="progressMeta">
+        <div id="trackCounter">Track — of —</div>
+        <button class="tBtn" id="playPauseBtn" title="Play/Pause">▶</button>
+        <button class="tBtn" id="micBtn" title="Ask a Question">🎙</button>
+        <div id="timecode">0:00 / 0:00</div>
       </div>
     </div>
+
+    <!-- Progress -->
+    <div style="width:100%">
+      <div id="progressWrap">
+        <div id="progressBar"></div>
+        <div id="cueMarkers" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <section id="tourVisualPanel" aria-live="polite">
+      <div id="tourVisualFrame">
+        <img id="tourVisualImage" alt="USS Pampanito audio tour visual" />
+        <video id="tourVideo" preload="auto" playsinline></video>
+        <div id="videoLoadingOverlay"></div>
+      </div>
+      <div id="tourVisualMeta">
+        <div id="tourVisualTitle"></div>
+        <div id="tourVisualCaption"></div>
+      </div>
+    </section>
 
     <div id="askStatus">
       <span id="askStatusMsg"></span>
@@ -705,6 +950,9 @@
 
   </main>
 
+  <!-- Hidden audio element -->
+  <audio id="player" preload="metadata"></audio>
+
   <!-- Settings dialog -->
   <dialog id="settingsModal">
     <h2>Settings</h2>
@@ -725,6 +973,11 @@
       <div class="hint">Default: Sarah (neutral US English)</div>
     </div>
     <div class="field">
+      <label>Tour Audio Base URL</label>
+      <input id="settAudioBase" value="" />
+      <div class="hint">e.g. https://media-host.local/tour — or leave blank to use relative /tour/</div>
+    </div>
+    <div class="field">
       <label>FAQ Audio Language</label>
       <select id="settLang">
         <option value="en">English (en)</option>
@@ -743,12 +996,59 @@
   </dialog>
 
   <script>
+    // Override the video base by setting window.PAMPANITO_VIDEO_BASE before this
+    // script runs, or by hosting a /web/video-config.js that assigns it.
+    // Defaults to /web/videos for local dev.
+  </script>
+  <script src="/web/video-config.js" onerror="void 0"></script>
+  <script src="/web/pampanito-tour-cues.js?v=20260319b"></script>
+
+  <script>
     // ── Debug mode ────────────────────────────────────────────────────────────
     const DEBUG = false;
 
+    // ── Track manifest ─────────────────────────────────────────────────────────
+    const TRACKS = [
+      { file: "01_after_deck.mp3", compartment: "after_deck", label: "After Deck" },
+      { file: "02_after_torpedo_room.mp3", compartment: "after_torpedo_room", label: "After Torpedo" },
+      { file: "03_maneuvering_room.mp3", compartment: "maneuvering_room", label: "Maneuvering" },
+      { file: "04_after_engine_room.mp3", compartment: "after_engine_room", label: "After Engine" },
+      { file: "05_forward_engine_room.mp3", compartment: "forward_engine_room", label: "Forward Engine" },
+      { file: "06_after_battery.mp3", compartment: "after_battery", label: "After Battery" },
+      { file: "07_crews_mess.mp3", compartment: "crews_mess", label: "Crew's Mess" },
+      { file: "08_radio_room.mp3", compartment: "radio_room", label: "Radio Room" },
+      { file: "09_control_room.mp3", compartment: "control_room", label: "Control" },
+      { file: "10_conning_tower.mp3", compartment: "conning_tower", label: "Conning Tower" },
+      { file: "11_forward_batter_compartment.mp3", compartment: "forward_battery_compartment", label: "Forward Battery" },
+      { file: "12_forward_torpedo_room.mp3", compartment: "forward_torpedo_room", label: "Forward Torpedo" },
+      { file: "13_forward_deck.mp3", compartment: "forward_deck", label: "Forward Deck" },
+    ];
+
+    const TOUR_MEDIA = window.PAMPANITO_TOUR_MEDIA || {};
+    const TOUR_PLAYBACK_MEDIA = TOUR_MEDIA.trackPlaybackMedia || {};
+    const VIDEO_EXTENSIONS = ['mp4', 'mov', 'm4v', 'webm'];
+    const DEFAULT_TOUR_VISUAL = TOUR_MEDIA.defaultVisual || {
+      src: '/web/images/USS_Pampanito 2560x1440.jpg',
+      alt: 'USS Pampanito underway',
+      title: 'USS Pampanito (SS-383)',
+      caption: 'Timed images for each stop appear here as the tour audio reaches key moments.'
+    };
+    const TRACK_VISUAL_DEFAULTS = TOUR_MEDIA.trackVisualDefaults || {};
+    const TOUR_IMAGE_CUES = TOUR_MEDIA.trackImageCues || {};
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    let currentIdx = 0;
+    let isPlaying = false;
+    let wasPlaying = false; // remember play state when interrupted
+    let playedTracks = new Set();
+    let activeTourVisualKey = '';
+    const missingVideoSources = new Set();
+    let lastVideoVariant = '';
+    let pendingTrackSeek = null;
+    let pendingTrackResume = false;
+    let pendingVideoFrameSeek = false;
+
     // ── Settings ───────────────────────────────────────────────────────────────
-    // The same localStorage keys the audio tour uses, so a visitor who set an API
-    // base or a language on one page finds it already set on the other.
     function getDefaultApiBase() {
       // Legacy local HTTPS/static split used 8444 for static files and 8443 for API.
       if (location.port === '8444') {
@@ -793,11 +1093,15 @@
     }
 
     function loadSettings() {
+      const normalizedApiBase = normalizeApiBase(localStorage.getItem('tour_apiBase'));
+      const storedAudioBase = localStorage.getItem('tour_audioBase') || '';
       return {
-        apiBase: normalizeApiBase(localStorage.getItem('tour_apiBase')),
+        apiBase: normalizedApiBase,
         elKey: localStorage.getItem('tour_elKey') || '',
         elVoice: localStorage.getItem('tour_elVoice') || 'EXAVITQu4vr4xnSDxMaL',
+        audioBase: normalizeTrackAudioBase(storedAudioBase),
         lang: localStorage.getItem('tour_lang') || 'en',
+        tourMode: localStorage.getItem('tour_mode') || 'auto',
       };
     }
 
@@ -805,15 +1109,50 @@
       localStorage.setItem('tour_apiBase', s.apiBase);
       localStorage.setItem('tour_elKey', s.elKey);
       localStorage.setItem('tour_elVoice', s.elVoice);
+      localStorage.setItem('tour_audioBase', s.audioBase);
       localStorage.setItem('tour_lang', s.lang);
+      localStorage.setItem('tour_mode', s.tourMode || 'auto');
+    }
+
+    function normalizeTrackAudioBase(storedAudioBase) {
+      if (!storedAudioBase) return 'tour';
+      const trimmed = storedAudioBase.replace(/\/$/, '');
+      if (trimmed === 'audio' || trimmed === '/web/audio') return 'tour';
+      try {
+        const url = new URL(trimmed, window.location.origin);
+        if (url.origin === window.location.origin && url.pathname === '/web/audio') {
+          return `${url.origin}/web/tour`;
+        }
+      } catch (e) {
+        return trimmed;
+      }
+      return trimmed;
     }
 
     function getAudioUrl(file) {
-      return `audio/${file}`;
+      const base = 'audio';
+      return `${base}/${file}`;
+    }
+
+    function getTrackAudioUrl(file) {
+      const base = (loadSettings().audioBase || 'tour').replace(/\/$/, '');
+      return `${base}/${file}`;
     }
 
     // ── DOM refs ───────────────────────────────────────────────────────────────
+    const player = document.getElementById('player');
+    const tourVideo = document.getElementById('tourVideo');
+    const trackCounter = document.getElementById('trackCounter');
+    const progressBar = document.getElementById('progressBar');
+    const progressWrap = document.getElementById('progressWrap');
+    const cueMarkers = document.getElementById('cueMarkers');
+    const timecodeEl = document.getElementById('timecode');
+    const tourModeAudioBtn = document.getElementById('tourModeAudioBtn');
+    const tourModeVideoBtn = document.getElementById('tourModeVideoBtn');
+    const playPauseBtn = document.getElementById('playPauseBtn');
     const micBtn = document.getElementById('micBtn');
+    const stopsSelect = document.getElementById('stopsSelect');
+    const selectSizer = document.getElementById('selectSizer');
     const askStatus = document.getElementById('askStatusMsg');
     const answerPanel = document.getElementById('answerPanel');
     const questionEcho = document.getElementById('questionEcho');
@@ -821,12 +1160,539 @@
     const answerSource = document.getElementById('answerSource');
     const answerSpeakBtn = document.getElementById('answerSpeakBtn');
     const answerDebug = document.getElementById('answerDebug');
+    const tourVisualPanel = document.getElementById('tourVisualPanel');
+    const tourVisualImage = document.getElementById('tourVisualImage');
+    const tourVisualTitle = document.getElementById('tourVisualTitle');
+    const tourVisualCaption = document.getElementById('tourVisualCaption');
     const settingsModal = document.getElementById('settingsModal');
     const settingsBtn = document.getElementById('settingsBtn');
     if (DEBUG) settingsBtn.style.display = 'block';
     const settApiBase = document.getElementById('settApiBase');
     const settElKey = document.getElementById('settElKey');
     const settElVoice = document.getElementById('settElVoice');
+    const settAudioBase = document.getElementById('settAudioBase');
+
+    function getActivePlayer() {
+      return tourVideo.style.display !== 'none' ? tourVideo : player;
+    }
+
+    function showTourVisualPanel() {
+      tourVisualPanel.classList.remove('is-empty');
+    }
+
+    function hideTourVisualPanel() {
+      tourVisualPanel.classList.add('is-empty');
+    }
+
+    function getStoredTourMode() {
+      const mode = loadSettings().tourMode;
+      return mode === 'audio' || mode === 'video' ? mode : 'auto';
+    }
+
+    function getTourMode(track = TRACKS[currentIdx]) {
+      const storedMode = getStoredTourMode();
+      if (storedMode === 'audio' || storedMode === 'video') return storedMode;
+      return trackHasVideo(track) ? 'video' : 'audio';
+    }
+
+    function updateTourModeButtons() {
+      const isVideo = getTourMode() === 'video';
+      tourModeAudioBtn.classList.toggle('active', !isVideo);
+      tourModeVideoBtn.classList.toggle('active', isVideo);
+      tourModeAudioBtn.setAttribute('aria-pressed', String(!isVideo));
+      tourModeVideoBtn.setAttribute('aria-pressed', String(isVideo));
+      cueMarkers.style.display = 'none';
+    }
+
+    function setTourMode(mode, preserveProgress = true) {
+      const nextMode = mode === 'video' ? 'video' : 'audio';
+      const settings = loadSettings();
+      if (getStoredTourMode() === nextMode) {
+        updateTourModeButtons();
+        return;
+      }
+      const activePlayer = getActivePlayer();
+      pendingTrackSeek = preserveProgress ? (activePlayer.currentTime || 0) : null;
+      pendingTrackResume = preserveProgress ? isPlaying : false;
+      settings.tourMode = nextMode;
+      saveSettings(settings);
+      updateTourModeButtons();
+      loadTrack(currentIdx);
+    }
+
+    // ── Stops select ──────────────────────────────────────────────────────────
+    function fitSelect() {
+      const label = TRACKS[currentIdx] ? TRACKS[currentIdx].label
+        : stopsSelect.options[stopsSelect.selectedIndex]?.text || '';
+      if (!fitSelect._canvas) fitSelect._canvas = document.createElement('canvas');
+      const ctx = fitSelect._canvas.getContext('2d');
+      const cs = getComputedStyle(stopsSelect);
+      ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+      stopsSelect.style.width = (Math.ceil(ctx.measureText(label).width) + 8) + 'px';
+    }
+
+    function buildPlaylist() {
+      stopsSelect.innerHTML = '';
+      TRACKS.forEach((t, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = t.label;
+        stopsSelect.appendChild(opt);
+      });
+      stopsSelect.value = currentIdx;
+      fitSelect();
+    }
+
+    function updatePlaylistHighlight() {
+      stopsSelect.value = currentIdx;
+      fitSelect();
+    }
+
+    stopsSelect.onchange = () => {
+      unlockAudio();
+      loadTrack(parseInt(stopsSelect.value));
+      play();
+    };
+
+    // Clicking the chevron (::after) or wrapper opens the select
+    document.getElementById('stopsWrap').addEventListener('click', (e) => {
+      if (e.target !== stopsSelect) {
+        try { stopsSelect.showPicker(); } catch (err) { stopsSelect.focus(); }
+      }
+    });
+
+    // ── Track loading ──────────────────────────────────────────────────────────
+    function parseCueTime(value) {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      const text = String(value || '').trim();
+      if (!text) return 0;
+      if (/^\d+(?:\.\d+)?$/.test(text)) return Number(text);
+      const parts = text.split(':').map(Number);
+      if (parts.some(part => Number.isNaN(part))) return 0;
+      let seconds = 0;
+      for (const part of parts) seconds = seconds * 60 + part;
+      return seconds;
+    }
+
+    function getPreferredVideoVariant() {
+      const ua = navigator.userAgent || '';
+      const isIPhone = /iPhone|iPod/i.test(ua);
+      const isAndroidPhone = /Android/i.test(ua) && /Mobile/i.test(ua);
+      const isOtherPhone = /Windows Phone|webOS|BlackBerry/i.test(ua);
+      const isPhoneByUA = isIPhone || isAndroidPhone || isOtherPhone;
+      if (isPhoneByUA) return 'mobile';
+      return window.matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop';
+    }
+
+    function normalizeVideoBase(storedVideoBase) {
+      const defaultVideoBase = '/web/videos';
+      const currentIsLocal = isPrivateNetworkHost(window.location.hostname);
+      if (!storedVideoBase) return defaultVideoBase;
+
+      try {
+        const storedUrl = new URL(storedVideoBase, window.location.origin);
+        if (currentIsLocal && !isPrivateNetworkHost(storedUrl.hostname)) {
+          return defaultVideoBase;
+        }
+        return storedUrl.origin === window.location.origin
+          ? `${storedUrl.origin}${storedUrl.pathname}`.replace(/\/$/, '')
+          : storedUrl.href.replace(/\/$/, '');
+      } catch (e) {
+        return storedVideoBase.replace(/\/$/, '') || defaultVideoBase;
+      }
+    }
+
+    const VIDEO_BASE = normalizeVideoBase(window.PAMPANITO_VIDEO_BASE || '/web/videos');
+
+    function getVariantSrc(playbackMedia, variant) {
+      if (!playbackMedia) return '';
+      const srcKey = `${variant}Src`;
+      const fileKey = `${variant}File`;
+      if (playbackMedia[srcKey]) return playbackMedia[srcKey];
+      if (playbackMedia[fileKey]) return `${VIDEO_BASE}/${playbackMedia[fileKey]}`;
+      return '';
+    }
+
+    function getAutoVideoCandidates(track = TRACKS[currentIdx], preferredVariant = getPreferredVideoVariant()) {
+      const compartment = track.compartment;
+      const orderedVariants = preferredVariant === 'mobile'
+        ? ['mobile', 'desktop']
+        : ['desktop', 'mobile'];
+      const candidates = [];
+      for (const variant of orderedVariants) {
+        for (const ext of VIDEO_EXTENSIONS) {
+          candidates.push(`${VIDEO_BASE}/${compartment}-${variant}.${ext}`);
+          candidates.push(`${VIDEO_BASE}/${compartment}/${variant}.${ext}`);
+          candidates.push(`${VIDEO_BASE}/${compartment}/${compartment}-${variant}.${ext}`);
+        }
+      }
+      for (const ext of VIDEO_EXTENSIONS) {
+        candidates.push(`${VIDEO_BASE}/${compartment}.${ext}`);
+        candidates.push(`${VIDEO_BASE}/${compartment}/${compartment}.${ext}`);
+        candidates.push(`${VIDEO_BASE}/${compartment}/tour.${ext}`);
+      }
+      return candidates.filter((candidate, index, list) => list.indexOf(candidate) === index);
+    }
+
+    function getTrackPlaybackMedia(track = TRACKS[currentIdx]) {
+      const configured = TOUR_PLAYBACK_MEDIA[track.compartment];
+      if (configured) return configured;
+      return {
+        type: 'video',
+        title: track.label,
+        caption: `${track.label} movie exported for the tour.`
+      };
+    }
+
+    function getPlaybackMediaCandidates(track = TRACKS[currentIdx], playbackMedia = getTrackPlaybackMedia(track)) {
+      if (!playbackMedia || playbackMedia.type !== 'video') return [];
+      const preferredVariant = getPreferredVideoVariant();
+      const candidates = [];
+
+      const preferredSrc = getVariantSrc(playbackMedia, preferredVariant);
+      const alternateSrc = getVariantSrc(playbackMedia, preferredVariant === 'mobile' ? 'desktop' : 'mobile');
+      if (preferredSrc) candidates.push(preferredSrc);
+      if (alternateSrc) candidates.push(alternateSrc);
+      if (playbackMedia.src) candidates.push(playbackMedia.src);
+      if (playbackMedia.file) candidates.push(`${VIDEO_BASE}/${playbackMedia.file}`);
+
+      return (candidates.length ? candidates : getAutoVideoCandidates(track, preferredVariant))
+        .filter((candidate, index, list) => list.indexOf(candidate) === index)
+        .filter(candidate => !missingVideoSources.has(candidate));
+    }
+
+    function getPlaybackMediaSrc(playbackMedia, track = TRACKS[currentIdx]) {
+      const candidates = getPlaybackMediaCandidates(track, playbackMedia);
+      return candidates[0] || '';
+    }
+
+    function trackHasVideo(track = TRACKS[currentIdx]) {
+      const playbackMedia = getTrackPlaybackMedia(track);
+      return !!(playbackMedia && playbackMedia.type === 'video' && getPlaybackMediaSrc(playbackMedia, track));
+    }
+
+    function trackUsesVideo(track = TRACKS[currentIdx]) {
+      return getTourMode() === 'video' && trackHasVideo(track);
+    }
+
+    function getTrackImageCues(track = TRACKS[currentIdx]) {
+      return (TOUR_IMAGE_CUES[track.compartment] || [])
+        .map((cue) => ({ ...cue, time: parseCueTime(cue.time) }))
+        .sort((a, b) => a.time - b.time);
+    }
+
+    function getTrackBaseVisual(track = TRACKS[currentIdx]) {
+      const visual = TRACK_VISUAL_DEFAULTS[track.compartment] || DEFAULT_TOUR_VISUAL;
+      return {
+        src: visual.src,
+        alt: visual.alt,
+        title: visual.title || track.label,
+        caption: visual.caption || `Timed visuals for ${track.label} will appear here when available.`
+      };
+    }
+
+    function getVisualForTime(track, currentTime) {
+      const cues = getTrackImageCues(track);
+      let currentCue = null;
+      for (const cue of cues) {
+        if (currentTime >= cue.time) currentCue = cue;
+        else break;
+      }
+      return currentCue || getTrackBaseVisual(track);
+    }
+
+    function showImageVisual() {
+      tourVideo.pause();
+      tourVideo.style.display = 'none';
+      tourVisualImage.style.display = 'block';
+      showTourVisualPanel();
+    }
+
+    function showVideoVisual(playbackMedia, track = TRACKS[currentIdx]) {
+      const src = encodeURI(getPlaybackMediaSrc(playbackMedia, track));
+      const nextKey = `video|${src}|${playbackMedia.title || ''}|${playbackMedia.caption || ''}`;
+      if (activeTourVisualKey !== nextKey) {
+        tourVisualPanel.classList.add('is-transitioning');
+        activeTourVisualKey = nextKey;
+        tourVideo.src = src;
+        tourVideo.removeAttribute('poster');
+        tourVisualTitle.textContent = playbackMedia.title || track.label;
+        tourVisualCaption.textContent = playbackMedia.caption || `Movie playback for ${track.label}.`;
+        window.setTimeout(() => tourVisualPanel.classList.remove('is-transitioning'), 220);
+      }
+      tourVisualImage.style.display = 'none';
+      tourVideo.style.display = 'block';
+      showTourVisualPanel();
+      pendingVideoFrameSeek = true;
+      tourVideo.load();
+      lastVideoVariant = getPreferredVideoVariant();
+    }
+
+    function clearVideoVisual() {
+      const t = TRACKS[currentIdx];
+      const src = getPlaybackMediaSrc(getTrackPlaybackMedia(t), t);
+      if (src) missingVideoSources.add(src);
+      activeTourVisualKey = '';
+      tourVideo.pause();
+      tourVideo.removeAttribute('src');
+      tourVideo.load();
+      tourVideo.style.display = 'none';
+      tourVisualImage.style.display = 'none';
+      tourVisualTitle.textContent = '';
+      tourVisualCaption.textContent = '';
+      hideTourVisualPanel();
+    }
+
+    function retryVideoVisual() {
+      const track = TRACKS[currentIdx];
+      const playbackMedia = getTrackPlaybackMedia(track);
+      const failedSrc = tourVideo.currentSrc || tourVideo.src;
+      if (failedSrc) {
+        const failedPath = failedSrc.replace(location.origin, '');
+        missingVideoSources.add(decodeURI(failedPath));
+      }
+      const nextSrc = getPlaybackMediaSrc(playbackMedia, track);
+      if (!nextSrc) {
+        clearVideoVisual();
+        return;
+      }
+      activeTourVisualKey = '';
+      showVideoVisual(playbackMedia, track);
+    }
+
+    function setTourVisual(visual) {
+      if (getTourMode() !== 'audio') return;
+      hideTourVisualPanel();
+      tourVisualImage.style.display = 'none';
+      tourVideo.style.display = 'none';
+      const resolvedSrc = encodeURI(visual.src);
+      const nextKey = `${resolvedSrc}|${visual.title || ''}|${visual.caption || ''}`;
+      if (activeTourVisualKey === nextKey) return;
+      activeTourVisualKey = nextKey;
+      tourVisualImage.src = resolvedSrc;
+      tourVisualImage.alt = visual.alt || visual.title || 'USS Pampanito audio tour visual';
+      tourVisualTitle.textContent = visual.title || TRACKS[currentIdx].label;
+      tourVisualCaption.textContent = visual.caption || '';
+    }
+
+    function updateTourVisualForCurrentTime() {
+      const track = TRACKS[currentIdx];
+      if (trackUsesVideo(track)) return;
+      const currentTime = getActivePlayer().currentTime || 0;
+      setTourVisual(getVisualForTime(track, currentTime));
+    }
+
+    function renderCueMarkers() {
+      cueMarkers.innerHTML = '';
+      cueMarkers.style.display = 'none';
+      if (trackUsesVideo() || getTourMode() === 'audio') return;
+      const duration = getActivePlayer().duration || 0;
+      if (!duration) return;
+      const cues = getTrackImageCues();
+      cues.forEach((cue) => {
+        const marker = document.createElement('span');
+        marker.className = 'cue-marker';
+        marker.style.left = `${Math.max(0, Math.min(100, (cue.time / duration) * 100))}%`;
+        marker.title = `${cue.title} (${fmt(cue.time)})`;
+        cueMarkers.appendChild(marker);
+      });
+    }
+
+    function loadTrack(idx) {
+      const wasPlaying = isPlaying;
+      currentIdx = idx;
+      const t = TRACKS[idx];
+      player.pause();
+      tourVideo.pause();
+      isPlaying = false;
+      playPauseBtn.textContent = '▶';
+      player.removeAttribute('src');
+      tourVideo.removeAttribute('src');
+      hideTourVisualPanel();
+      const playbackMedia = getTrackPlaybackMedia(t);
+      trackCounter.textContent = `Stop ${idx + 1} of ${TRACKS.length}`;
+      progressBar.style.width = '0%';
+      cueMarkers.innerHTML = '';
+      timecodeEl.textContent = '0:00 / 0:00';
+      answerPanel.classList.remove('visible');
+      activeTourVisualKey = '';
+      if (trackUsesVideo(t)) {
+        showVideoVisual(playbackMedia, t);
+        if (wasPlaying) {
+          pendingTrackResume = true;
+        }
+      } else {
+        tourVideo.style.display = 'none';
+        tourVisualImage.style.display = 'none';
+        hideTourVisualPanel();
+        player.src = getTrackAudioUrl(t.file);
+        player.load();
+        setTourVisual(getTrackBaseVisual(t));
+        if (wasPlaying) {
+          pendingTrackResume = true;
+        }
+      }
+      updatePlaylistHighlight();
+    }
+
+    function play() {
+      getActivePlayer().play().catch(() => { });
+      isPlaying = true;
+      playPauseBtn.textContent = '⏸';
+    }
+
+    function pause() {
+      getActivePlayer().pause();
+      isPlaying = false;
+      playPauseBtn.textContent = '▶';
+    }
+
+    // ── Transport ──────────────────────────────────────────────────────────────
+    playPauseBtn.onclick = () => { unlockAudio(); isPlaying ? pause() : play(); };
+
+    function onTrackEnded() {
+      playedTracks.add(currentIdx);
+      updatePlaylistHighlight();
+      if (currentIdx < TRACKS.length - 1) {
+        loadTrack(currentIdx + 1);
+        play();
+      } else {
+        isPlaying = false;
+        playPauseBtn.textContent = '▶';
+      }
+    }
+
+    function onTrackLoadedMetadata() {
+      const activePlayer = getActivePlayer();
+      if (pendingTrackSeek != null && activePlayer.duration) {
+        activePlayer.currentTime = Math.min(pendingTrackSeek, activePlayer.duration);
+      }
+      timecodeEl.textContent = `0:00 / ${fmt(activePlayer.duration || 0)}`;
+      renderCueMarkers();
+      updateTourVisualForCurrentTime();
+      const shouldResume = pendingTrackResume;
+      pendingTrackSeek = null;
+      pendingTrackResume = false;
+      if (shouldResume) play();
+    }
+
+    const videoLoadingOverlay = document.getElementById('videoLoadingOverlay');
+
+    tourVideo.addEventListener('loadstart', () => {
+      videoLoadingOverlay.classList.add('visible');
+      playPauseBtn.style.visibility = 'hidden';
+    });
+    tourVideo.addEventListener('waiting', () => {
+      videoLoadingOverlay.classList.add('visible');
+      playPauseBtn.style.visibility = 'hidden';
+    });
+    tourVideo.addEventListener('canplay', () => {
+      videoLoadingOverlay.classList.remove('visible');
+      playPauseBtn.style.visibility = '';
+    });
+    tourVideo.addEventListener('error', () => {
+      videoLoadingOverlay.classList.remove('visible');
+      playPauseBtn.style.visibility = '';
+    });
+
+    tourVideo.addEventListener('loadeddata', () => {
+      if (pendingVideoFrameSeek) {
+        pendingVideoFrameSeek = false;
+        try {
+          tourVideo.currentTime = 0.001;
+        } catch (_) { }
+      }
+      showTourVisualPanel();
+    });
+
+    function onTrackTimeUpdate() {
+      const activePlayer = getActivePlayer();
+      const cur = activePlayer.currentTime || 0;
+      const dur = activePlayer.duration || 0;
+      if (dur > 0) progressBar.style.width = `${(cur / dur) * 100}%`;
+      timecodeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
+      updateTourVisualForCurrentTime();
+    }
+
+    player.addEventListener('ended', () => {
+      if (getActivePlayer() !== player) return;
+      onTrackEnded();
+    });
+    tourVideo.addEventListener('ended', () => {
+      if (getActivePlayer() !== tourVideo) return;
+      onTrackEnded();
+    });
+
+    player.addEventListener('loadedmetadata', () => {
+      if (getActivePlayer() !== player) return;
+      onTrackLoadedMetadata();
+    });
+    tourVideo.addEventListener('loadedmetadata', () => {
+      if (getActivePlayer() !== tourVideo) return;
+      onTrackLoadedMetadata();
+    });
+
+    player.addEventListener('timeupdate', () => {
+      if (getActivePlayer() !== player) return;
+      onTrackTimeUpdate();
+    });
+    tourVideo.addEventListener('timeupdate', () => {
+      if (getActivePlayer() !== tourVideo) return;
+      onTrackTimeUpdate();
+    });
+
+    progressWrap.onclick = (e) => {
+      const rect = progressWrap.getBoundingClientRect();
+      const pct = (e.clientX - rect.left) / rect.width;
+      const activePlayer = getActivePlayer();
+      if (activePlayer.duration) activePlayer.currentTime = pct * activePlayer.duration;
+    };
+
+    function fmt(s) {
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return `${m}:${String(sec).padStart(2, '0')}`;
+    }
+
+    tourVisualImage.addEventListener('error', () => {
+      const fallback = getTrackBaseVisual();
+      const fallbackSrc = encodeURI(fallback.src);
+      if (tourVisualImage.src.endsWith(fallbackSrc)) return;
+      activeTourVisualKey = '';
+      setTourVisual(fallback);
+    });
+
+    tourVideo.addEventListener('error', () => {
+      if (trackUsesVideo()) {
+        retryVideoVisual();
+        return;
+      }
+      clearVideoVisual();
+    });
+
+    window.addEventListener('resize', () => {
+      const preferredVariant = getPreferredVideoVariant();
+      if (preferredVariant === lastVideoVariant) return;
+      const track = TRACKS[currentIdx];
+      if (!trackUsesVideo(track) || getActivePlayer() !== tourVideo) return;
+      const currentTime = tourVideo.currentTime || 0;
+      const wasVideoPlaying = !tourVideo.paused;
+      activeTourVisualKey = '';
+      showVideoVisual(getTrackPlaybackMedia(track), track);
+      tourVideo.addEventListener('loadedmetadata', function syncCurrentTimeOnce() {
+        tourVideo.removeEventListener('loadedmetadata', syncCurrentTimeOnce);
+        if (currentTime > 0 && tourVideo.duration) {
+          tourVideo.currentTime = Math.min(currentTime, tourVideo.duration);
+        }
+        if (wasVideoPlaying) {
+          tourVideo.play().catch(() => { });
+        }
+      });
+    });
+
+    [tourModeAudioBtn, tourModeVideoBtn].forEach((button) => {
+      button.addEventListener('click', () => setTourMode(button.dataset.mode, true));
+    });
 
     // ── Rendering helpers ──────────────────────────────────────────────────────
     const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -994,9 +1860,11 @@
     });
     feedbackSend.addEventListener('click', submitFeedback);
 
-    // A supplementary video is offered as a button, not an autoplaying frame, so
-    // nothing is requested from the video host until the visitor asks for it —
-    // reading an answer doesn't hand a third party a page view.
+    // A supplementary video is offered as a button, not an autoplaying frame.
+    // Two reasons: the narration is already playing when an answer lands, so an
+    // autoplaying clip would talk over it; and nothing is requested from the
+    // video host until the visitor asks for it, so simply reading an answer
+    // doesn't hand a third party a page view.
     function videoBlockHtml(video) {
       if (!video || !video.embed_url) return '';
       const caption = video.caption
@@ -1081,6 +1949,7 @@
     }
 
     function renderAnswer(data) {
+      console.log('[renderAnswer] partial_match=', data.partial_match, 'answer_short length=', (data.answer_short || '').length);
       const text = data.answer_short || '';
       const disclaimer = data.partial_match
         ? `<p class="partial-match-note">I don’t have a direct answer to that, but here’s something related:</p>`
@@ -1145,16 +2014,9 @@
       micBtn.onclick = () => { stopAnswerAudio(); showAskBtn(); };
     }
 
-    // Restores the button after an answer finishes.  Must land back in whatever
-    // mode the visitor is in — handing a microphone to someone who chose to
-    // type would silently undo their choice every time an answer plays out.
     function showAskBtn() {
       micBtn.classList.remove('answering');
-      if (useTextMode) {
-        micBtn.textContent = '⌨️';
-        micBtn.title = 'Type your question';
-        micBtn.onclick = () => { textAskRow.style.display = 'flex'; textAskInput.focus(); };
-      } else if (useRecordMode) {
+      if (useRecordMode) {
         micBtn.textContent = '🎙';
         micBtn.title = 'Tap to record your question';
         micBtn.onclick = () => { unlockAudio(); startRecordTranscribe(); };
@@ -1218,20 +2080,29 @@
       // If the answer is only a partial match, play the "no direct answer"
       // audio clip first, then play the answer audio as usual.
       if (data.partial_match) {
+        console.log('[playFaqAudioOrSpeak] partial_match=true, fetching nodirectanswer.mp3 from', getAudioUrl('nodirectanswer.mp3'));
         try {
           const abrtCtrl = new AbortController();
           const abrtTimer = setTimeout(() => abrtCtrl.abort(), 3000);
           const ndaResp = await fetch(getAudioUrl('nodirectanswer.mp3'), { signal: abrtCtrl.signal });
           clearTimeout(abrtTimer);
+          console.log('[playFaqAudioOrSpeak] nodirectanswer.mp3 HTTP status=', ndaResp.status);
           if (ndaResp.ok) {
             const ndaBuf = await ndaResp.arrayBuffer();
             await new Promise(resolve => playArrayBuffer(ndaBuf, resolve, 2.0));
           }
         } catch (e) { console.warn('[playFaqAudioOrSpeak] nodirectanswer fetch/play error:', e); }
+      } else {
+        console.log('[playFaqAudioOrSpeak] partial_match=false, skipping nodirectanswer.mp3');
       }
 
-      const setSpeakStop = () => { showStopBtn(); };
-      const resetSpeakBtn = () => { showAskBtn(); };
+      const setSpeakStop = (onStop) => {
+        showStopBtn();
+      };
+      const resetSpeakBtn = () => {
+        showAskBtn();
+        if (wasPlaying) setTimeout(() => play(), 2000);
+      };
 
       // 1. Pre-recorded FAQ MP3 — fast timeout so a missing file doesn't block
       if (chunkId) {
@@ -1256,7 +2127,7 @@
               } catch (e) { console.warn('[playFaqAudioOrSpeak] faqThatCoversThisTopic fetch/play error:', e); }
             }
             playArrayBuffer(arrayBuf, resetSpeakBtn);
-            setSpeakStop();
+            setSpeakStop(null);
             askStatus.textContent = '';
             return;
           }
@@ -1273,7 +2144,7 @@
           const arrayBuf = await prefetchedAudio;
           if (arrayBuf) {
             playArrayBuffer(arrayBuf, resetSpeakBtn);
-            setSpeakStop();
+            setSpeakStop(null);
             askStatus.textContent = '';
             return;
           }
@@ -1289,7 +2160,7 @@
           if (res.ok) {
             const arrayBuf = await res.arrayBuffer();
             playArrayBuffer(arrayBuf, resetSpeakBtn);
-            setSpeakStop();
+            setSpeakStop(null);
             askStatus.textContent = '';
             return;
           }
@@ -1324,7 +2195,7 @@
           if (res.ok) {
             const arrayBuf = await res.arrayBuffer();
             playArrayBuffer(arrayBuf, resetSpeakBtn);
-            setSpeakStop();
+            setSpeakStop(null);
             return;
           }
         } catch (e) {
@@ -1333,26 +2204,26 @@
         }
       }
 
-      askStatus.style.display = '';
       askStatus.textContent = 'Spoken audio is not available for this answer right now.';
       resetSpeakBtn();
     }
 
     // ── API call ───────────────────────────────────────────────────────────────
-    // No compartment and no playhead: a visitor here isn't standing anywhere in
-    // particular, so retrieval falls back to the global FAQ and reference corpora.
     async function askQuestion(questionText) {
       const s = loadSettings();
+      const t = TRACKS[currentIdx];
+      const payload = {
+        compartment_id: t.compartment,
+        audio_track_id: t.compartment,
+        playhead_time_ms: Math.floor((getActivePlayer().currentTime || 0) * 1000),
+        question_text: questionText,
+        answer_mode: 'standard',
+      };
+
       const res = await fetch(`${s.apiBase}/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          compartment_id: '',
-          audio_track_id: '',
-          playhead_time_ms: 0,
-          question_text: questionText,
-          answer_mode: 'standard',
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
@@ -1367,107 +2238,26 @@
     let lastQuestionAudio = null;  // Blob of the most recent question recording
     let transcribeAvailable = true; // default true — downgraded only if /health says false
     let useRecordMode = false;       // use MediaRecorder→server instead of SpeechRecognition
-    let useTextMode = false;         // no working microphone — typing is the only way in
 
     const LANG_BCP47 = { en: 'en-US', fr: 'fr-FR', de: 'de-DE', es: 'es-ES', zh: 'zh-CN', ja: 'ja-JP' };
 
     const textAskRow = document.getElementById('textAskRow');
     const textAskInput = document.getElementById('textAskInput');
     const textAskSend = document.getElementById('textAskSend');
-    const micPrompt = document.getElementById('micPrompt');
-    const modeVoiceBtn = document.getElementById('modeVoiceBtn');
-    const modeTextBtn = document.getElementById('modeTextBtn');
-
-    // Record mode is tap-to-start, tap-to-stop; native SpeechRecognition stops
-    // itself when the visitor stops talking.  The mic is the whole page here, so
-    // the hint has to describe the mode the visitor actually got.
-    const RECORD_HINT = 'Tap the microphone, ask your question, then tap again.';
-    const LISTEN_HINT = 'Tap the microphone and ask your question.';
-    const TYPE_HINT = 'Type your question and press Ask.';
-
-    function setAskHint(hint) {
-      askStatus.style.display = '';
-      askStatus.textContent = hint;
-    }
-
-    function showListenMode(hint) {
-      useRecordMode = false;
-      useTextMode = false;
-      micPrompt.textContent = 'Ask the docent anything about Pampanito.';
-      textAskRow.style.display = 'none';
-      showAskBtn();
-      setAskHint(hint || LISTEN_HINT);
-      updateModeSwitch();
-    }
-
-    // Set once this browser's native speech service has been proven unreachable.
-    function speechKnownBroken() {
-      try { return localStorage.getItem('tour_speechBroken') === '1'; } catch (_) { return false; }
-    }
-
-    // Whether any route to a spoken question exists — our own server-side
-    // transcription works everywhere, so it alone is enough.
-    function voiceAvailable() {
-      return transcribeAvailable || (!!SpeechRec && !speechKnownBroken());
-    }
-
-    // A deliberate choice from the Speak/Type switch, remembered across visits.
-    // Distinct from a forced fallback: this is the visitor saying which they
-    // want, not the page reporting what broke.
-    function getAskMode() {
-      try { return localStorage.getItem('tour_askMode'); } catch (_) { return null; }
-    }
-
-    function setAskMode(mode) {
-      try {
-        if (mode) localStorage.setItem('tour_askMode', mode);
-        else localStorage.removeItem('tour_askMode');
-      } catch (_) { /* private browsing — the choice just won't persist */ }
-    }
-
-    function updateModeSwitch() {
-      const canVoice = voiceAvailable();
-      modeVoiceBtn.classList.toggle('active', !useTextMode);
-      modeTextBtn.classList.toggle('active', useTextMode);
-      modeVoiceBtn.setAttribute('aria-pressed', String(!useTextMode));
-      modeTextBtn.setAttribute('aria-pressed', String(useTextMode));
-      modeVoiceBtn.disabled = !canVoice;
-      modeVoiceBtn.title = canVoice
-        ? 'Ask out loud'
-        : `Voice unavailable: ${getVoiceUnavailableReason()}`;
-    }
-
-    modeVoiceBtn.addEventListener('click', () => {
-      if (!voiceAvailable()) return;
-      setAskMode('voice');
-      unlockAudio();       // this click is the gesture that lets audio play later
-      applyVoiceMode();
-    });
-
-    modeTextBtn.addEventListener('click', () => {
-      setAskMode('text');
-      enterTextMode(null, true);
-    });
 
     function applyVoiceMode(hint) {
-      // A visitor who asked to type keeps typing until they say otherwise —
-      // including when the health check re-runs this on load.
-      if (getAskMode() === 'text') {
-        enterTextMode();
-        return;
-      }
-
-      // Android Chrome advertises webkitSpeechRecognition but it needs Google's
-      // cloud, which is unreachable from a local server — and any browser that
-      // has already failed that way stays failed.  Both go straight to our own
-      // transcription rather than through a microphone that cannot work.
-      if (isAndroid || speechKnownBroken()) {
+      if (isAndroid) {
         if (transcribeAvailable) {
-          enableRecordMode(hint);
+          enableRecordMode(hint || 'Tap 🎤 to record your question');
           return;
         }
-        if (SpeechRec && !speechKnownBroken()) {
-          showListenMode(hint);
+        if (SpeechRec) {
+          useRecordMode = false;
+          showAskBtn();
+          if (hint) {
+            askStatus.style.display = '';
+            askStatus.textContent = hint;
+          }
           return;
         }
         showTextFallback(hint);
@@ -1479,7 +2269,12 @@
         return;
       }
 
-      showListenMode(hint);
+      useRecordMode = false;
+      showAskBtn();
+      if (hint) {
+        askStatus.style.display = '';
+        askStatus.textContent = hint;
+      }
     }
 
     function getVoiceUnavailableReason() {
@@ -1491,53 +2286,35 @@
       return reasons.join('; ');
     }
 
-    // The keyboard UI itself.  Reached two ways: the visitor picks Type, or the
-    // microphone failed and this is what is left.  Only the message differs.
-    // The button never closes the box, just opens and focuses it — a keyboard
-    // icon that hides the one remaining way to ask leaves the visitor nothing.
-    function enterTextMode(hint, focusInput) {
-      useTextMode = true;
-      useRecordMode = false;
-      stopAnswerAudio();
+    function showTextFallback(hint) {
+      // Switch the mic button to a keyboard icon and show the text row
       micBtn.textContent = '⌨️';
       micBtn.title = 'Type your question';
       micBtn.onclick = () => {
-        textAskRow.style.display = 'flex';
-        textAskInput.focus();
+        textAskRow.style.display = textAskRow.style.display === 'none' ? 'flex' : 'none';
+        if (textAskRow.style.display !== 'none') textAskInput.focus();
       };
-      micPrompt.textContent = 'Type your question and the docent will answer.';
       textAskRow.style.display = 'flex';
-      // Only grab focus when the visitor just acted.  Doing it on load would
-      // throw up the on-screen keyboard before they have seen the page.
-      if (focusInput) textAskInput.focus();
-      setAskHint(hint || TYPE_HINT);
-      updateModeSwitch();
-    }
-
-    function showTextFallback(hint) {
-      enterTextMode(hint || `Voice unavailable: ${getVoiceUnavailableReason()}. Type your question below.`, true);
+      textAskInput.focus();
+      askStatus.textContent = hint || `Voice unavailable: ${getVoiceUnavailableReason()}. Type your question below.`;
     }
 
     function enableRecordMode(hint) {
       // Switch to server-side Whisper transcription (works on all Android browsers)
       useRecordMode = true;
-      useTextMode = false;
       micBtn.textContent = '🎤';
       micBtn.title = 'Tap to record your question';
       micBtn.onclick = () => { unlockAudio(); startRecordTranscribe(); };
-      micPrompt.textContent = 'Ask the docent anything about Pampanito.';
       textAskRow.style.display = 'none';
-      setAskHint(hint || RECORD_HINT);
-      updateModeSwitch();
+      if (hint) { askStatus.style.display = ''; askStatus.textContent = hint; }
     }
 
-    // Wire up text-ask submit.  When typing is the visitor's only way in, the
-    // box stays put between questions instead of collapsing after each one.
+    // Wire up text-ask submit
     function submitTextAsk() {
       const q = textAskInput.value.trim();
       if (!q) return;
       textAskInput.value = '';
-      if (!useTextMode) textAskRow.style.display = 'none';
+      textAskRow.style.display = 'none';
       handleQuestion(correctTranscript(q));
     }
     textAskSend.onclick = submitTextAsk;
@@ -1548,7 +2325,7 @@
     // and on any browser without SpeechRecognition.  Desktop browsers get native
     // SpeechRecognition which auto-detects silence — no tap-to-stop needed.
     const isAndroid = /android/i.test(navigator.userAgent);
-    applyVoiceMode();
+    applyVoiceMode('Tap 🎤 to record your question');
 
     // Background health check — if server has no Groq key, ensure Android falls
     // back to text input and desktop stays in native-speech mode.
@@ -1575,7 +2352,7 @@
         transcribeAvailable = !!d.transcribe_available;
         ttsAvailable = !!d.tts_available;
         if (transcribeAvailable) {
-          applyVoiceMode();
+          applyVoiceMode('Tap 🎤 to record your question');
         } else if (isAndroid && SpeechRec) {
           applyVoiceMode('Server transcription is disabled. Using browser speech recognition instead.');
         } else if (isAndroid || !SpeechRec) {
@@ -1586,6 +2363,9 @@
 
     function startListening() {
       if (!SpeechRec || !window.isSecureContext) return;
+
+      wasPlaying = isPlaying;
+      pause();
 
       recognition = new SpeechRec();
       recognition.lang = LANG_BCP47[loadSettings().lang] || 'en-US';
@@ -1601,19 +2381,15 @@
       micBtn.onclick = () => { if (isListening) stopListening(null); };
 
       let finalTranscript = '';
-      // Set when onerror has handed this attempt over to server transcription.
-      // onend still fires afterwards, and without this it would see the *new*
-      // recording's isListening and tear it straight back down.
-      let handedOff = false;
 
       // Hard timeout — iOS onend is unreliable; stop after 12 s max
       const hardTimeout = setTimeout(() => {
-        if (!handedOff && isListening) stopListening(finalTranscript);
+        if (isListening) stopListening(finalTranscript);
       }, 12000);
 
       const finishUp = () => {
         clearTimeout(hardTimeout);
-        if (!handedOff && isListening) stopListening(finalTranscript);
+        if (isListening) stopListening(finalTranscript);
       };
 
       recognition.onresult = (e) => {
@@ -1633,36 +2409,17 @@
         if (e.error === 'no-speech') return;
         clearTimeout(hardTimeout);
         stopListening(null);
-
-        // 'not-allowed' = the visitor denied the microphone.  Server transcription
-        // needs the same microphone, so there is nothing left but the keyboard.
-        if (e.error === 'not-allowed') {
-          showTextFallback('Microphone blocked — type your question below.');
-          return;
+        // 'network' = Google Speech API unreachable (common on Android/local server)
+        // 'not-allowed' = mic permission denied
+        if (e.error === 'network' || e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          showTextFallback(
+            e.error === 'not-allowed'
+              ? 'Microphone blocked \u2014 type your question below.'
+              : 'Speech recognition unavailable \u2014 type your question below.'
+          );
+        } else {
+          askStatus.textContent = `Mic error: ${e.error}`;
         }
-
-        // 'network'/'service-not-allowed' = the browser's own speech service is
-        // unreachable (Chrome needs Google's, Safari needs Apple's).  The
-        // microphone itself is fine, so record it here and let our server
-        // transcribe instead of dropping the visitor to a keyboard.  Their tap
-        // was a request to speak — honour it by starting the recording now
-        // rather than making them tap a second time.
-        if (e.error === 'network' || e.error === 'service-not-allowed') {
-          if (transcribeAvailable) {
-            // Remember it: a browser whose speech service is unreachable now
-            // will almost certainly still be unreachable on the next visit, and
-            // a museum device gets opened over and over.  Skip the dead end.
-            try { localStorage.setItem('tour_speechBroken', '1'); } catch (_) { }
-            handedOff = true;
-            enableRecordMode();
-            startRecordTranscribe();  // their tap already asked to speak
-          } else {
-            showTextFallback('Speech recognition unavailable — type your question below.');
-          }
-          return;
-        }
-
-        askStatus.textContent = `Mic error: ${e.error}`;
       };
 
       recognition.onend = finishUp;
@@ -1696,6 +2453,8 @@
         showTextFallback('Microphone not available — type your question below.');
         return;
       }
+      wasPlaying = isPlaying;
+      pause();
       isListening = true;
       micBtn.classList.add('listening');
       micBtn.textContent = '⏹';
@@ -1732,6 +2491,7 @@
 
           if (blob.size < 500) {
             askStatus.textContent = 'No audio captured — try again.';
+            if (wasPlaying) play();
             return;
           }
 
@@ -1749,12 +2509,14 @@
             const transcript = (data.transcript || '').trim();
             if (!transcript) {
               askStatus.textContent = 'Could not understand — try again.';
+              if (wasPlaying) play();
               return;
             }
             handleQuestion(correctTranscript(transcript));
           } catch (err) {
             console.error('[transcribe]', err);
             showTextFallback('Transcription failed — type your question below.');
+            if (wasPlaying) play();
           }
         };
         mediaRecorder.start(250);
@@ -1772,7 +2534,6 @@
     function stopRecordTranscribe() {
       if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
     }
-
     const CORRECTIONS = [
       // Ship name
       [/pam\s*pan+[ie]to/gi, 'Pampanito'],
@@ -1833,6 +2594,7 @@
 
       if (!transcript || !transcript.trim()) {
         askStatus.textContent = 'No speech detected. Try again.';
+        if (wasPlaying) play();
         return;
       }
       handleQuestion(correctTranscript(transcript.trim()));
@@ -1863,7 +2625,7 @@
       rec.onerror = () => { clearTimeout(timer); finish(''); };
       rec.onend = () => { clearTimeout(timer); if (!done) finish(''); };
 
-      askStatus.textContent = 'Listening…';
+      askStatus.textContent = 'Listening\u2026';
       rec.start();
     }
 
@@ -1913,28 +2675,119 @@
       rec.onerror = () => { clearTimeout(timer); finish(false); };
       rec.onend = () => { clearTimeout(timer); if (!done) finish(false); };
 
-      askStatus.textContent = 'Say "yes" or "no"…';
+      askStatus.textContent = 'Say "yes" or "no"\u2026';
       rec.start();
     }
 
-    // ── Suggestion chips ──────────────────────────────────────────────────────
-    // No compartment context here, so these are ship-wide openers.
+    const COMPARTMENT_SUGGESTIONS = {
+      forward_torpedo_room: [
+        'How did the torpedoes work?',
+        'Did sailors sleep next to the torpedoes?',
+        'How many torpedoes could Pampanito carry?',
+        'How long did it take to reload a torpedo?',
+        'What was the range of the torpedoes?',
+        'Were the torpedoes dangerous to the crew?',
+      ],
+      after_torpedo_room: [
+        'How many torpedoes were fired from the stern?',
+        'Could you fire from both ends at once?',
+        'How many bunks are in the after torpedo room?',
+        'What happened during a depth charge attack?',
+        'How thick is the pressure hull?',
+      ],
+      conning_tower: [
+        'Where are the periscopes?',
+        'How did the captain fire torpedoes?',
+        'What is a TDC?',
+        'How deep could Pampanito dive?',
+        'How did the radar work?',
+      ],
+      control_room: [
+        'How did the crew dive the submarine?',
+        'What are the ballast tanks?',
+        'How many men were in the control room?',
+        'How did they navigate underwater?',
+        'Could they communicate underwater?',
+      ],
+      crews_mess: [
+        'What did the crew eat?',
+        'How was food stored on board?',
+        'Did the crew have enough food?',
+        'Where did the officers eat?',
+        'How many meals a day did the crew get?',
+      ],
+      forward_battery_compartment: [
+        'How many batteries did Pampanito have?',
+        'How long could the submarine run on batteries?',
+        'How were the batteries recharged?',
+        'Were the batteries dangerous?',
+        'What happened if the batteries ran low?',
+      ],
+      after_battery: [
+        'Where did the crew sleep?',
+        'What was a hot bunk?',
+        'How many men slept in this area?',
+        'Did any sailors get sick on patrol?',
+        'What was the smell like inside the submarine?',
+      ],
+      forward_engine_room: [
+        'What kind of engines did Pampanito have?',
+        'How fast could Pampanito go on the surface?',
+        'How loud were the engines?',
+        'How much fuel did the submarine carry?',
+        'What did engine room crew do during battle?',
+      ],
+      after_engine_room: [
+        'How did the diesel engines work?',
+        'How many engines did Pampanito have?',
+        'How far could Pampanito travel on one tank of fuel?',
+        'What happened if an engine broke down at sea?',
+        'How hot did it get in the engine room?',
+      ],
+      maneuvering_room: [
+        'How did the crew control the electric motors?',
+        'What did the electricians do during a dive?',
+        'How did the submarine switch from diesel to electric?',
+        'How fast could Pampanito go underwater?',
+        'What was the crew size?',
+      ],
+      radio_room: [
+        'How did the crew communicate with headquarters?',
+        'Could enemy ships detect their radio signals?',
+        'What codes did they use?',
+        'How did they receive orders while submerged?',
+        'What was ULTRA intelligence?',
+      ],
+      forward_deck: [
+        'What gun is on the forward deck?',
+        'When did submarines use deck guns?',
+        'Did Pampanito ever sink a ship with its deck gun?',
+        'How dangerous was it on deck in combat?',
+        'How did the crew rescue survivors?',
+      ],
+      after_deck: [
+        'What gun is on the after deck?',
+        'What happened during a crash dive?',
+        'How did the crew get in and out of the submarine?',
+        'What patrols did Pampanito complete?',
+        'How did Pampanito rescue POWs?',
+      ],
+    };
+
     const DEFAULT_SUGGESTIONS = [
       'How deep could Pampanito dive?',
       'How many men were in the crew?',
       'How long were patrols?',
       'What ships did Pampanito sink?',
       'Did anyone on Pampanito get killed?',
-      'Where did the crew sleep?',
-      'What did the crew eat?',
-      'How did the torpedoes work?',
-      'How did Pampanito rescue POWs?',
     ];
 
-    function showSuggestions() {
+    function showSuggestions(compartmentId) {
       const row = document.getElementById('suggestionsRow');
-      const shuffled = DEFAULT_SUGGESTIONS.slice().sort(() => Math.random() - 0.5);
-      row.innerHTML = shuffled.slice(0, 3).map(q =>
+      const pool = COMPARTMENT_SUGGESTIONS[compartmentId] || DEFAULT_SUGGESTIONS;
+      const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+      const picks = shuffled.slice(0, 3);
+      row.innerHTML = picks.map(q =>
         `<button class="sugChip" data-q="${q.replace(/"/g, '&quot;')}">${q}</button>`
       ).join('');
     }
@@ -1946,7 +2799,6 @@
 
     async function handleQuestion(question) {
       document.getElementById('suggestionsRow').innerHTML = '';
-      askStatus.style.display = '';
       askStatus.textContent = `Heard: "${question}"`;
       questionEcho.textContent = `"${question}"`;
       answerText.textContent = '';
@@ -1956,7 +2808,7 @@
       _lastAnswerData = null;
       _lastAnswerPlain = '';
       clearAnswerAudioPrefetch();
-      answerDebug.textContent = DEBUG ? `API: ${loadSettings().apiBase}` : '';
+      answerDebug.textContent = `API: ${loadSettings().apiBase}`;
       resetFeedback();
       answerPanel.classList.add('visible');
 
@@ -1970,12 +2822,16 @@
           showStopBtn();
           const ok = await fetchAndPlay(getAudioUrl('nothits.mp3'), () => {
             listenYesNo((heardYes) => {
+              console.log('[nohits] heardYes =', heardYes);
               askStatus.textContent = heardYes ? 'Got it…' : '';
               if (heardYes) {
                 showStopBtn();
-                fetchAndPlay(getAudioUrl('emailaddressorphonenumber.mp3'), () => {
+                const url2 = getAudioUrl('emailaddressorphonenumber.mp3');
+                console.log('[nohits] fetching', url2);
+                fetchAndPlay(url2, () => {
                   // Audio finished — listen for their contact info
                   listenFreeform((response) => {
+                    console.log('[contact] response:', response);
                     if (response) {
                       sendContact(question, response);
                       showStopBtn();
@@ -1991,8 +2847,9 @@
                     }
                   });
                 }, 2.0).then(played => {
+                  console.log('[nohits] emailaddressorphonenumber played =', played);
                   if (!played) {
-                    askStatus.textContent = '';
+                    askStatus.textContent = 'Audio file not found.';
                     showAskBtn();
                   }
                 });
@@ -2002,28 +2859,27 @@
             });
           }, 2.0);
           if (!ok) {
-            askStatus.textContent = '';
+            askStatus.textContent = 'nothits.mp3 not found.';
             showAskBtn();
           }
-          showSuggestions();
           return;
         }
 
         renderAnswer(data);
-        if (DEBUG) renderAnswerDebug(question, data);
+        renderAnswerDebug(question, data);
         const answerPlain = containsHtmlMarkup(data.answer_short || '')
           ? htmlToPlainText(data.answer_short || '')
           : (data.answer_short || '').replace(/\n+/g, ' ');
         answerPanel.classList.add('visible');
         askStatus.textContent = '';
         askStatus.style.display = 'none';
-        showSuggestions();
+        showSuggestions(TRACKS[currentIdx].compartment);
         showFeedback(question, answerPlain);
         showAnswerSpeakButton(data, answerPlain);
       } catch (err) {
         answerText.textContent = `Error: ${err.message}`;
         hideAnswerSpeakButton();
-        answerDebug.textContent = DEBUG ? `API: ${loadSettings().apiBase}` : '';
+        answerDebug.textContent = `API: ${loadSettings().apiBase}`;
         askStatus.textContent = '';
       }
     }
@@ -2034,6 +2890,7 @@
       settApiBase.value = s.apiBase;
       settElKey.value = s.elKey;
       settElVoice.value = s.elVoice;
+      settAudioBase.value = s.audioBase;
       document.getElementById('settLang').value = s.lang;
       settingsModal.showModal();
     };
@@ -2043,11 +2900,20 @@
         apiBase: settApiBase.value.trim().replace(/\/+$/, ''),
         elKey: settElKey.value.trim(),
         elVoice: settElVoice.value.trim() || 'EXAVITQu4vr4xnSDxMaL',
+        audioBase: settAudioBase.value.trim().replace(/\/+$/, ''),
         lang: document.getElementById('settLang').value,
+        tourMode: getTourMode(),
       });
       document.getElementById('headerLang').value = document.getElementById('settLang').value;
+      const src = getActivePlayer().src;
+      if (!src) loadTrack(currentIdx);
       settingsModal.close();
     };
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    updateTourModeButtons();
+    buildPlaylist();
+    loadTrack(0);
 
     // ── Header language dropdown ──────────────────────────────────────────────
     const headerLang = document.getElementById('headerLang');
@@ -2058,9 +2924,6 @@
       saveSettings(s);
       document.getElementById('settLang').value = headerLang.value;
     });
-
-    // ── Init ───────────────────────────────────────────────────────────────────
-    showSuggestions();
   </script>
 </body>
 
