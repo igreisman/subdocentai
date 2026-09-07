@@ -431,6 +431,16 @@ def _editable_corpus_path(filename: str) -> str:
         import shutil
         shutil.copy2(bundled, disk_path)
         print(f"✅ Seeded persistent disk copy of {filename} from bundled corpora")
+    elif filename == "videos.jsonl" and os.path.exists(disk_path) and os.path.exists(bundled):
+        # If an empty persistent copy slipped in, recover from the bundled seed.
+        # This is safe: only zero-byte files are replaced.
+        try:
+            if os.path.getsize(disk_path) == 0 and os.path.getsize(bundled) > 0:
+                import shutil
+                shutil.copy2(bundled, disk_path)
+                print("✅ Recovered empty /data/videos.jsonl from bundled corpora/videos.jsonl")
+        except OSError:
+            pass
     return disk_path
 
 
@@ -3886,7 +3896,41 @@ def _video_categories(entry: Dict[str, Any]) -> List[str]:
 
 
 def _load_videos_raw() -> List[Dict[str, Any]]:
-    return load_jsonl(VIDEOS_PATH)
+    entries = load_jsonl(VIDEOS_PATH)
+
+    # Production self-heal: if the persistent copy lost descriptions, restore
+    # only the missing description fields from the bundled corpus by matching id.
+    # This preserves live edits while repairing blank-description regressions.
+    if _persistent_disk_available and os.path.abspath(VIDEOS_PATH) == os.path.abspath(os.path.join(_RENDER_DATA_DIR, "videos.jsonl")):
+        bundled = load_jsonl(os.path.join(CORPORA_DIR, "videos.jsonl"))
+        if bundled:
+            if not entries:
+                _save_videos(bundled)
+                return bundled
+
+            desc_by_id: Dict[str, str] = {}
+            for row in bundled:
+                video_id = str(row.get("id") or "").strip()
+                description = str(row.get("description") or "").strip()
+                if video_id and description and video_id not in desc_by_id:
+                    desc_by_id[video_id] = description
+
+            changed = 0
+            for row in entries:
+                video_id = str(row.get("id") or "").strip()
+                if not video_id:
+                    continue
+                current = str(row.get("description") or "").strip()
+                fallback = desc_by_id.get(video_id, "")
+                if not current and fallback:
+                    row["description"] = fallback
+                    changed += 1
+
+            if changed:
+                _save_videos(entries)
+                print(f"✅ Backfilled missing descriptions for {changed} videos from bundled corpus")
+
+    return entries
 
 
 async def _youtube_metadata(video_url: str) -> Dict[str, str]:
