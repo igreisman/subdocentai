@@ -31,14 +31,56 @@
       margin-bottom: 36px;
     }
 
+    .video-group-head {
+      margin: 0 0 10px;
+    }
+
+    .video-group-toggle {
+      width: 100%;
+      border: 1px solid #dbe3ee;
+      border-radius: 10px;
+      background: #fff;
+      color: #1d2734;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .video-group-toggle:hover {
+      background: #f8fbff;
+    }
+
+    .video-group-toggle:focus-visible {
+      outline: 3px solid #2b65b3;
+      outline-offset: 2px;
+    }
+
+    .video-group-sign {
+      width: 24px;
+      text-align: center;
+      font-size: 22px;
+      line-height: 1;
+      color: #2b65b3;
+      flex: 0 0 24px;
+    }
+
     .video-group-title {
-      margin: 0 0 14px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #dbe3ee;
+      margin: 0;
       font-size: 15px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: #44506a;
+    }
+
+    .video-group-videos {
+      display: none;
+    }
+
+    .video-group.is-open .video-group-videos {
+      display: block;
     }
 
     .video-card {
@@ -48,6 +90,66 @@
       overflow: hidden;
       margin-bottom: 28px;
       box-shadow: 0 1px 2px rgba(20, 35, 60, 0.05);
+    }
+
+    .video-layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 16px;
+      align-items: start;
+      padding: 14px;
+    }
+
+    .video-thumb {
+      display: block;
+      width: 100%;
+      border: 0;
+      border-radius: 8px;
+      padding: 0;
+      cursor: pointer;
+      background: #0b1220;
+      overflow: hidden;
+      position: relative;
+      aspect-ratio: 16 / 9;
+    }
+
+    .video-thumb:focus-visible {
+      outline: 3px solid #2b65b3;
+      outline-offset: 2px;
+    }
+
+    .video-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .video-thumb-fallback {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #2b65b3, #17315c);
+      color: #fff;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: center;
+      padding: 8px;
+    }
+
+    .video-thumb-play {
+      position: absolute;
+      inset: auto auto 10px 10px;
+      background: rgba(0, 0, 0, 0.72);
+      color: #fff;
+      font-size: 12px;
+      line-height: 1;
+      padding: 7px 9px;
+      border-radius: 999px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
 
     .video-frame {
@@ -64,9 +166,13 @@
       border: 0;
       display: block;
     }
-
     .video-body {
-      padding: 16px 18px 18px;
+      display: block;
+      padding: 2px 2px 4px;
+    }
+
+    .video-detail-block {
+      display: block;
     }
 
     .video-title {
@@ -74,6 +180,33 @@
       font-size: 18px;
       line-height: 1.3;
       color: #14213d;
+    }
+
+    .video-channel {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin: -2px 0 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #c4d8fb;
+      background: linear-gradient(135deg, #e6eefc, #d8e7ff);
+      color: #163a73;
+      font-size: 12px;
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .video-channel::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #2b65b3;
+      box-shadow: 0 0 0 2px rgba(43, 101, 179, 0.2);
+      flex: 0 0 7px;
     }
 
     .video-description {
@@ -84,6 +217,48 @@
       white-space: pre-wrap;
     }
 
+    .video-description-wrap {
+      position: relative;
+    }
+
+    .video-description.is-clamped {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+      max-height: calc(1.6em * 3);
+      padding-right: 76px;
+    }
+
+    .video-more {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      border: 0;
+      background: #fff;
+      color: #2b65b3;
+      font-size: 13px;
+      line-height: 1.2;
+      padding: 1px 0 1px 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .video-more:hover {
+      text-decoration: underline;
+    }
+
+    .video-description-wrap.is-expanded .video-description {
+      display: block;
+      overflow: visible;
+      max-height: none;
+      padding-right: 0;
+    }
+
+    .video-description-wrap.is-expanded .video-more {
+      display: none;
+    }
+
     .video-meta {
       margin-top: 12px;
       padding-top: 10px;
@@ -91,6 +266,10 @@
       font-size: 12px;
       line-height: 1.5;
       color: #6a737d;
+    }
+
+    .video-meta.is-collapsed {
+      display: none;
     }
 
     .video-meta a {
@@ -119,6 +298,83 @@
       color: #1d2734;
       font-size: 16px;
     }
+
+    .video-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 9, 18, 0.82);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 1000;
+    }
+
+    .video-modal.is-open {
+      display: flex;
+    }
+
+    .video-modal-dialog {
+      width: min(980px, 100%);
+      background: #0c1320;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .video-modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.06);
+      color: #f4f7fb;
+    }
+
+    .video-modal-title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .video-modal-close {
+      border: 0;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .video-modal-player {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+    }
+
+    .video-modal-player iframe,
+    .video-modal-player video {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+
+    @media (max-width: 720px) {
+      .video-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .video-modal {
+        padding: 12px;
+      }
+    }
   </style>
 </head>
 
@@ -128,6 +384,16 @@
       <div class="state">Loading&hellip;</div>
     </div>
   </main>
+
+  <div id="video-modal" class="video-modal" aria-hidden="true">
+    <div class="video-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="video-modal-title">
+      <div class="video-modal-head">
+        <h2 id="video-modal-title" class="video-modal-title"></h2>
+        <button id="video-modal-close" class="video-modal-close" type="button" aria-label="Close video">&times;</button>
+      </div>
+      <div id="video-modal-player" class="video-modal-player"></div>
+    </div>
+  </div>
 
   <script src="/web/site-header.js"></script>
   <script>
@@ -142,21 +408,82 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
     const list = document.getElementById('video-list');
+    const modal = document.getElementById('video-modal');
+    const modalTitle = document.getElementById('video-modal-title');
+    const modalPlayer = document.getElementById('video-modal-player');
+    const modalClose = document.getElementById('video-modal-close');
+    const playableVideos = [];
 
     // Only http(s) reaches an iframe src. Records are hand-maintained in
     // videos.jsonl, and a malformed or hostile URL should render nothing
     // rather than become an embed.
     const isSafeUrl = u => /^https?:\/\//i.test(String(u || ''));
 
+    const youtubeId = u => {
+      const s = String(u || '');
+      const m = s.match(/(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i);
+      return m ? m[1] : '';
+    };
+
+    function thumbnailMarkup(v) {
+      const video = v.video || {};
+      const explicitThumb = video.thumbnail_url || video.thumb_url || video.poster_url;
+      if (isSafeUrl(explicitThumb)) {
+        return `<img src="${esc(explicitThumb)}" alt="Thumbnail for ${esc(v.title || 'video')}">`;
+      }
+
+      const yid = youtubeId(video.embed_url);
+      if (yid) {
+        return `<img src="https://img.youtube.com/vi/${esc(yid)}/hqdefault.jpg" alt="Thumbnail for ${esc(v.title || 'video')}">`;
+      }
+
+      return `<div class="video-thumb-fallback">Video Preview</div>`;
+    }
+
+    function renderPlayer(videoData) {
+      if (!videoData) return '';
+      if (videoData.kind === 'file') {
+        return `<video src="${esc(videoData.embed_url)}" controls preload="metadata" playsinline autoplay title="${esc(videoData.title || 'Video')}"></video>`;
+      }
+      return `<iframe src="${esc(videoData.embed_url)}" title="${esc(videoData.title || 'Video')}" loading="eager" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
+    }
+
+    function openModal(videoData) {
+      modalTitle.textContent = videoData.title || 'Video';
+      modalPlayer.innerHTML = renderPlayer(videoData);
+      modal.classList.add('is-open');
+      modal.setAttribute('aria-hidden', 'false');
+      modalClose.focus();
+    }
+
+    function closeModal() {
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
+      modalPlayer.innerHTML = '';
+    }
+
     function cardHtml(v) {
       const video = v.video || {};
       if (!isSafeUrl(video.embed_url)) return '';
 
+      const index = playableVideos.push({
+        kind: video.kind,
+        embed_url: video.embed_url,
+        title: v.title || 'Video'
+      }) - 1;
+
       const title = v.title
         ? `<h2 class="video-title">${esc(v.title)}</h2>`
         : '';
+      const channelName = (video.channel_name || v.channel_name || video.credit || '').trim();
+      const channel = channelName
+        ? `<div class="video-channel">${esc(channelName)}</div>`
+        : '';
       const description = v.description
-        ? `<p class="video-description">${esc(v.description)}</p>`
+        ? `<div class="video-description-wrap">
+             <p class="video-description is-clamped">${esc(v.description)}</p>
+             <button type="button" class="video-more" aria-label="Show full description">more ...</button>
+           </div>`
         : '';
 
       // Rendered verbatim. Rights holders dictate exact wording -- Omni Media
@@ -169,32 +496,107 @@
       const rights = v.rights_note
         ? `<div class="video-rights">${esc(v.rights_note)}</div>`
         : '';
-      const meta = (creditInner || rights)
-        ? `<div class="video-meta">${creditInner}${rights}</div>`
+      const metaInner = (creditInner || rights)
+        ? `${creditInner}${rights}`
         : '';
-
-      // A file we host plays in <video>; anything else is framed. preload
-      // "metadata" fetches the header for duration and the poster frame without
-      // pulling the whole file down before a visitor has asked to watch.
-      const player = video.kind === 'file'
-        ? `<video src="${esc(video.embed_url)}"
-                  controls preload="metadata" playsinline
-                  title="${esc(v.title || 'Video')}"></video>`
-        : `<iframe src="${esc(video.embed_url)}"
-                   title="${esc(v.title || 'Video')}"
-                   loading="lazy"
-                   allow="encrypted-media; picture-in-picture; fullscreen"
-                   referrerpolicy="strict-origin-when-cross-origin"
-                   allowfullscreen></iframe>`;
+      const hasDescription = Boolean(v.description);
+      const meta = metaInner
+        ? `<div class="video-meta${hasDescription ? ' is-collapsed' : ''}">${metaInner}</div>`
+        : '';
 
       return `
         <article class="video-card">
-          <div class="video-frame">${player}</div>
-          <div class="video-body">
-            ${title}${description}${meta}
+          <div class="video-layout">
+            <button type="button" class="video-thumb" data-video-index="${index}" aria-label="Play ${esc(v.title || 'video')}">
+              ${thumbnailMarkup(v)}
+              <span class="video-thumb-play">Play</span>
+            </button>
+            <div class="video-body">
+              ${title}
+              ${channel}
+              <div class="video-detail-block">
+                ${description}${meta}
+              </div>
+            </div>
           </div>
         </article>`;
     }
+
+    function syncDescriptionClamp() {
+      list.querySelectorAll('.video-description-wrap').forEach(wrap => {
+        const description = wrap.querySelector('.video-description');
+        const more = wrap.querySelector('.video-more');
+        if (!description || !more) return;
+        more.hidden = description.scrollHeight <= description.clientHeight + 1;
+      });
+    }
+
+    list.addEventListener('click', e => {
+      const categoryToggle = e.target.closest('[data-category-toggle]');
+      if (categoryToggle) {
+        const group = categoryToggle.closest('.video-group');
+        if (!group) return;
+
+        const willOpen = !group.classList.contains('is-open');
+
+        // Accordion mode: opening one category closes the rest.
+        list.querySelectorAll('.video-group').forEach(otherGroup => {
+          const otherToggle = otherGroup.querySelector('[data-category-toggle]');
+          const otherSign = otherGroup.querySelector('[data-category-sign]');
+          const isTarget = otherGroup === group;
+          const open = isTarget && willOpen;
+
+          otherGroup.classList.toggle('is-open', open);
+          if (otherToggle) {
+            otherToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+          }
+          if (otherSign) {
+            otherSign.textContent = open ? '-' : '+';
+          }
+        });
+
+        requestAnimationFrame(syncDescriptionClamp);
+        return;
+      }
+
+      const more = e.target.closest('.video-more');
+      if (more) {
+        const wrap = more.closest('.video-description-wrap');
+        if (wrap) {
+          wrap.classList.add('is-expanded');
+          more.setAttribute('aria-expanded', 'true');
+          const body = wrap.closest('.video-body');
+          const meta = body ? body.querySelector('.video-meta.is-collapsed') : null;
+          if (meta) meta.classList.remove('is-collapsed');
+        }
+        return;
+      }
+
+      const trigger = e.target.closest('[data-video-index]');
+      if (!trigger) return;
+
+      const clickedCard = trigger.closest('.video-card');
+      if (clickedCard) {
+        list.querySelectorAll('.video-card').forEach(card => {
+          card.classList.toggle('is-active', card === clickedCard);
+        });
+        requestAnimationFrame(syncDescriptionClamp);
+      }
+
+      const idx = Number(trigger.getAttribute('data-video-index'));
+      if (!Number.isInteger(idx) || !playableVideos[idx]) return;
+      openModal(playableVideos[idx]);
+    });
+
+    modalClose.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => {
+      if (e.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && modal.classList.contains('is-open')) {
+        closeModal();
+      }
+    });
 
     fetch('/api/videos')
       .then(r => {
@@ -202,14 +604,22 @@
         return r.json();
       })
       .then(groups => {
-        const sections = (groups || []).map(g => {
+        const sections = (groups || []).map((g, groupIndex) => {
           const cards = (g.videos || []).map(cardHtml).filter(Boolean).join('');
           // A category whose videos all failed to render would otherwise leave a
           // heading standing over nothing.
           if (!cards) return '';
+          const groupId = `video-group-${groupIndex}`;
           return `<section class="video-group">
-                    <h2 class="video-group-title">${esc(g.category)}</h2>
-                    ${cards}
+                    <div class="video-group-head">
+                      <button type="button" class="video-group-toggle" data-category-toggle aria-expanded="false" aria-controls="${groupId}">
+                        <span class="video-group-sign" data-category-sign>+</span>
+                        <h2 class="video-group-title">${esc(g.category)}</h2>
+                      </button>
+                    </div>
+                    <div class="video-group-videos" id="${groupId}">
+                      ${cards}
+                    </div>
                   </section>`;
         }).filter(Boolean).join('');
 
@@ -219,6 +629,7 @@
             We only publish video we have the rights to show. As permissions come
             through, the videos will appear here.
           </div>`;
+        requestAnimationFrame(syncDescriptionClamp);
       })
       .catch(err => {
         list.innerHTML = `<div class="state"><strong>Unable to load videos</strong>${esc(err.message)}</div>`;

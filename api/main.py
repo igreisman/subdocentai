@@ -2169,9 +2169,11 @@ def _video_payload(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "kind": kind,
         "embed_url": embed_url,
         "watch_url": raw_url,
+        "thumbnail_url": (entry.get("thumbnail_url") or "").strip(),
         "caption": (entry.get("video_caption") or "").strip(),
         "credit": (entry.get("video_credit") or "").strip(),
         "credit_url": (entry.get("video_credit_url") or "").strip(),
+        "channel_name": (entry.get("channel_name") or "").strip(),
         "start": start,
     }
 
@@ -3848,7 +3850,7 @@ def public_faqs():
 # restart, which is how a curator expects a save to behave.
 VIDEO_EDITABLE_FIELDS = (
     "title", "video_url", "video_start", "description",
-    "video_credit", "video_credit_url", "category",
+    "video_credit", "video_credit_url", "channel_name", "thumbnail_url", "category", "tags",
     # Who it belongs to and what was agreed. See "Content rights" above.
     "museum_id", "rights_status", "rights_note", "rights_expires",
 )
@@ -3856,8 +3858,102 @@ VIDEO_EDITABLE_FIELDS = (
 VIDEO_DEFAULT_CATEGORY = "General"
 
 
+def _video_categories(entry: Dict[str, Any]) -> List[str]:
+    """Return normalized category names for one video record.
+
+    Supports legacy single-category strings, comma/semicolon/newline-separated
+    lists from the editor, and hand-edited JSON arrays in videos.jsonl.
+    """
+    raw = entry.get("category")
+    if isinstance(raw, list):
+        parts = raw
+    else:
+        parts = re.split(r"[,;\n]", str(raw or ""))
+
+    out: List[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        name = str(part or "").strip()
+        if not name:
+            continue
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(name)
+
+    return out or [VIDEO_DEFAULT_CATEGORY]
+
+
 def _load_videos_raw() -> List[Dict[str, Any]]:
     return load_jsonl(VIDEOS_PATH)
+
+
+async def _youtube_metadata(video_url: str) -> Dict[str, str]:
+    """Best-effort metadata pull for a YouTube URL.
+
+    Uses oEmbed for title/thumbnail and falls back to parsing the watch page for
+    a fuller description when available.
+    """
+    raw_url = (video_url or "").strip()
+    if not raw_url:
+        raise HTTPException(status_code=400, detail="video_url is required")
+    if not _SAFE_LINK_SCHEME_RE.match(raw_url):
+        raise HTTPException(status_code=400, detail="video_url must start with http:// or https://")
+    if not _YT_ID_RE.search(raw_url):
+        raise HTTPException(status_code=400, detail="Only YouTube URLs are supported")
+
+    title = ""
+    description = ""
+    thumbnail_url = ""
+    channel_name = ""
+
+    async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+        try:
+            oembed = await client.get(
+                "https://www.youtube.com/oembed",
+                params={"url": raw_url, "format": "json"},
+            )
+            if oembed.is_success:
+                payload = oembed.json()
+                title = str(payload.get("title") or "").strip()
+                thumbnail_url = str(payload.get("thumbnail_url") or "").strip()
+                channel_name = str(payload.get("author_name") or "").strip()
+        except Exception:
+            # Keep going; watch-page parsing can still succeed.
+            pass
+
+        try:
+            watch_resp = await client.get(raw_url)
+            if watch_resp.is_success:
+                body = watch_resp.text
+                # Player response typically includes the cleanest long form text.
+                match = re.search(r'"shortDescription":"((?:\\.|[^"\\])*)"', body)
+                if match:
+                    try:
+                        description = json.loads(f'"{match.group(1)}"').strip()
+                    except Exception:
+                        description = ""
+                if not description:
+                    meta_match = re.search(
+                        r'<meta\s+name="description"\s+content="([^"]+)"',
+                        body,
+                        flags=re.IGNORECASE,
+                    )
+                    if meta_match:
+                        description = html.unescape(meta_match.group(1)).strip()
+        except Exception:
+            pass
+
+    if not title and not description:
+        raise HTTPException(status_code=502, detail="Unable to fetch metadata from YouTube for this URL")
+
+    return {
+        "title": title,
+        "description": description,
+        "thumbnail_url": thumbnail_url,
+        "channel_name": channel_name,
+    }
 
 
 def _save_videos(entries: List[Dict[str, Any]]) -> None:
@@ -3899,8 +3995,26 @@ def _apply_video_payload(target: Dict[str, Any], payload: Dict[str, Any]) -> Non
         )
     target["video_url"] = url
 
-    for field in ("title", "description", "video_credit", "video_credit_url",
-                  "category", "museum_id", "rights_note", "rights_expires"):
+    # Optional thumbnail shown on the public videos page when present.
+    if "thumbnail_url" in payload:
+        thumbnail = (payload.get("thumbnail_url") or "").strip()
+        if thumbnail and not _SAFE_LINK_SCHEME_RE.match(thumbnail):
+            raise HTTPException(
+                status_code=400,
+                detail="thumbnail_url must start with http:// or https://",
+            )
+        target["thumbnail_url"] = thumbnail
+
+    if "category" in payload:
+        raw_category = payload.get("category")
+        if isinstance(raw_category, list):
+            category_parts = [str(part or "").strip() for part in raw_category]
+            target["category"] = ", ".join(part for part in category_parts if part)
+        else:
+            target["category"] = (raw_category or "").strip()
+
+    for field in ("title", "description", "video_credit", "video_credit_url", "channel_name", "tags",
+                  "museum_id", "rights_note", "rights_expires"):
         if field in payload:
             target[field] = (payload.get(field) or "").strip()
 
@@ -3945,6 +4059,32 @@ def get_admin_videos():
     curator can see and repair a broken entry instead of wondering where it went.
     """
     return _load_videos_raw()
+
+
+@app.get("/admin/videos/youtube-metadata")
+async def get_youtube_video_metadata(video_url: str):
+    return await _youtube_metadata(video_url)
+
+
+@app.post("/admin/videos/youtube-metadata")
+async def post_youtube_video_metadata(request: Request):
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        payload = {}
+    return await _youtube_metadata(str(payload.get("video_url") or ""))
+
+
+@app.get("/api/youtube-metadata")
+async def get_public_youtube_video_metadata(video_url: str):
+    return await _youtube_metadata(video_url)
+
+
+@app.post("/api/youtube-metadata")
+async def post_public_youtube_video_metadata(request: Request):
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        payload = {}
+    return await _youtube_metadata(str(payload.get("video_url") or ""))
 
 
 # ── Unpublished pages ────────────────────────────────────────────────────────
@@ -4164,14 +4304,17 @@ def public_videos():
         video = _video_payload(entry)
         if not video:
             continue
+        categories = _video_categories(entry)
         out.append({
             "id": entry.get("id") or "",
             "title": (entry.get("title") or "").strip(),
             "description": (entry.get("description") or "").strip(),
+            "tags": (entry.get("tags") or "").strip(),
             # Why we are permitted to show this one — shown on the page so the
             # basis is visible rather than buried in a commit message.
             "rights_note": (entry.get("rights_note") or "").strip(),
-            "category": (entry.get("category") or "").strip() or VIDEO_DEFAULT_CATEGORY,
+            "category": categories[0],
+            "categories": categories,
             "video": video,
             "display_order": entry.get("display_order"),
         })
@@ -4183,8 +4326,10 @@ def public_videos():
     # moves its section too, rather than needing a second thing to maintain.
     groups: Dict[str, List[Dict[str, Any]]] = {}
     for item in out:
-        groups.setdefault(item["category"], []).append(item)
-    return [{"category": name, "videos": videos} for name, videos in groups.items()]
+        for category_name in item.get("categories") or [item["category"]]:
+            groups.setdefault(category_name, []).append(item)
+    ordered_names = sorted(groups.keys(), key=lambda value: value.casefold())
+    return [{"category": name, "videos": groups[name]} for name in ordered_names]
 
 
 @app.get("/api/operations-guide")

@@ -72,6 +72,44 @@
       color: #14213d;
     }
 
+    .video-edit-toggle {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .video-edit-toggle h2 {
+      margin: 0;
+    }
+
+    .video-edit-chevron {
+      color: #607090;
+      font-size: 16px;
+      line-height: 1;
+      flex: 0 0 auto;
+    }
+
+    .video-edit-body {
+      display: none;
+      margin-top: 12px;
+    }
+
+    .card.is-open .video-edit-body {
+      display: block;
+    }
+
+    .card.is-open .video-edit-chevron {
+      transform: rotate(90deg);
+    }
+
     label {
       display: block;
       font-size: 12px;
@@ -210,6 +248,77 @@
       color: #5a6a80;
       word-break: break-all;
     }
+
+    .order-card {
+      background: #fff;
+      border: 1px solid #e1e7ef;
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+    }
+
+    .order-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .order-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border: 1px solid #d8e0eb;
+      border-radius: 8px;
+      background: #f8fbff;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .order-item:active {
+      cursor: grabbing;
+    }
+
+    .order-item.drag-over {
+      border-color: #2f6fd0;
+      background: #eaf2ff;
+    }
+
+    .order-handle {
+      color: #607090;
+      font-size: 16px;
+      letter-spacing: 0.05em;
+      width: 16px;
+      text-align: center;
+      flex: 0 0 16px;
+    }
+
+    .order-title {
+      color: #14213d;
+      font-size: 14px;
+      line-height: 1.35;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .order-item-actions {
+      margin-left: auto;
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .order-mini-btn {
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+
   </style>
 </head>
 
@@ -235,9 +344,21 @@
     <datalist id="video-categories"></datalist>
 
     <h2 class="section-heading">Videos on the Videos page</h2>
-    <div id="list"><div class="empty">Loading&hellip;</div></div>
+    <div class="actions" style="margin: 0 0 12px;">
+      <button id="show-add-video" class="primary" type="button">Add a Video</button>
+    </div>
+    <div class="order-card">
+      <h2 style="margin:0 0 8px;font-size:15px;color:#14213d;">Video Order</h2>
+      <p class="section-note" style="margin:0 0 12px;">Drag titles to reorder. Changes save automatically after each move.</p>
+      <div id="order"><div class="empty">Loading&hellip;</div></div>
+    </div>
 
-    <div class="card">
+    <div class="card" id="edit-video-card" hidden>
+      <h2>Edit video</h2>
+      <div id="edit-form"></div>
+    </div>
+
+    <div class="card" id="add-video-card" hidden>
       <h2>Add a video</h2>
       <div id="new-form"></div>
     </div>
@@ -264,8 +385,114 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-    const listEl = document.getElementById('list');
     const newFormEl = document.getElementById('new-form');
+    const addVideoCardEl = document.getElementById('add-video-card');
+    const showAddVideoBtn = document.getElementById('show-add-video');
+    const editVideoCardEl = document.getElementById('edit-video-card');
+    const editFormEl = document.getElementById('edit-form');
+    const orderEl = document.getElementById('order');
+    let currentVideos = [];
+    let editingVideoId = null;
+    let youtubeMetadataStrategies = null;
+
+    showAddVideoBtn.addEventListener('click', () => {
+      addVideoCardEl.hidden = false;
+      const firstInput = addVideoCardEl.querySelector('input, textarea, button');
+      if (firstInput) firstInput.focus();
+    });
+
+    function looksLikeYouTubeUrl(url) {
+      return /(?:youtube\.com|youtu\.be)/i.test(String(url || ''));
+    }
+
+    async function resolveYoutubeMetadataStrategies() {
+      if (youtubeMetadataStrategies) return youtubeMetadataStrategies;
+      const strategies = [];
+      try {
+        const res = await fetch('/openapi.json', { method: 'GET' });
+        if (res.ok) {
+          const spec = await res.json();
+          const paths = spec && spec.paths ? spec.paths : {};
+          const hasPath = p => Object.prototype.hasOwnProperty.call(paths, p);
+          const hasMethod = (p, m) => hasPath(p) && paths[p] && paths[p][m];
+
+          if (hasMethod('/api/youtube-metadata', 'get')) {
+            strategies.push(url => send('GET', `/api/youtube-metadata?video_url=${encodeURIComponent(url)}`));
+          }
+          if (hasMethod('/api/youtube-metadata', 'post')) {
+            strategies.push(url => send('POST', '/api/youtube-metadata', { video_url: url }));
+          }
+          if (hasMethod('/admin/videos/youtube-metadata', 'get')) {
+            strategies.push(url => send('GET', `/admin/videos/youtube-metadata?video_url=${encodeURIComponent(url)}`));
+          }
+          if (hasMethod('/admin/videos/youtube-metadata', 'post')) {
+            strategies.push(url => send('POST', '/admin/videos/youtube-metadata', { video_url: url }));
+          }
+        }
+      } catch (e) {
+        // Keep a fallback strategy order when OpenAPI cannot be read.
+      }
+
+      if (!strategies.length) {
+        strategies.push(url => send('GET', `/api/youtube-metadata?video_url=${encodeURIComponent(url)}`));
+        strategies.push(url => send('POST', '/api/youtube-metadata', { video_url: url }));
+        strategies.push(url => send('GET', `/admin/videos/youtube-metadata?video_url=${encodeURIComponent(url)}`));
+        strategies.push(url => send('POST', '/admin/videos/youtube-metadata', { video_url: url }));
+      }
+      youtubeMetadataStrategies = strategies;
+      return strategies;
+    }
+
+    async function autofillFromYoutube(prefix, statusEl, { silent = false } = {}) {
+      const urlEl = document.getElementById(`${prefix}-url`);
+      if (!urlEl) return;
+      const url = urlEl.value.trim();
+      if (!url) {
+        if (!silent) setStatus(statusEl, 'Paste a YouTube URL first.', 'error');
+        return;
+      }
+      if (!looksLikeYouTubeUrl(url)) {
+        if (!silent) setStatus(statusEl, 'This auto-fill works for YouTube URLs.', 'error');
+        return;
+      }
+
+      try {
+        if (!silent) setStatus(statusEl, 'Fetching YouTube metadata…');
+        const strategies = await resolveYoutubeMetadataStrategies();
+        let meta = null;
+        let lastErr = null;
+        for (const strategy of strategies) {
+          try {
+            meta = await strategy(url);
+            break;
+          } catch (err) {
+            lastErr = err;
+            const message = String(err && err.message || '');
+            if (!/method not allowed|not found|authentication required/i.test(message)) {
+              throw err;
+            }
+          }
+        }
+        if (!meta) {
+          throw lastErr || new Error('Could not fetch metadata for this YouTube URL.');
+        }
+        const titleEl = document.getElementById(`${prefix}-title`);
+        const descEl = document.getElementById(`${prefix}-desc`);
+        const channelEl = document.getElementById(`${prefix}-channel`);
+        const thumbEl = document.getElementById(`${prefix}-thumb`);
+        if (titleEl && meta.title) titleEl.value = meta.title;
+        if (descEl && meta.description) descEl.value = meta.description;
+        if (channelEl && meta.channel_name) channelEl.value = meta.channel_name;
+        if (thumbEl && !thumbEl.value.trim() && meta.thumbnail_url) thumbEl.value = meta.thumbnail_url;
+
+        if (!silent) {
+          const hasDesc = Boolean(meta.description);
+          setStatus(statusEl, hasDesc ? 'Filled title and description from YouTube.' : 'Filled title from YouTube.', 'ok');
+        }
+      } catch (err) {
+        if (!silent) setStatus(statusEl, err.message, 'error');
+      }
+    }
 
     function fieldsHtml(v, idPrefix) {
       const p = idPrefix;
@@ -279,8 +506,17 @@
         <label for="${p}-desc">Description <span class="hint">shown under the player</span></label>
         <textarea id="${p}-desc">${esc(v.description || '')}</textarea>
 
-        <label for="${p}-category">Category <span class="hint">groups the video on the public page — blank means General</span></label>
+        <label for="${p}-channel">Channel name <span class="hint">optional; e.g. YouTube channel or publisher</span></label>
+        <input type="text" id="${p}-channel" value="${esc(v.channel_name || '')}">
+
+        <label for="${p}-thumb">Thumbnail URL <span class="hint">optional — shown on the first column card</span></label>
+        <input type="text" id="${p}-thumb" value="${esc(v.thumbnail_url || '')}" placeholder="https://.../thumbnail.jpg">
+
+        <label for="${p}-category">Category <span class="hint">comma-separated; one video can appear in multiple categories — blank means General</span></label>
         <input type="text" id="${p}-category" list="video-categories" value="${esc(v.category || '')}">
+
+        <label for="${p}-tags">Tags <span class="hint">comma-separated keywords for this video</span></label>
+        <input type="text" id="${p}-tags" value="${esc(v.tags || '')}" placeholder="e.g. WWII, USS Pampanito, oral history">
 
         <div class="row">
           <div>
@@ -315,11 +551,14 @@
         video_url: val('url'),
         title: val('title'),
         description: document.getElementById(`${p}-desc`).value.trim(),
+        channel_name: val('channel'),
         category: val('category'),
+        tags: val('tags'),
         video_start: val('start'),
         display_order: val('order'),
         video_credit: val('credit'),
         video_credit_url: val('crediturl'),
+        thumbnail_url: val('thumb'),
         rights_note: val('rights'),
       };
     }
@@ -327,7 +566,11 @@
     // Suggest categories already in use, so "Oral Histories" and "Oral
     // histories" don't quietly become two sections on the public page.
     function renderCategoryOptions(videos) {
-      const names = [...new Set(videos.map(v => (v.category || '').trim()).filter(Boolean))].sort();
+      const split = raw => {
+        if (Array.isArray(raw)) return raw.map(v => String(v || '').trim()).filter(Boolean);
+        return String(raw || '').split(/[,;\n]/).map(v => v.trim()).filter(Boolean);
+      };
+      const names = [...new Set((videos || []).flatMap(v => split(v.category)))].sort();
       document.getElementById('video-categories').innerHTML =
         names.map(n => `<option value="${esc(n)}"></option>`).join('');
     }
@@ -352,39 +595,133 @@
       return data;
     }
 
-    function renderList(videos) {
+    function sortVideos(videos) {
+      const ranked = (videos || []).map((v, index) => {
+        const n = Number(v.display_order);
+        return {
+          video: v,
+          hasOrder: Number.isFinite(n),
+          order: Number.isFinite(n) ? n : 0,
+          index,
+        };
+      });
+
+      ranked.sort((a, b) => {
+        if (a.hasOrder !== b.hasOrder) return a.hasOrder ? -1 : 1;
+        if (a.order !== b.order) return a.order - b.order;
+        const at = String(a.video.title || a.video.id || '').toLowerCase();
+        const bt = String(b.video.title || b.video.id || '').toLowerCase();
+        if (at < bt) return -1;
+        if (at > bt) return 1;
+        return a.index - b.index;
+      });
+
+      return ranked.map(x => x.video);
+    }
+
+    async function saveOrderAfterMove() {
+      const statusEl = document.getElementById('order-status');
+      try {
+        setStatus(statusEl, 'Saving order…');
+        for (let i = 0; i < currentVideos.length; i += 1) {
+          const v = currentVideos[i];
+          await send('PUT', `/admin/videos/${encodeURIComponent(v.id)}`, {
+            video_url: v.video_url,
+            display_order: i + 1,
+          });
+          v.display_order = i + 1;
+        }
+        setStatus(statusEl, 'Order saved', 'ok');
+      } catch (err) {
+        setStatus(statusEl, err.message, 'error');
+      }
+    }
+
+    function renderOrderList(videos) {
       if (!videos.length) {
-        listEl.innerHTML = `<div class="empty">No videos yet. Add the first one below.</div>`;
+        orderEl.innerHTML = `<div class="empty">No videos yet.</div>`;
         return;
       }
-      listEl.innerHTML = videos.map(v => {
-        const p = `v-${esc(v.id)}`;
-        return `
-          <div class="card" data-id="${esc(v.id)}">
-            <h2>${esc(v.title || v.id || 'Untitled')}</h2>
-            ${fieldsHtml(v, p)}
-            <div class="actions">
-              <button class="primary" data-act="save" data-id="${esc(v.id)}">Save</button>
-              <button class="danger" data-act="delete" data-id="${esc(v.id)}">Delete</button>
-              <span class="status" id="${p}-status"></span>
-            </div>
-          </div>`;
-      }).join('');
 
-      listEl.querySelectorAll('button[data-act]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id = btn.dataset.id;
-          const statusEl = document.getElementById(`v-${id}-status`);
+      orderEl.innerHTML = `
+        <ol id="order-list" class="order-list">
+          ${videos.map((v, i) => `
+            <li class="order-item" draggable="true" data-id="${esc(v.id)}">
+              <span class="order-handle" aria-hidden="true">::</span>
+              <span class="order-title">${esc(v.title || v.id || 'Untitled')}</span>
+              <span class="order-item-actions">
+                <button type="button" class="order-mini-btn" data-edit-id="${esc(v.id)}">Edit</button>
+                <button type="button" class="order-mini-btn danger" data-del-id="${esc(v.id)}">Delete</button>
+              </span>
+            </li>
+          `).join('')}
+        </ol>
+        <div class="actions">
+          <span class="status" id="order-status"></span>
+        </div>`;
+
+      const orderList = document.getElementById('order-list');
+      let dragId = null;
+
+      orderList.querySelectorAll('.order-item').forEach(item => {
+        item.addEventListener('dragstart', () => {
+          dragId = item.dataset.id;
+          item.classList.add('dragging');
+        });
+        item.addEventListener('dragend', () => {
+          dragId = null;
+          orderList.querySelectorAll('.order-item').forEach(el => el.classList.remove('drag-over', 'dragging'));
+        });
+        item.addEventListener('dragover', e => {
+          e.preventDefault();
+          item.classList.add('drag-over');
+        });
+        item.addEventListener('dragleave', () => {
+          item.classList.remove('drag-over');
+        });
+        item.addEventListener('drop', async e => {
+          e.preventDefault();
+          item.classList.remove('drag-over');
+          const targetId = item.dataset.id;
+          if (!dragId || !targetId || dragId === targetId) return;
+
+          const from = currentVideos.findIndex(v => String(v.id) === String(dragId));
+          const to = currentVideos.findIndex(v => String(v.id) === String(targetId));
+          if (from < 0 || to < 0) return;
+          const [moved] = currentVideos.splice(from, 1);
+          currentVideos.splice(to, 0, moved);
+          renderOrderList(currentVideos);
+          await saveOrderAfterMove();
+        });
+      });
+
+      orderList.querySelectorAll('button[data-edit-id]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          openEditVideo(btn.dataset.editId);
+        });
+      });
+
+      orderList.querySelectorAll('button[data-del-id]').forEach(btn => {
+        btn.addEventListener('click', async e => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = btn.dataset.delId;
+          if (!id) return;
+          if (!confirm('Delete this video? This removes it from the public page.')) return;
+
+          const statusEl = document.getElementById('order-status');
           try {
-            if (btn.dataset.act === 'delete') {
-              if (!confirm('Delete this video? This removes it from the public page.')) return;
-              await send('DELETE', `/admin/videos/${encodeURIComponent(id)}`);
-            } else {
-              setStatus(statusEl, 'Saving…');
-              await send('PUT', `/admin/videos/${encodeURIComponent(id)}`, readFields(`v-${id}`));
-              setStatus(statusEl, 'Saved', 'ok');
+            setStatus(statusEl, 'Deleting…');
+            await send('DELETE', `/admin/videos/${encodeURIComponent(id)}`);
+            if (editingVideoId === id) {
+              editingVideoId = null;
+              editVideoCardEl.hidden = true;
+              editFormEl.innerHTML = '';
             }
             await load();
+            setStatus(statusEl, 'Deleted', 'ok');
           } catch (err) {
             setStatus(statusEl, err.message, 'error');
           }
@@ -392,15 +729,80 @@
       });
     }
 
+    function renderEditForm(video) {
+      editFormEl.innerHTML = `
+        ${fieldsHtml(video, 'edit')}
+        <div class="actions">
+          <button class="primary" id="edit-save" type="button">Save changes</button>
+          <button class="danger" id="edit-delete" type="button">Delete</button>
+          <button id="edit-cancel" type="button">Close</button>
+          <span class="status" id="edit-status"></span>
+        </div>`;
+
+      document.getElementById('edit-save').addEventListener('click', async () => {
+        const statusEl = document.getElementById('edit-status');
+        if (!editingVideoId) return;
+        try {
+          setStatus(statusEl, 'Saving…');
+          await send('PUT', `/admin/videos/${encodeURIComponent(editingVideoId)}`, readFields('edit'));
+          setStatus(statusEl, 'Saved', 'ok');
+          await load();
+        } catch (err) {
+          setStatus(statusEl, err.message, 'error');
+        }
+      });
+
+      document.getElementById('edit-delete').addEventListener('click', async () => {
+        const statusEl = document.getElementById('edit-status');
+        if (!editingVideoId) return;
+        if (!confirm('Delete this video? This removes it from the public page.')) return;
+        try {
+          setStatus(statusEl, 'Deleting…');
+          await send('DELETE', `/admin/videos/${encodeURIComponent(editingVideoId)}`);
+          editingVideoId = null;
+          editVideoCardEl.hidden = true;
+          editFormEl.innerHTML = '';
+          await load();
+        } catch (err) {
+          setStatus(statusEl, err.message, 'error');
+        }
+      });
+
+      document.getElementById('edit-cancel').addEventListener('click', () => {
+        editVideoCardEl.hidden = true;
+      });
+    }
+
+    function openEditVideo(id) {
+      const video = currentVideos.find(v => String(v.id) === String(id));
+      if (!video) return;
+      editingVideoId = String(video.id);
+      renderEditForm(video);
+      editVideoCardEl.hidden = false;
+      const firstInput = editVideoCardEl.querySelector('input, textarea, button');
+      if (firstInput) firstInput.focus();
+      editVideoCardEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     function renderNewForm() {
       newFormEl.innerHTML = `
         ${fieldsHtml({}, 'new')}
         <div class="actions">
+          <button id="new-fetch" type="button">Fetch title + description</button>
           <button class="primary" id="new-save">Add video</button>
           <span class="status" id="new-status"></span>
         </div>`;
+      const statusEl = document.getElementById('new-status');
+      document.getElementById('new-fetch').addEventListener('click', async () => {
+        await autofillFromYoutube('new', statusEl);
+      });
+      document.getElementById('new-url').addEventListener('blur', async () => {
+        const title = document.getElementById('new-title').value.trim();
+        const desc = document.getElementById('new-desc').value.trim();
+        if (title || desc) return;
+        await autofillFromYoutube('new', statusEl, { silent: true });
+      });
       document.getElementById('new-save').addEventListener('click', async () => {
-        const statusEl = document.getElementById('new-status');
         try {
           setStatus(statusEl, 'Adding…');
           await send('POST', '/admin/videos', readFields('new'));
@@ -520,10 +922,11 @@
     async function load() {
       try {
         const videos = await send('GET', '/admin/videos');
-        renderCategoryOptions(videos || []);
-        renderList(videos || []);
+        currentVideos = sortVideos(videos || []);
+        renderCategoryOptions(currentVideos);
+        renderOrderList(currentVideos);
       } catch (err) {
-        listEl.innerHTML = `<div class="empty">Unable to load videos: ${esc(err.message)}</div>`;
+        orderEl.innerHTML = `<div class="empty">Unable to load videos: ${esc(err.message)}</div>`;
       }
     }
 
