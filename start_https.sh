@@ -13,6 +13,18 @@ LOCAL_TOUR_PATH="${LOCAL_TOUR_PATH:-/web/pampanito.html}"
 SSL_KEYFILE="${SSL_KEYFILE:-certs/key.pem}"
 SSL_CERTFILE="${SSL_CERTFILE:-certs/cert.pem}"
 
+detect_lan_ip() {
+  local ip
+  for iface in en0 en1; do
+    ip=$(ipconfig getifaddr "$iface" 2>/dev/null || true)
+    if [ -n "$ip" ]; then
+      echo "$ip"
+      return 0
+    fi
+  done
+  return 1
+}
+
 # Load secrets from .env.local (never committed to git)
 if [ -f .env.local ]; then
   # shellcheck disable=SC1091
@@ -36,6 +48,14 @@ echo ""
 echo " On your iPhone, open Safari and go to:"
 echo ""
 echo "   https://${LOCAL_HTTPS_HOST}:${LOCAL_HTTPS_PORT}${LOCAL_TOUR_PATH}"
+if [ "$LOCAL_HTTPS_HOST" = "localhost" ] || [ "$LOCAL_HTTPS_HOST" = "127.0.0.1" ]; then
+  LAN_IP="$(detect_lan_ip || true)"
+  if [ -n "$LAN_IP" ]; then
+    echo ""
+    echo "   If you are using another device (phone/tablet), use your Mac's LAN IP instead:"
+    echo "   https://${LAN_IP}:${LOCAL_HTTPS_PORT}${LOCAL_TOUR_PATH}"
+  fi
+fi
 echo ""
 echo " API base URL (in Settings on the page):"
 echo "   https://${LOCAL_HTTPS_HOST}:${LOCAL_HTTPS_PORT}"
