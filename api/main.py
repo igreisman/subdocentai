@@ -4186,6 +4186,11 @@ def _apply_video_payload(target: Dict[str, Any], payload: Dict[str, Any]) -> Non
             except (TypeError, ValueError):
                 raise HTTPException(status_code=400, detail="display_order must be a number")
 
+    # Pre-fill a standard rights note for YouTube, but do not overwrite a
+    # curator-entered note.
+    if _YT_ID_RE.search(target.get("video_url", "")) and not str(target.get("rights_note") or "").strip():
+        target["rights_note"] = "Embeddable under YouTube Terms of Service"
+
 
 @app.get("/admin/videos")
 def get_admin_videos():

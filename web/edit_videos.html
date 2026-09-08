@@ -406,6 +406,17 @@
       return /(?:youtube\.com|youtu\.be)/i.test(String(url || ''));
     }
 
+    const YOUTUBE_RIGHTS_NOTE = 'Embeddable under YouTube Terms of Service';
+
+    function prefillYouTubeRightsNote(prefix) {
+      const urlEl = document.getElementById(`${prefix}-url`);
+      const rightsEl = document.getElementById(`${prefix}-rights`);
+      if (!urlEl || !rightsEl) return;
+      if (!looksLikeYouTubeUrl(urlEl.value.trim())) return;
+      if (rightsEl.value.trim()) return;
+      rightsEl.value = YOUTUBE_RIGHTS_NOTE;
+    }
+
     async function resolveYoutubeMetadataStrategies() {
       if (youtubeMetadataStrategies) return youtubeMetadataStrategies;
       const strategies = [];
@@ -456,6 +467,8 @@
         if (!silent) setStatus(statusEl, 'This auto-fill works for YouTube URLs.', 'error');
         return;
       }
+
+      prefillYouTubeRightsNote(prefix);
 
       try {
         if (!silent) setStatus(statusEl, 'Fetching YouTube metadata…');
@@ -805,6 +818,7 @@
         await autofillFromYoutube('new', statusEl);
       });
       document.getElementById('new-url').addEventListener('blur', async () => {
+        prefillYouTubeRightsNote('new');
         const title = document.getElementById('new-title').value.trim();
         const desc = document.getElementById('new-desc').value.trim();
         if (title || desc) return;
