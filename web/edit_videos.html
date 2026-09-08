@@ -399,6 +399,7 @@
       addVideoCardEl.hidden = false;
       const firstInput = addVideoCardEl.querySelector('input, textarea, button');
       if (firstInput) firstInput.focus();
+      addVideoCardEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
     function looksLikeYouTubeUrl(url) {
@@ -479,10 +480,12 @@
         const titleEl = document.getElementById(`${prefix}-title`);
         const descEl = document.getElementById(`${prefix}-desc`);
         const channelEl = document.getElementById(`${prefix}-channel`);
+        const channelUrlEl = document.getElementById(`${prefix}-channelurl`);
         const thumbEl = document.getElementById(`${prefix}-thumb`);
         if (titleEl && meta.title) titleEl.value = meta.title;
         if (descEl && meta.description) descEl.value = meta.description;
         if (channelEl && meta.channel_name) channelEl.value = meta.channel_name;
+        if (channelUrlEl && meta.channel_url) channelUrlEl.value = meta.channel_url;
         if (thumbEl && !thumbEl.value.trim() && meta.thumbnail_url) thumbEl.value = meta.thumbnail_url;
 
         if (!silent) {
@@ -508,6 +511,9 @@
 
         <label for="${p}-channel">Channel name <span class="hint">optional; e.g. YouTube channel or publisher</span></label>
         <input type="text" id="${p}-channel" value="${esc(v.channel_name || '')}">
+
+        <label for="${p}-channelurl">Channel URL <span class="hint">optional; makes the channel name clickable on the public page</span></label>
+        <input type="text" id="${p}-channelurl" value="${esc(v.channel_url || '')}" placeholder="https://...">
 
         <label for="${p}-thumb">Thumbnail URL <span class="hint">optional — shown on the first column card</span></label>
         <input type="text" id="${p}-thumb" value="${esc(v.thumbnail_url || '')}" placeholder="https://.../thumbnail.jpg">
@@ -552,6 +558,7 @@
         title: val('title'),
         description: document.getElementById(`${p}-desc`).value.trim(),
         channel_name: val('channel'),
+        channel_url: val('channelurl'),
         category: val('category'),
         tags: val('tags'),
         video_start: val('start'),
@@ -784,15 +791,16 @@
       editVideoCardEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    function renderNewForm() {
+    function renderNewForm(statusMessage = '', statusKind = '') {
       newFormEl.innerHTML = `
         ${fieldsHtml({}, 'new')}
         <div class="actions">
-          <button id="new-fetch" type="button">Fetch title + description</button>
           <button class="primary" id="new-save">Add video</button>
+          <button id="new-fetch" type="button">Fetch title + description</button>
           <span class="status" id="new-status"></span>
         </div>`;
       const statusEl = document.getElementById('new-status');
+      if (statusMessage) setStatus(statusEl, statusMessage, statusKind);
       document.getElementById('new-fetch').addEventListener('click', async () => {
         await autofillFromYoutube('new', statusEl);
       });
@@ -806,9 +814,8 @@
         try {
           setStatus(statusEl, 'Adding…');
           await send('POST', '/admin/videos', readFields('new'));
-          setStatus(statusEl, 'Added', 'ok');
-          renderNewForm();
           await load();
+          renderNewForm('Video added.', 'ok');
         } catch (err) {
           setStatus(statusEl, err.message, 'error');
         }

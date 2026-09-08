@@ -39,6 +39,40 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(BASE_DIR, "web")
 
+
+def _load_local_env_defaults() -> None:
+    """Load .env defaults without overriding real environment variables.
+
+    Local startup scripts usually export these first, but direct uvicorn runs
+    may skip that step and unexpectedly disable admin auth and local corpus
+    routing. This keeps local behavior consistent while preserving deployed env.
+    """
+    for filename in (".env.local", ".env"):
+        path = os.path.join(BASE_DIR, filename)
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                for raw_line in handle:
+                    line = raw_line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    if not key:
+                        continue
+                    value = value.strip()
+                    if ((value.startswith('"') and value.endswith('"'))
+                            or (value.startswith("'") and value.endswith("'"))):
+                        value = value[1:-1]
+                    os.environ.setdefault(key, value)
+        except OSError:
+            # Keep startup resilient when local env files are unreadable.
+            continue
+
+
+_load_local_env_defaults()
+
 # Render persistent disk.  Editable corpora live here so on-site edits survive a
 # redeploy; see _editable_corpus_path below.  Pages that are deployed but not
 # published to the repository live under <disk>/web for the same reason — a
@@ -2175,6 +2209,8 @@ def _video_payload(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         kind = "file" if _MEDIA_FILE_RE.search(raw_url.split("?", 1)[0]) else "embed"
         if kind == "file" and start > 0:
             embed_url += f"#t={start}"
+    channel_name = (entry.get("channel_name") or entry.get("video_credit") or "").strip()
+    channel_url = (entry.get("channel_url") or entry.get("video_credit_url") or "").strip()
     return {
         "kind": kind,
         "embed_url": embed_url,
@@ -2183,7 +2219,8 @@ def _video_payload(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "caption": (entry.get("video_caption") or "").strip(),
         "credit": (entry.get("video_credit") or "").strip(),
         "credit_url": (entry.get("video_credit_url") or "").strip(),
-        "channel_name": (entry.get("channel_name") or "").strip(),
+        "channel_name": channel_name,
+        "channel_url": channel_url,
         "start": start,
     }
 
@@ -3860,7 +3897,7 @@ def public_faqs():
 # restart, which is how a curator expects a save to behave.
 VIDEO_EDITABLE_FIELDS = (
     "title", "video_url", "video_start", "description",
-    "video_credit", "video_credit_url", "channel_name", "thumbnail_url", "category", "tags",
+    "video_credit", "video_credit_url", "channel_name", "channel_url", "thumbnail_url", "category", "tags",
     # Who it belongs to and what was agreed. See "Content rights" above.
     "museum_id", "rights_status", "rights_note", "rights_expires",
 )
@@ -3965,6 +4002,7 @@ async def _youtube_metadata(video_url: str) -> Dict[str, str]:
     description = ""
     thumbnail_url = ""
     channel_name = ""
+    channel_url = ""
 
     async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
         try:
@@ -3977,6 +4015,7 @@ async def _youtube_metadata(video_url: str) -> Dict[str, str]:
                 title = str(payload.get("title") or "").strip()
                 thumbnail_url = str(payload.get("thumbnail_url") or "").strip()
                 channel_name = str(payload.get("author_name") or "").strip()
+                channel_url = str(payload.get("author_url") or "").strip()
         except Exception:
             # Keep going; watch-page parsing can still succeed.
             pass
@@ -4011,6 +4050,7 @@ async def _youtube_metadata(video_url: str) -> Dict[str, str]:
         "description": description,
         "thumbnail_url": thumbnail_url,
         "channel_name": channel_name,
+        "channel_url": channel_url,
     }
 
 
@@ -4071,7 +4111,7 @@ def _apply_video_payload(target: Dict[str, Any], payload: Dict[str, Any]) -> Non
         else:
             target["category"] = (raw_category or "").strip()
 
-    for field in ("title", "description", "video_credit", "video_credit_url", "channel_name", "tags",
+    for field in ("title", "description", "video_credit", "video_credit_url", "channel_name", "channel_url", "tags",
                   "museum_id", "rights_note", "rights_expires"):
         if field in payload:
             target[field] = (payload.get(field) or "").strip()
@@ -4368,11 +4408,15 @@ def public_videos():
             or (entry.get("video_description") or "")
             or (entry.get("video_caption") or "")
         ).strip()
+        channel_name = (entry.get("channel_name") or entry.get("video_credit") or "").strip()
+        channel_url = (entry.get("channel_url") or entry.get("video_credit_url") or "").strip()
         out.append({
             "id": entry.get("id") or "",
             "title": (entry.get("title") or "").strip(),
             "description": description,
             "tags": (entry.get("tags") or "").strip(),
+            "channel_name": channel_name,
+            "channel_url": channel_url,
             # Why we are permitted to show this one — shown on the page so the
             # basis is visible rather than buried in a commit message.
             "rights_note": (entry.get("rights_note") or "").strip(),

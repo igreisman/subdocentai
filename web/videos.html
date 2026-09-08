@@ -199,6 +199,16 @@
       text-transform: uppercase;
     }
 
+    .video-channel a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .video-channel a:hover,
+    .video-channel a:focus-visible {
+      text-decoration: underline;
+    }
+
     .video-channel::before {
       content: "";
       width: 7px;
@@ -279,6 +289,37 @@
     .video-rights {
       margin-top: 3px;
       font-style: italic;
+    }
+
+    .debug-banner {
+      margin: 0 0 16px;
+      padding: 7px 12px;
+      border: 1px solid #cfe0ff;
+      border-radius: 999px;
+      background: #edf5ff;
+      color: #1f4f8a;
+      font-size: 11px;
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+
+    .debug-banner::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #3f8fef;
+      box-shadow: 0 0 0 3px rgba(63, 143, 239, 0.18);
+      flex: 0 0 7px;
     }
 
     .state {
@@ -380,6 +421,7 @@
 
 <body>
   <main>
+    <div id="debug-banner" class="debug-banner" aria-live="polite" hidden>Debug: loading</div>
     <div id="video-list">
       <div class="state">Loading&hellip;</div>
     </div>
@@ -408,11 +450,17 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
     const list = document.getElementById('video-list');
+    const debugBanner = document.getElementById('debug-banner');
     const modal = document.getElementById('video-modal');
     const modalTitle = document.getElementById('video-modal-title');
     const modalPlayer = document.getElementById('video-modal-player');
     const modalClose = document.getElementById('video-modal-close');
     const playableVideos = [];
+
+    function setDebugBanner(message) {
+      debugBanner.hidden = !message;
+      debugBanner.textContent = message || 'Debug: loading';
+    }
 
     // Only http(s) reaches an iframe src. Records are hand-maintained in
     // videos.jsonl, and a malformed or hostile URL should render nothing
@@ -476,8 +524,14 @@
         ? `<h2 class="video-title">${esc(v.title)}</h2>`
         : '';
       const channelName = (video.channel_name || v.channel_name || video.credit || '').trim();
+      const channelUrl = (video.channel_url || v.channel_url || video.credit_url || v.video_credit_url || '').trim();
+      const channelContent = channelName
+        ? (channelUrl && isSafeUrl(channelUrl)
+          ? `<a href="${esc(channelUrl)}" target="_blank" rel="noopener noreferrer">${esc(channelName)}</a>`
+          : esc(channelName))
+        : '';
       const channel = channelName
-        ? `<div class="video-channel">${esc(channelName)}</div>`
+        ? `<div class="video-channel">${channelContent}</div>`
         : '';
       const descriptionText = (v.description || v.video_description || video.caption || '').trim();
       const description = descriptionText
@@ -605,6 +659,10 @@
         return r.json();
       })
       .then(groups => {
+        const totalVideos = (groups || []).reduce((sum, g) => sum + ((g.videos || []).length), 0);
+        const categoryCount = (groups || []).length;
+        setDebugBanner(`Debug: ${totalVideos} videos / ${categoryCount} categories / ${new Date().toLocaleTimeString()}`);
+
         const sections = (groups || []).map((g, groupIndex) => {
           const cards = (g.videos || []).map(cardHtml).filter(Boolean).join('');
           // A category whose videos all failed to render would otherwise leave a
@@ -633,6 +691,7 @@
         requestAnimationFrame(syncDescriptionClamp);
       })
       .catch(err => {
+        setDebugBanner(`Debug: API error / ${esc(err.message)}`);
         list.innerHTML = `<div class="state"><strong>Unable to load videos</strong>${esc(err.message)}</div>`;
       });
   </script>
