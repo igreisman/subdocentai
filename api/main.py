@@ -4363,10 +4363,15 @@ def public_videos():
         if not video:
             continue
         categories = _video_categories(entry)
+        description = (
+            (entry.get("description") or "")
+            or (entry.get("video_description") or "")
+            or (entry.get("video_caption") or "")
+        ).strip()
         out.append({
             "id": entry.get("id") or "",
             "title": (entry.get("title") or "").strip(),
-            "description": (entry.get("description") or "").strip(),
+            "description": description,
             "tags": (entry.get("tags") or "").strip(),
             # Why we are permitted to show this one — shown on the page so the
             # basis is visible rather than buried in a commit message.

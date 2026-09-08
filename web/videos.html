@@ -479,9 +479,10 @@
       const channel = channelName
         ? `<div class="video-channel">${esc(channelName)}</div>`
         : '';
-      const description = v.description
+      const descriptionText = (v.description || v.video_description || video.caption || '').trim();
+      const description = descriptionText
         ? `<div class="video-description-wrap">
-             <p class="video-description is-clamped">${esc(v.description)}</p>
+             <p class="video-description is-clamped">${esc(descriptionText)}</p>
              <button type="button" class="video-more" aria-label="Show full description">more ...</button>
            </div>`
         : '';
@@ -499,7 +500,7 @@
       const metaInner = (creditInner || rights)
         ? `${creditInner}${rights}`
         : '';
-      const hasDescription = Boolean(v.description);
+      const hasDescription = Boolean(descriptionText);
       const meta = metaInner
         ? `<div class="video-meta${hasDescription ? ' is-collapsed' : ''}">${metaInner}</div>`
         : '';
