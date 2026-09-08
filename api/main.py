@@ -3909,19 +3909,33 @@ def _load_videos_raw() -> List[Dict[str, Any]]:
                 return bundled
 
             desc_by_id: Dict[str, str] = {}
+            desc_by_url: Dict[str, str] = {}
+            desc_by_title: Dict[str, str] = {}
             for row in bundled:
                 video_id = str(row.get("id") or "").strip()
+                video_url = str(row.get("video_url") or "").strip()
+                title = str(row.get("title") or "").strip().casefold()
                 description = str(row.get("description") or "").strip()
                 if video_id and description and video_id not in desc_by_id:
                     desc_by_id[video_id] = description
+                if video_url and description and video_url not in desc_by_url:
+                    desc_by_url[video_url] = description
+                if title and description and title not in desc_by_title:
+                    desc_by_title[title] = description
 
             changed = 0
             for row in entries:
                 video_id = str(row.get("id") or "").strip()
+                video_url = str(row.get("video_url") or "").strip()
+                title = str(row.get("title") or "").strip().casefold()
                 if not video_id:
-                    continue
+                    video_id = ""
                 current = str(row.get("description") or "").strip()
-                fallback = desc_by_id.get(video_id, "")
+                fallback = (
+                    desc_by_id.get(video_id, "")
+                    or desc_by_url.get(video_url, "")
+                    or desc_by_title.get(title, "")
+                )
                 if not current and fallback:
                     row["description"] = fallback
                     changed += 1
