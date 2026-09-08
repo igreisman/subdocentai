@@ -4054,6 +4054,44 @@ async def _youtube_metadata(video_url: str) -> Dict[str, str]:
     }
 
 
+async def _enrich_video_payload_from_youtube(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Best-effort server-side metadata fill for admin video writes.
+
+    The editor tries to populate title/description client-side, but production
+    can still receive partial payloads (stale JS, blocked fetch, or save before
+    autofill completes). This keeps persisted records complete without forcing a
+    second edit pass.
+    """
+    if not isinstance(payload, dict):
+        return payload
+
+    video_url = str(payload.get("video_url") or "").strip()
+    if not video_url or not _YT_ID_RE.search(video_url):
+        return payload
+
+    needs_metadata = not any(
+        str(payload.get(field) or "").strip()
+        for field in ("description", "title", "channel_name", "channel_url", "thumbnail_url")
+    )
+    if not needs_metadata:
+        return payload
+
+    try:
+        meta = await _youtube_metadata(video_url)
+    except HTTPException:
+        return payload
+    except Exception:
+        return payload
+
+    for field in ("title", "description", "thumbnail_url", "channel_name", "channel_url"):
+        if not str(payload.get(field) or "").strip():
+            value = str(meta.get(field) or "").strip()
+            if value:
+                payload[field] = value
+
+    return payload
+
+
 def _save_videos(entries: List[Dict[str, Any]]) -> None:
     """Write the whole file atomically so a crash mid-write can't truncate it.
 
@@ -4348,6 +4386,7 @@ async def create_admin_video(request: Request):
     payload = await request.json()
     if not isinstance(payload, dict):
         payload = {}
+    payload = await _enrich_video_payload_from_youtube(payload)
     with _videos_write_lock:
         entries = _load_videos_raw()
         entry: Dict[str, Any] = {"id": _next_video_id(entries)}
@@ -4361,6 +4400,9 @@ async def create_admin_video(request: Request):
 @app.put("/admin/videos/{video_id}")
 async def update_admin_video(video_id: str, request: Request):
     payload = await request.json()
+    if not isinstance(payload, dict):
+        payload = {}
+    payload = await _enrich_video_payload_from_youtube(payload)
     with _videos_write_lock:
         entries = _load_videos_raw()
         target = next((e for e in entries if str(e.get("id")) == video_id), None)
