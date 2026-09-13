@@ -546,6 +546,10 @@
             <label for="${p}-order">Display order <span class="hint">also orders the categories</span></label>
             <input type="number" id="${p}-order" value="${v.display_order ?? ''}">
           </div>
+          <div>
+            <label for="${p}-duration">Duration <span class="hint">e.g. 26:00 or 1:25:00</span></label>
+            <input type="text" id="${p}-duration" value="${esc(v.duration || '')}" placeholder="mm:ss">
+          </div>
         </div>
 
         <div class="row">
@@ -576,6 +580,7 @@
         tags: val('tags'),
         video_start: val('start'),
         display_order: val('order'),
+        duration: val('duration'),
         video_credit: val('credit'),
         video_credit_url: val('crediturl'),
         thumbnail_url: val('thumb'),

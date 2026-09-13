@@ -118,7 +118,6 @@ def _resolve_path_setting(raw_value: str, default_path: str) -> str:
 DEFAULT_CORPORA_DIR = os.path.join(BASE_DIR, "corpora")
 SAMPLE_CORPORA_DIR = os.path.join(BASE_DIR, "sample_data", "corpora")
 REQUIRED_CORPORA_FILES = (
-    "pampanito_tour_corpus.jsonl",
     "dieselsubs_faq_corpus.jsonl",
     "dieselsubs_faq_categories.jsonl",
     "dieselsubs_shorts_corpus.jsonl",
@@ -175,6 +174,14 @@ def _csv_env(name: str, default: str) -> Tuple[str, ...]:
 LEGACY_DOMAIN_HOSTS = set(_csv_env("LEGACY_DOMAIN_HOSTS", "submarinedocent.com,www.submarinedocent.com"))
 LEGACY_DOMAIN_TARGET = os.getenv("LEGACY_DOMAIN_TARGET", "https://submarinedocent.org").strip()
 TOUR_HOST_PREFIXES = _csv_env("TOUR_HOST_PREFIXES", "pampanito.")
+# The Pampanito audio tour (the page, the compartment MP3s, and the transcript
+# the docent answers from) is the San Francisco Maritime National Park
+# Association's content. The page was built in May 2026 as an unreleased
+# proof of concept to show the boat manager what an interactive tour could
+# do; it was never linked from the site or announced. It was withdrawn in
+# September 2026 pending the Association's permission. Off by default; set
+# PAMPANITO_TOUR_ENABLED=1 only once that permission is in hand.
+PAMPANITO_TOUR_ENABLED = os.getenv("PAMPANITO_TOUR_ENABLED", "").strip().lower() in ("1", "true", "yes")
 DEFAULT_ROOT_REDIRECT = os.getenv("DEFAULT_ROOT_REDIRECT", "/web/welcome.html").strip() or "/web/welcome.html"
 RETURNING_VISITOR_REDIRECT = os.getenv("RETURNING_VISITOR_REDIRECT", "/web/faqs.html").strip() or "/web/faqs.html"
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
@@ -228,6 +235,10 @@ def _is_museum_admin_path(path: str) -> bool:
 
 def _is_preview_path(path: str) -> bool:
     return path in PREVIEW_PAGE_PATHS
+
+
+def _is_tour_asset_path(path: str) -> bool:
+    return path in PREVIEW_PAGE_PATHS or path.startswith("/web/tour/") or path == "/tour" or path.startswith("/tour/")
 
 
 def _check_basic_auth(request: Request, username: str, password: str) -> bool:
@@ -291,6 +302,13 @@ async def protect_sensitive_routes(request: Request, call_next):
             )
         if not _check_basic_auth(request, ADMIN_USERNAME, ADMIN_PASSWORD):
             return _basic_auth_challenge("SubmarineDocent Admin", "Authentication required.")
+    elif not PAMPANITO_TOUR_ENABLED and _is_tour_asset_path(path):
+        # Tour withdrawn (see PAMPANITO_TOUR_ENABLED). A person gets the welcome
+        # page; a script or media request gets a plain 404 rather than a redirect
+        # it would follow into HTML.
+        if path.endswith(".html"):
+            return RedirectResponse(url=DEFAULT_ROOT_REDIRECT)
+        return PlainTextResponse("The Pampanito audio tour is not available.", status_code=404)
     elif _is_preview_path(path) and PREVIEW_USERNAME and PREVIEW_PASSWORD:
         if not _check_basic_auth(request, PREVIEW_USERNAME, PREVIEW_PASSWORD):
             return _basic_auth_challenge("SubmarineDocent Preview", "Authentication required.")
@@ -299,7 +317,7 @@ async def protect_sensitive_routes(request: Request, call_next):
 @app.get("/", include_in_schema=False)
 def root_redirect(request: Request):
     host = _request_host(request)
-    if host and _is_tour_host(host):
+    if host and _is_tour_host(host) and PAMPANITO_TOUR_ENABLED:
         return RedirectResponse(url="/web/pampanito.html")
     if request.cookies.get("visited") == "1":
         return RedirectResponse(url=RETURNING_VISITOR_REDIRECT)
@@ -370,6 +388,14 @@ if os.path.isdir(WEB_DIR):
     @app.get("/videos.html", include_in_schema=False)
     def redirect_videos_html():
         return RedirectResponse(url="/web/videos.html")
+
+    @app.get("/video-search", include_in_schema=False)
+    @app.get("/video-search.html", include_in_schema=False)
+    def redirect_video_search_html(request: Request):
+        target = "/web/video-search.html"
+        if request.url.query:
+            target = f"{target}?{request.url.query}"
+        return RedirectResponse(url=target)
 
     @app.get("/index.html", include_in_schema=False)
     @app.get("/web/index.html", include_in_schema=False)
@@ -691,7 +717,7 @@ def load_jsonl(path: str) -> List[Dict[str, Any]]:
 
 
 print("Loading corpora...")
-TOUR = load_jsonl(TOUR_PATH)
+TOUR = load_jsonl(TOUR_PATH) if PAMPANITO_TOUR_ENABLED else []
 FAQ = load_jsonl(FAQ_PATH)
 SHORTS = load_jsonl(SHORTS_PATH)
 CATEGORIES = load_jsonl(CATEGORIES_PATH)
@@ -3898,11 +3924,47 @@ def public_faqs():
 VIDEO_EDITABLE_FIELDS = (
     "title", "video_url", "video_start", "description",
     "video_credit", "video_credit_url", "channel_name", "channel_url", "thumbnail_url", "category", "tags",
+    # Running time as text ("26:00", "1:25:00"), shown beside the channel name
+    # so a visitor can tell a four-minute clip from a full documentary before
+    # pressing play. Hand-entered; the page never derives it from the player.
+    "duration",
     # Who it belongs to and what was agreed. See "Content rights" above.
     "museum_id", "rights_status", "rights_note", "rights_expires",
 )
 # Bucket for records with no category, matching what the FAQ grouping uses.
 VIDEO_DEFAULT_CATEGORY = "General"
+
+
+_DURATION_RE = re.compile(r"^\s*(?:(\d{1,2}):)?(\d{1,3}):(\d{2})\s*$")
+
+
+def _normalize_duration(raw: Any) -> str:
+    """Return a duration as "m:ss" or "h:mm:ss", or "" if it can't be read.
+
+    Accepts what a curator is likely to paste: "26:00", "1:25:00", "4:39",
+    a bare number of seconds ("1560"), or "26m" / "1h25m". Anything else
+    becomes "" rather than an error, so a typo hides the badge instead of
+    blocking the save.
+    """
+    text = str(raw or "").strip().lower()
+    if not text:
+        return ""
+    seconds: int | None = None
+    m = _DURATION_RE.match(text)
+    if m:
+        h = int(m.group(1) or 0)
+        seconds = h * 3600 + int(m.group(2)) * 60 + int(m.group(3))
+    elif text.isdigit():
+        seconds = int(text)
+    else:
+        m2 = re.match(r"^(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?$", text)
+        if m2 and any(m2.groups()):
+            seconds = int(m2.group(1) or 0) * 3600 + int(m2.group(2) or 0) * 60 + int(m2.group(3) or 0)
+    if seconds is None or seconds <= 0:
+        return ""
+    h, rem = divmod(seconds, 3600)
+    mnt, sec = divmod(rem, 60)
+    return f"{h}:{mnt:02d}:{sec:02d}" if h else f"{mnt}:{sec:02d}"
 
 
 def _video_categories(entry: Dict[str, Any]) -> List[str]:
@@ -4153,6 +4215,9 @@ def _apply_video_payload(target: Dict[str, Any], payload: Dict[str, Any]) -> Non
                   "museum_id", "rights_note", "rights_expires"):
         if field in payload:
             target[field] = (payload.get(field) or "").strip()
+
+    if "duration" in payload:
+        target["duration"] = _normalize_duration(payload.get("duration"))
 
     # Refuse an unrecognised status at write time.  Stored unrecognised, it
     # would read as "not cleared" and the video would silently vanish from the
@@ -4467,6 +4532,7 @@ def public_videos():
             # Why we are permitted to show this one — shown on the page so the
             # basis is visible rather than buried in a commit message.
             "rights_note": (entry.get("rights_note") or "").strip(),
+            "duration": _normalize_duration(entry.get("duration")),
             "category": categories[0],
             "categories": categories,
             "video": video,
