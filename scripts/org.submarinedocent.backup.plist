@@ -8,7 +8,7 @@
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/python3</string>
-    <string>/Users/irving/Documents/submarinedocent/scripts/backup_site.py</string>
+    <string>/Users/irving/.local/bin/backup_site.py</string>
   </array>
 
   <!-- 3:30 every morning. If the Mac is asleep, launchd runs it on wake. -->

@@ -35,7 +35,13 @@ def load_env(path):
                 if not line or line.startswith("#") or "=" not in line:
                     continue
                 k, v = line.split("=", 1)
-                env[k.strip()] = v.strip().strip('"').strip("'")
+                v = v.strip()
+                # Allow KEY="value" or KEY='value', but only unwrap when the
+                # quotes are a matching pair; a password may legitimately end
+                # in a quote character.
+                if len(v) >= 2 and v[0] == v[-1] and v[0] in ("'", '"'):
+                    v = v[1:-1]
+                env[k.strip()] = v
     except FileNotFoundError:
         sys.exit(f"Missing {path}. See the header of this script for its format.")
     for k in ("ADMIN_USERNAME", "ADMIN_PASSWORD"):
@@ -88,7 +94,15 @@ def main():
     if os.path.isdir(latest):
         shutil.rmtree(latest)
     with tarfile.open(out, "r:gz") as t:
-        t.extractall(latest, filter="data")
+        # The "data" filter (Python 3.12+) refuses paths that escape the target
+        # directory; older Pythons don't have it, so check the members ourselves.
+        for m in t.getmembers():
+            if m.name.startswith("/") or ".." in m.name.split("/"):
+                sys.exit(f"Backup failed: archive contains an unsafe path ({m.name})")
+        try:
+            t.extractall(latest, filter="data")
+        except TypeError:
+            t.extractall(latest)
     print(f"unpacked to {latest}")
 
     # Prune.

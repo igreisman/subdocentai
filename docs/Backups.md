@@ -47,6 +47,11 @@ a gigabyte.
 
 3. Install the nightly job (3:30 a.m.; runs on wake if the Mac was asleep).
 
+   macOS does not let background jobs read `~/Documents`, so the job runs a
+   copy of the script from `~/.local/bin`. Re-copy it after any change.
+
+       mkdir -p ~/.local/bin
+       cp ~/Documents/submarinedocent/scripts/backup_site.py ~/.local/bin/
        cp ~/Documents/submarinedocent/scripts/org.submarinedocent.backup.plist ~/Library/LaunchAgents/
        launchctl load ~/Library/LaunchAgents/org.submarinedocent.backup.plist
 
