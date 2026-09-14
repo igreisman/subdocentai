@@ -4257,6 +4257,63 @@ def _apply_video_payload(target: Dict[str, Any], payload: Dict[str, Any]) -> Non
         target["rights_note"] = "Embeddable under YouTube Terms of Service"
 
 
+# ── Backup ───────────────────────────────────────────────────────────────────
+# Everything a curator edits through the admin screens lives on the Render
+# persistent disk, not in git: videos, FAQ text, glossary, museum pages,
+# uploaded images, feedback.  A redeploy keeps it; a lost disk does not.  This
+# hands the whole editable set over as one tar.gz so a nightly job on someone's
+# own machine can keep dated copies (scripts/backup_site.py).  Admin auth is
+# enforced by the middleware like every other /admin/ path.
+_BACKUP_SKIP_DIRS = {"tts_cache"}   # regenerable, and by far the largest thing on the disk
+
+
+@app.get("/admin/backup")
+def admin_backup(include_cache: bool = False):
+    import tarfile
+    import time
+
+    base = _RENDER_DATA_DIR if _persistent_disk_available else CORPORA_DIR
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    buf = io.BytesIO()
+    count = 0
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for root, dirs, files in os.walk(base):
+            rel_root = os.path.relpath(root, base)
+            if not include_cache:
+                dirs[:] = [d for d in dirs if d not in _BACKUP_SKIP_DIRS]
+            for name in files:
+                if name.endswith(".tmp"):
+                    continue
+                full = os.path.join(root, name)
+                arc = os.path.join("data", "" if rel_root == "." else rel_root, name)
+                tar.add(full, arcname=arc)
+                count += 1
+        if os.path.exists(FEEDBACK_PATH):
+            tar.add(FEEDBACK_PATH, arcname="feedback.jsonl")
+            count += 1
+        manifest = json.dumps({
+            "created": stamp,
+            "source_dir": base,
+            "persistent_disk": _persistent_disk_available,
+            "files": count,
+            "include_cache": include_cache,
+        }, indent=2).encode("utf-8")
+        info = tarfile.TarInfo("MANIFEST.json")
+        info.size = len(manifest)
+        info.mtime = int(time.time())
+        tar.addfile(info, io.BytesIO(manifest))
+    buf.seek(0)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/gzip",
+        headers={
+            "Content-Disposition": f'attachment; filename="submarinedocent-backup-{stamp}.tar.gz"',
+            "Cache-Control": "no-store",
+            "X-Backup-Files": str(count),
+        },
+    )
+
+
 @app.get("/admin/videos")
 def get_admin_videos():
     """Return raw video records for the editor, unfiltered.

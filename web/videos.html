@@ -225,6 +225,7 @@
       border: 0;
       display: block;
     }
+
     .video-body {
       display: block;
       padding: 2px 2px 4px;
@@ -1166,9 +1167,17 @@
       })
       .then(groups => {
         allGroups = groups || [];
-        const totalVideos = allGroups.reduce((sum, g) => sum + ((g.videos || []).length), 0);
-        const categoryCount = allGroups.length;
-        setDebugBanner(`Debug: ${totalVideos} videos / ${categoryCount} categories / ${new Date().toLocaleTimeString()}`);
+        // /api/videos returns a cross-listed video once per category, so
+        // counting rows would report more videos than the collection holds.
+        const distinct = new Set();
+        let listings = 0;
+        allGroups.forEach(g => (g.videos || []).forEach(v => {
+          listings += 1;
+          distinct.add(videoKey(v));
+        }));
+        const crossListed = listings - distinct.size;
+        setDebugBanner(`Debug: ${distinct.size} videos${crossListed ? ` (+${crossListed} cross-listed)` : ''}`
+          + ` / ${allGroups.length} categories / ${new Date().toLocaleTimeString()}`);
 
         buildChannelOptions();
         render();
