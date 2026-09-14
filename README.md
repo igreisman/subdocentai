@@ -238,7 +238,7 @@ This is a deliberate hardening change so the repository can be prepared for open
 
 The app is currently deployed on Render, configured in the Render dashboard rather than by a blueprint in this repository. The `render.yaml` blueprint was removed in July 2026 because it recreated a duplicate service on sync; service settings, environment variables, and the persistent disk are managed in the dashboard.
 
-Automatic redeploy on push is handled by GitHub Actions via `.github/workflows/render-auto-deploy.yml`. To enable it, set repository secret `RENDER_DEPLOY_HOOK_URL` to your Render service deploy hook URL (Dashboard -> Service -> Settings -> Deploy Hook).
+Redeploy on push is handled by Render's own GitHub integration, which watches `main` and rebuilds each service. A `render-auto-deploy.yml` workflow used to fire a deploy hook as well; it was removed in September 2026 as a redundant second path that failed on every push once its `RENDER_DEPLOY_HOOK_URL` secret went missing, while the native integration deployed the same commits regardless.
 
 For local museum-style HTTPS startup, [start_https.sh](start_https.sh) reads host and port display values from environment variables rather than assuming one fixed local IP. It expects a TLS key and certificate at `certs/key.pem` and `certs/cert.pem`; `certs/` is not tracked, so generate your own for local use.
 
